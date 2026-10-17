@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "disorderlaucher.default.dark",
+  "name": "Default Dark",
+  "mode": "dark",
+  "colors": {
+    "background": "#0C0C0C",
+    "surface": "#141414",
+    "surfaceAlt": "#1D1D1D",
+    "surfaceRaised": "#252525",
+    "textPrimary": "#F0F0EA",
+    "textSecondary": "#A0A09A",
+    "border": "#2D2D2D",
+    "borderStrong": "#4D4D4D",
+    "action": "#F3F3ED",
+    "actionText": "#0C0C0C"
+  },
+  "typography": {
+    "displayFamily": "Space Grotesk",
+    "bodyFamily": "IBM Plex Sans",
+    "scale": 1.0
+  },
+  "shape": {
+    "inputRadius": 8,
+    "buttonRadius": 10,
+    "cardRadius": 18,
+    "heroRadius": 24
+  },
+  "density": {
+    "uiScale": 1.0,
+    "compact": false
+  },
+  "effects": {
+    "shadowStrength": 0.2,
+    "animations": true
+  }
+}

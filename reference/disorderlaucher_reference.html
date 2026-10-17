@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DisorderLaucher — Monochrome Material</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#ecece8;
+  --surface:#f8f8f5;
+  --surface-2:#dfdfdb;
+  --surface-3:#cfcfca;
+  --text:#0a0a0a;
+  --muted:#62625e;
+  --line:#c8c8c2;
+  --line-strong:#9e9e98;
+  --ink:#101010;
+  --paper:#f4f4ef;
+  --shadow:0 12px 30px rgba(10,10,10,.08);
+  --shadow-soft:0 4px 12px rgba(10,10,10,.06);
+  --r-xl:26px;
+  --r-lg:18px;
+  --r-md:12px;
+  --r-sm:8px;
+}
+body.dark{
+  --bg:#0c0c0c;
+  --surface:#141414;
+  --surface-2:#1d1d1d;
+  --surface-3:#252525;
+  --text:#f0f0ea;
+  --muted:#a0a09a;
+  --line:#2d2d2d;
+  --line-strong:#4d4d4d;
+  --ink:#f3f3ed;
+  --paper:#161616;
+  --shadow:0 16px 40px rgba(0,0,0,.36);
+  --shadow-soft:0 4px 14px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:"IBM Plex Sans",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit;letter-spacing:-.005em}
+button{cursor:pointer}
+body{transition:background .22s ease,color .22s ease}
+.shell{min-height:100vh;display:grid;grid-template-columns:210px minmax(0,1fr)}
+.sidebar{
+  background:var(--surface);
+  border-right:1px solid var(--line);
+  padding:20px 14px;
+  display:flex;
+  flex-direction:column;
+  position:sticky;top:0;height:100vh;
+}
+.brand{
+  border:1px solid var(--line-strong);
+  border-radius:0 16px 16px 0;
+  padding:14px 12px;
+  margin-bottom:26px;
+  background:var(--paper);
+}
+.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.brand strong{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;font-size:18px;letter-spacing:-.035em;font-weight:700}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav button{
+  border:0;background:transparent;color:var(--muted);
+  padding:12px 12px;text-align:left;border-radius:8px;
+  display:flex;align-items:center;gap:10px;transition:.18s
+}
+.nav button:hover{background:var(--surface-2);color:var(--text)}
+.nav button.active{
+  background:var(--ink);color:var(--bg);
+  border-radius:0 10px 10px 0;font-weight:700;
+}
+.nav-spacer{flex:1}
+.profile-box{
+  border-top:1px solid var(--line);
+  padding-top:14px;
+}
+.profile-box strong{display:block;font-size:13px}
+.profile-box span{color:var(--muted);font-size:11px}
+
+.main{padding:24px;min-width:0}
+.top{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  margin-bottom:20px;
+}
+.title-block small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.18em;margin-bottom:5px}
+.title-block h1{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;font-size:34px;margin:0;letter-spacing:-.055em;line-height:.95;font-weight:700}
+.title-block p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:650px}
+.theme{
+  width:46px;height:46px;border-radius:50%;
+  border:1px solid var(--line);background:var(--surface);color:var(--text);
+  box-shadow:var(--shadow-soft)
+}
+
+.layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr);
+  gap:18px;
+}
+.panel{
+  background:var(--surface);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow-soft);
+}
+.hero{
+  min-height:360px;
+  position:relative;
+  overflow:hidden;
+  padding:26px;
+  border-radius:24px 0 24px 0;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+.hero::before{
+  content:"";
+  position:absolute;
+  top:0;right:0;
+  width:34%;height:100%;
+  background:
+    linear-gradient(135deg,
+      transparent 0 28%,
+      color-mix(in srgb, var(--text) 4%, transparent) 28% 58%,
+      transparent 58% 100%);
+  pointer-events:none;
+}
+.hero-copy{position:relative;z-index:1;max-width:670px}
+.kicker{
+  display:inline-block;padding:6px 9px;border:1px solid var(--line);
+  border-radius:999px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+}
+.hero h2{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;font-size:48px;line-height:.98;letter-spacing:-.06em;margin:18px 0 12px;max-width:660px;font-weight:700}
+.hero p{font-size:14px;color:var(--muted);line-height:1.65;max-width:590px}
+.launch-row{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;
+}
+.field label{display:block;font-size:10px;color:var(--muted);margin:0 0 6px 1px;text-transform:uppercase;letter-spacing:.1em}
+.control{
+  width:100%;background:var(--surface-2);color:var(--text);
+  border:1px solid var(--line);border-radius:8px 8px 0 8px;
+  padding:12px 13px;outline:none
+}
+.play{
+  border:0;background:var(--ink);color:var(--bg);
+  padding:13px 24px;border-radius:0 12px 12px 12px;
+  font-weight:800;letter-spacing:.02em;min-width:140px;
+  box-shadow:var(--shadow-soft)
+}
+.play:hover{transform:translateY(-1px)}
+
+.metric-row{
+  display:grid;grid-template-columns:1.05fr .95fr .95fr;gap:10px;margin-top:14px
+}
+.metric{
+  background:var(--surface);
+  border:1px solid var(--line);
+  padding:16px;
+  min-height:92px;
+}
+.metric:nth-child(1){border-radius:0 18px 18px 18px}
+.metric:nth-child(2){border-radius:12px}
+.metric:nth-child(3){border-radius:18px 0 18px 18px}
+.metric small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.11em}
+.metric strong{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;display:block;font-size:24px;margin-top:7px;letter-spacing:-.035em;font-weight:650}
+
+.sidecol{display:flex;flex-direction:column;gap:18px}
+.section{
+  padding:18px;
+}
+.section.square{border-radius:0}
+.section.soft{border-radius:18px}
+.section.mix{border-radius:18px 0 18px 18px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-head h3{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;margin:0;font-size:15px;letter-spacing:-.025em;font-weight:650}
+.text-btn{border:0;background:transparent;color:var(--muted);font-size:11px}
+
+.profile{
+  display:grid;grid-template-columns:98px 1fr;gap:14px;align-items:center
+}
+.skin{
+  height:128px;
+  background:
+    linear-gradient(90deg,transparent 49%,var(--line) 50%,transparent 51%),
+    linear-gradient(transparent 49%,var(--line) 50%,transparent 51%),
+    var(--surface-2);
+  background-size:20px 20px;
+  border:1px solid var(--line);
+  border-radius:18px 0 18px 0;
+  display:grid;place-items:center;font-size:46px
+}
+.profile-meta strong{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;display:block;font-size:18px;letter-spacing:-.02em;font-weight:650}
+.profile-meta span{color:var(--muted);font-size:11px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.chip{
+  border:1px solid var(--line);background:var(--surface);color:var(--text);
+  padding:7px 10px;border-radius:999px;font-size:10px
+}
+
+.quick-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid var(--line)
+}
+.quick-row:last-child{border-bottom:0}
+.quick-row strong{display:block;font-size:12px}
+.quick-row span{font-size:10px;color:var(--muted)}
+.switch{
+  width:44px;height:24px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface-2);padding:2px
+}
+.switch i{display:block;width:18px;height:18px;border-radius:50%;background:var(--surface);transition:.18s}
+.switch.on{background:var(--ink)} .switch.on i{transform:translateX(19px);background:var(--bg)}
+
+.instances{
+  margin-top:18px;padding:18px;border-radius:0 20px 20px 20px
+}
+.instance-list{display:flex;flex-direction:column;gap:9px}
+.instance{
+  display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;
+  border:1px solid var(--line);background:var(--surface-2);
+  padding:12px 12px
+}
+.instance:nth-child(1){border-radius:0 12px 12px 12px}
+.instance:nth-child(2){border-radius:10px}
+.instance:nth-child(3){border-radius:12px 12px 0 12px}
+.loader{
+  width:42px;height:42px;background:var(--ink);color:var(--bg);
+  display:grid;place-items:center;font-size:9px;font-weight:800;
+  border-radius:8px 0 8px 8px
+}
+.instance strong{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;display:block;font-size:12px;font-weight:600}
+.instance small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.secondary{
+  border:1px solid var(--line);background:var(--surface);color:var(--text);
+  padding:8px 10px;border-radius:8px 0 8px 8px;font-size:10px
+}
+
+.bottom{
+  display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px
+}
+.mods{padding:18px;border-radius:20px 0 20px 20px}
+.mod-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.mod{
+  border:1px solid var(--line);background:var(--surface-2);
+  padding:12px;border-radius:8px
+}
+.mod:nth-child(2),.mod:nth-child(3){border-radius:0}
+.mod strong{font-family:"Space Grotesk","IBM Plex Sans",sans-serif;display:block;font-size:11px;font-weight:600}
+.mod span{font-size:10px;color:var(--muted)}
+.console-card{padding:18px;border-radius:0 20px 20px 20px}
+.console{
+  height:180px;background:#050505;color:#c8c8c3;border:1px solid #242424;
+  padding:14px;font:11px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto;
+  border-radius:8px 0 8px 8px
+}
+.console .ok{color:#e9efe9}.console .err{color:#e8bcbc}
+.hidden{display:none!important}
+.viewpanel{padding:18px;max-width:1080px;border-radius:0 22px 22px 22px}
+
+@media(max-width:980px){
+  .shell{grid-template-columns:78px 1fr}
+  .brand strong,.brand small,.nav button span,.profile-box{display:none}
+  .brand{padding:10px 6px;text-align:center}
+  .nav button{justify-content:center;padding:11px 8px}
+  .layout{grid-template-columns:1fr}
+  .sidecol{display:grid;grid-template-columns:1fr 1fr}
+}
+@media(max-width:720px){
+  .shell{display:block}
+  .sidebar{position:static;height:auto;flex-direction:row;overflow:auto;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
+  .brand,.nav-spacer,.profile-box{display:none}
+  .nav{flex-direction:row}
+  .nav button{min-width:max-content;border-radius:8px}
+  .nav button.active{border-radius:8px}
+  .main{padding:14px}
+  .top{align-items:center}.title-block h1{font-size:27px}
+  .hero{padding:18px;min-height:410px;border-radius:18px 0 18px 0}
+  .hero h2{font-size:38px}
+  .launch-row{grid-template-columns:1fr}
+  .play{width:100%}
+  .metric-row{grid-template-columns:1fr}
+  .sidecol,.bottom{display:block}
+  .section,.instances,.mods,.console-card{margin-bottom:14px}
+  .profile{grid-template-columns:1fr}
+  .skin{height:110px}
+  .mod-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body class="dark">
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <small>Java Edition</small>
+      <strong>DisorderLaucher</strong>
+    </div>
+
+    <nav class="nav">
+      <button class="active" data-view="home">⌂ <span>Inicio</span></button>
+      <button data-view="instances">▦ <span>Instancias</span></button>
+      <button data-view="mods">◫ <span>Mods</span></button>
+      <button data-view="skins">◇ <span>Skins</span></button>
+      <button data-view="settings">⚙ <span>Ajustes</span></button>
+    </nav>
+
+    <div class="nav-spacer"></div>
+    <div class="profile-box">
+      <strong>David</strong>
+      <span>Perfil local</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <div class="title-block">
+        <small>Launcher workspace</small>
+        <h1 id="pageTitle">Inicio</h1>
+        <p>Una interfaz sobria, técnica y editorial para gestionar Minecraft Java, loaders, mods y perfiles.</p>
+      </div>
+      <button class="theme" id="themeToggle">◐</button>
+    </header>
+
+    <section id="homeView">
+      <div class="layout">
+        <div>
+          <section class="panel hero">
+            <div class="hero-copy">
+              <span class="kicker">Instancia activa</span>
+              <h2>Fabric Performance</h2>
+              <p>Configuración ligera orientada a equipos modestos, con Fabric, perfil local, Java automático y un conjunto controlado de mods de rendimiento.</p>
+            </div>
+
+            <div class="launch-row">
+              <div class="field">
+                <label>Versión</label>
+                <select class="control" id="versionSelect">
+                  <option>1.21.1</option>
+                  <option>1.20.6</option>
+                  <option>1.20.1</option>
+                  <option>1.19.4</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Loader</label>
+                <select class="control" id="loaderSelect">
+                  <option>Fabric</option>
+                  <option>Vanilla</option>
+                  <option>NeoForge</option>
+                  <option>Forge</option>
+                  <option>Quilt</option>
+                </select>
+              </div>
+              <button class="play" id="playBtn">▶ JUGAR</button>
+            </div>
+          </section>
+
+          <div class="metric-row">
+            <div class="metric"><small>Memoria</small><strong>4 GB</strong></div>
+            <div class="metric"><small>Mods activos</small><strong>18</strong></div>
+            <div class="metric"><small>Runtime</small><strong>Java 21</strong></div>
+          </div>
+
+          <section class="panel instances">
+            <div class="section-head"><h3>Instancias recientes</h3><button class="text-btn">Ver todas</button></div>
+            <div class="instance-list">
+              <div class="instance"><div class="loader">FAB</div><div><strong>Fabric Performance</strong><small>1.21.1 · 18 mods</small></div><button class="secondary">Abrir</button></div>
+              <div class="instance"><div class="loader">NEO</div><div><strong>Create & Tech</strong><small>1.20.1 · 43 mods</small></div><button class="secondary">Abrir</button></div>
+              <div class="instance"><div class="loader">VAN</div><div><strong>Vanilla Clean</strong><small>1.21.1 · sin mods</small></div><button class="secondary">Abrir</button></div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="sidecol">
+          <section class="panel section mix">
+            <div class="section-head"><h3>Perfil & skin</h3><button class="text-btn">Editar</button></div>
+            <div class="profile">
+              <div class="skin">🧍</div>
+              <div class="profile-meta">
+                <strong>David</strong>
+                <span>Local / Offline</span>
+                <div class="chips">
+                  <button class="chip">Importar PNG</button>
+                  <button class="chip">Modelo</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel section square">
+            <div class="section-head"><h3>Preferencias rápidas</h3></div>
+            <div class="quick-row"><div><strong>Modo bajo consumo</strong><span>Menos procesos paralelos</span></div><button class="switch on"><i></i></button></div>
+            <div class="quick-row"><div><strong>Cerrar launcher al jugar</strong><span>Libera RAM</span></div><button class="switch"><i></i></button></div>
+            <div class="quick-row"><div><strong>Snapshots</strong><span>Versiones experimentales</span></div><button class="switch"><i></i></button></div>
+          </section>
+        </aside>
+      </div>
+
+      <div class="bottom">
+        <section class="panel mods">
+          <div class="section-head"><h3>Mods principales</h3><button class="text-btn">Administrar</button></div>
+          <div class="mod-grid">
+            <div class="mod"><strong>Sodium</strong><span>Render · activo</span></div>
+            <div class="mod"><strong>Lithium</strong><span>Lógica · activo</span></div>
+            <div class="mod"><strong>FerriteCore</strong><span>Memoria · activo</span></div>
+            <div class="mod"><strong>Iris</strong><span>Shaders · activo</span></div>
+          </div>
+        </section>
+
+        <section class="panel console-card">
+          <div class="section-head"><h3>Actividad</h3><button class="text-btn" id="clearLog">Limpiar</button></div>
+          <div class="console" id="console">
+            <div class="ok">[OK] Launcher inicializado.</div>
+            <div>[INFO] Perfil local: David.</div>
+            <div>[INFO] Instancia: Fabric Performance.</div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="instancesView" class="hidden">
+      <div class="panel viewpanel">
+        <div class="section-head"><h3>Instancias</h3><button class="play">+ Nueva instancia</button></div>
+        <div class="instance-list">
+          <div class="instance"><div class="loader">FAB</div><div><strong>Fabric Performance</strong><small>1.21.1 · 18 mods</small></div><button class="secondary">Configurar</button></div>
+          <div class="instance"><div class="loader">NEO</div><div><strong>Create & Tech</strong><small>1.20.1 · 43 mods</small></div><button class="secondary">Configurar</button></div>
+          <div class="instance"><div class="loader">VAN</div><div><strong>Vanilla Clean</strong><small>1.21.1 · sin mods</small></div><button class="secondary">Configurar</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="modsView" class="hidden">
+      <div class="panel viewpanel">
+        <div class="section-head"><h3>Mods</h3><button class="play">Buscar en Modrinth</button></div>
+        <div class="mod-grid">
+          <div class="mod"><strong>Sodium</strong><span>Fabric · activo</span></div>
+          <div class="mod"><strong>Lithium</strong><span>Fabric · activo</span></div>
+          <div class="mod"><strong>FerriteCore</strong><span>Fabric · activo</span></div>
+          <div class="mod"><strong>Iris</strong><span>Fabric · activo</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="skinsView" class="hidden">
+      <div class="panel viewpanel">
+        <div class="section-head"><h3>Skins</h3><button class="play">Importar PNG</button></div>
+        <div class="profile">
+          <div class="skin">🧍</div>
+          <div class="profile-meta">
+            <strong>Skin local actual</strong>
+            <span>Biblioteca local, modelo Steve/Alex y futura cuenta Microsoft.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="settingsView" class="hidden">
+      <div class="panel viewpanel">
+        <div class="section-head"><h3>Ajustes</h3></div>
+        <div class="quick-row"><div><strong>RAM automática</strong><span>Según equipo e instancia</span></div><button class="switch on"><i></i></button></div>
+        <div class="quick-row"><div><strong>Verificar archivos</strong><span>Antes de iniciar</span></div><button class="switch on"><i></i></button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const body=document.body;
+const themeToggle=document.getElementById('themeToggle');
+if(localStorage.getItem('ul-theme')==='light') body.classList.remove('dark');
+themeToggle.onclick=()=>{
+  body.classList.toggle('dark');
+  localStorage.setItem('ul-theme',body.classList.contains('dark')?'dark':'light');
+};
+
+document.querySelectorAll('.switch').forEach(sw=>{
+  sw.onclick=()=>sw.classList.toggle('on');
+});
+
+const views={
+  home:document.getElementById('homeView'),
+  instances:document.getElementById('instancesView'),
+  mods:document.getElementById('modsView'),
+  skins:document.getElementById('skinsView'),
+  settings:document.getElementById('settingsView')
+};
+const names={home:'Inicio',instances:'Instancias',mods:'Mods',skins:'Skins',settings:'Ajustes'};
+
+document.querySelectorAll('.nav button').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.values(views).forEach(v=>v.classList.add('hidden'));
+    views[btn.dataset.view].classList.remove('hidden');
+    document.getElementById('pageTitle').textContent=names[btn.dataset.view];
+  };
+});
+
+const log=document.getElementById('console');
+const play=document.getElementById('playBtn');
+function pushLog(text,cls=''){
+  const line=document.createElement('div');
+  line.textContent=text;if(cls)line.className=cls;
+  log.appendChild(line);log.scrollTop=log.scrollHeight;
+}
+play.onclick=()=>{
+  const v=document.getElementById('versionSelect').value;
+  const l=document.getElementById('loaderSelect').value;
+  play.disabled=true;play.textContent='INICIANDO…';
+  pushLog(`[INFO] Preparando Minecraft ${v} (${l})...`);
+  setTimeout(()=>pushLog('[OK] Runtime Java verificado.','ok'),400);
+  setTimeout(()=>pushLog('[OK] Assets y librerías listos.','ok'),850);
+  setTimeout(()=>{pushLog('[OK] Minecraft iniciado.','ok');play.disabled=false;play.textContent='▶ JUGAR';},1300);
+};
+document.getElementById('clearLog').onclick=()=>log.innerHTML='';
+</script>
+</body>
+</html>

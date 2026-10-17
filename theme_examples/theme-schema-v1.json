@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DisorderLaucher Theme v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "mode",
+    "colors",
+    "typography",
+    "shape"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "mode": {
+      "enum": [
+        "dark",
+        "light"
+      ]
+    },
+    "colors": {
+      "type": "object"
+    },
+    "typography": {
+      "type": "object"
+    },
+    "shape": {
+      "type": "object"
+    },
+    "density": {
+      "type": "object"
+    },
+    "effects": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
