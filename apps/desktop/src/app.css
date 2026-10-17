@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #0C0C0C;
+  --surface: #141414;
+  --surface-alt: #1D1D1D;
+  --surface-raised: #252525;
+  --text-primary: #F0F0EA;
+  --text-secondary: #A0A09A;
+  --border: #2D2D2D;
+  --border-strong: #4D4D4D;
+  --action: #F3F3ED;
+  --action-text: #0C0C0C;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.36);
+  --shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.28);
+  --r-xl: 26px;
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 8px;
+
+  --font-display: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+:root[data-theme="light"] {
+  --bg: #ECECE8;
+  --surface: #F8F8F5;
+  --surface-alt: #DFDFDB;
+  --surface-raised: #CFCFCA;
+  --text-primary: #0A0A0A;
+  --text-secondary: #62625E;
+  --border: #C8C8C2;
+  --border-strong: #9E9E98;
+  --action: #101010;
+  --action-text: #F4F4EF;
+  --shadow: 0 12px 30px rgba(10, 10, 10, 0.08);
+  --shadow-soft: 0 4px 12px rgba(10, 10, 10, 0.06);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  overflow: hidden;
+}
+
+button, input, select {
+  font: inherit;
+  letter-spacing: -0.005em;
+}
+
+button {
+  cursor: pointer;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  margin: 0;
+}
+
+a {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

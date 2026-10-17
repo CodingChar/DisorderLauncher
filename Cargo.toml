@@ -14,6 +14,7 @@ members = [
     "crates/instance-manager",
     "crates/launcher-core",
     "crates/diagnostics",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.package]
