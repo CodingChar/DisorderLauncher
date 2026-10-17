@@ -49,10 +49,10 @@
   const failure = $derived.by(() => {
     if (session?.phase === 'failed') {
       const message = session.message ?? 'No se pudo iniciar Minecraft.'
-      return { message, retry: session.kind === 'offline', repair: session.kind === 'repairable' }
+      return { message, retry: session.kind === 'offline', repair: session.kind === 'repairable', signIn: session.kind === 'signIn' }
     }
     if (crashed) {
-      return { message: 'Minecraft se cerró de forma inesperada. Reparar la instancia suele solucionarlo.', retry: false, repair: true }
+      return { message: 'Minecraft se cerró de forma inesperada. Reparar la instancia suele solucionarlo.', retry: false, repair: true, signIn: false }
     }
     return null
   })
@@ -63,6 +63,7 @@
     sessions.dismiss(id)
     if (failure.retry) sessions.launch(id)
     else if (failure.repair) sessions.repair(id)
+    else if (failure.signIn) nav.go('accounts')
   }
 
   const isProblem = $derived(
@@ -109,10 +110,10 @@
 
     <ConfirmDialog
       open={failure !== null}
-      title={failure?.retry ? 'Sin conexión' : 'Algo salió mal'}
+      title={failure?.retry ? 'Sin conexión' : failure?.signIn ? 'Inicia sesión de nuevo' : 'Algo salió mal'}
       message={failure?.message ?? ''}
-      confirmLabel={failure?.retry ? 'Reintentar' : failure?.repair ? 'Reparar' : 'Entendido'}
-      cancelLabel={failure?.retry || failure?.repair ? 'Cerrar' : ''}
+      confirmLabel={failure?.retry ? 'Reintentar' : failure?.repair ? 'Reparar' : failure?.signIn ? 'Ir a Perfiles' : 'Entendido'}
+      cancelLabel={failure?.retry || failure?.repair || failure?.signIn ? 'Cerrar' : ''}
       onconfirm={onFailureConfirm}
       oncancel={() => instance && sessions.dismiss(instance.id)}
     />

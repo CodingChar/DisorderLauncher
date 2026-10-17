@@ -5,7 +5,7 @@ import type { Settings, ThemeEntry } from '../types'
 const media = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: light)') : null
 
 class SettingsStore {
-  value = $state<Settings>({ schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null, javaPath: null })
+  value = $state<Settings>({ schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null, microsoftClientId: null, javaPath: null })
   dataDir = $state('')
   themes = $state<ThemeEntry[]>([])
 

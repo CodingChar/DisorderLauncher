@@ -43,7 +43,8 @@
 
   onMount(async () => {
     await sessions.init()
-    await Promise.all([settings.load(), accounts.load(), instances.load()])
+    await accounts.listen()
+    await Promise.all([settings.load(), accounts.load(), instances.load(), accounts.loadMicrosoft()])
   })
 </script>
 

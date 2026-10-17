@@ -22,6 +22,8 @@ let accounts: AccountRecord[] = []
 let defaultId: string | null = null
 let instances: Instance[] = []
 let counter = 0
+let msLoginPending = false
+const msExpired = new Set<string>()
 let mockThemes: any[] = [
   { builtin: true, schemaVersion: 1, id: 'disorderlaucher.default.dark', name: 'Default Dark', mode: 'dark',
     colors: { background: '#0C0C0C', surface: '#141414', surfaceAlt: '#1D1D1D', surfaceRaised: '#252525', textPrimary: '#F0F0EA', textSecondary: '#A0A09A', border: '#2D2D2D', borderStrong: '#4D4D4D', action: '#F3F3ED', actionText: '#0C0C0C' },
@@ -36,7 +38,7 @@ let mockThemes: any[] = [
 ]
 const installedMods = new Map<string, any[]>()
 const pendingUpdates = new Set<string>()
-let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null as string | null, javaPath: null as string | null }
+let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null as string | null, microsoftClientId: null as string | null, javaPath: null as string | null }
 
 const versions: VersionEntry[] = ['1.21.4', '1.21.1', '1.20.4', '1.19.4', '1.16.5', '1.12.2'].map((id) => ({
   id,
@@ -93,6 +95,48 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       accounts = [...accounts, record]
       defaultId ??= record.id
       return record
+    }
+    case 'microsoft_status':
+      return { enabled: !!settings.microsoftClientId, loginInProgress: msLoginPending }
+    case 'accounts_microsoft_begin_login': {
+      if (!settings.microsoftClientId) throw 'el inicio de sesion con Microsoft no esta configurado en esta version.'
+      msLoginPending = true
+      emit('auth://state', { state: 'authorizing' })
+      void (async () => {
+        await sleep(1800)
+        if (!msLoginPending) return
+        msLoginPending = false
+        const record: AccountRecord = {
+          id: `acc_ms_${++counter}`,
+          provider: 'microsoft',
+          label: 'Notch',
+          createdAt: new Date().toISOString(),
+          lastUsedAt: null,
+          providerData: { type: 'microsoft', minecraftUuid: '069a79f4', minecraftName: 'Notch' },
+        }
+        accounts = [...accounts, record]
+        defaultId ??= record.id
+        emit('auth://state', { state: 'connected', accountId: record.id, name: 'Notch' })
+      })()
+      return null
+    }
+    case 'accounts_microsoft_cancel_login':
+      if (msLoginPending) {
+        msLoginPending = false
+        emit('auth://state', { state: 'cancelled' })
+      }
+      return null
+    case 'accounts_auth_state': {
+      const acc = accounts.find((a) => a.id === args.id)
+      if (acc?.provider === 'microsoft') return msExpired.has(args.id) ? 'MicrosoftExpired' : 'MicrosoftAuthenticated'
+      return 'LocalReady'
+    }
+    case 'accounts_remove': {
+      const using = instances.filter((i) => i.profileId === args.id).length
+      if (using > 0) throw `Este perfil lo usan ${using} instancia(s). Cambia el perfil de esas instancias antes de quitarlo.`
+      accounts = accounts.filter((a) => a.id !== args.id)
+      if (defaultId === args.id) defaultId = accounts[0]?.id ?? null
+      return null
     }
     case 'accounts_set_default':
       defaultId = args.id

@@ -49,7 +49,7 @@ export interface VersionEntry {
 }
 
 /** Que accion ofrecer ante un fallo: reintentar con internet, reparar archivos u otra cosa. */
-export type ErrorKind = 'offline' | 'repairable' | 'other'
+export type ErrorKind = 'offline' | 'repairable' | 'signIn' | 'other'
 
 export type InstallPhase =
   | 'metadata'
@@ -101,6 +101,7 @@ export interface Settings {
   theme: Theme
   downloadProfile: DownloadProfile
   themeId: string | null
+  microsoftClientId: string | null
   javaPath: string | null
 }
 
@@ -199,3 +200,24 @@ export interface ThemeEntry {
   density: { uiScale: number; compact: boolean }
   effects: { shadowStrength: number; animations: boolean }
 }
+
+export type AuthState =
+  | 'LocalReady'
+  | 'MicrosoftDisconnected'
+  | 'MicrosoftAuthorizing'
+  | 'MicrosoftAuthenticated'
+  | 'MicrosoftRefreshRequired'
+  | 'MicrosoftOfflineCachedIdentity'
+  | 'MicrosoftExpired'
+  | { Error: unknown }
+
+export interface MicrosoftStatus {
+  enabled: boolean
+  loginInProgress: boolean
+}
+
+export type AuthEvent =
+  | { state: 'authorizing' }
+  | { state: 'connected'; accountId: string; name: string }
+  | { state: 'cancelled' }
+  | { state: 'failed'; message: string }

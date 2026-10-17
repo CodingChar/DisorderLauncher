@@ -21,6 +21,7 @@
   let speed = $state<DownloadProfile>(settings.value.downloadProfile)
   let javaPath = $state(settings.value.javaPath ?? '')
   let themeId = $state(settings.value.themeId ?? '')
+  let msClientId = $state(settings.value.microsoftClientId ?? '')
   const customThemes = $derived(settings.themes.filter((t) => !t.builtin))
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
@@ -63,6 +64,7 @@
         theme,
         downloadProfile: speed,
         themeId: themeId || null,
+        microsoftClientId: msClientId.trim() || null,
         javaPath: javaPath.trim() || null,
       })
       notice = 'Preferencias guardadas.'
@@ -124,6 +126,16 @@
         placeholder="Déjalo vacío para que se gestione solo"
         hint="Solo se usa si es compatible con la versión de Minecraft; si no, el launcher elige uno adecuado."
       />
+
+      <details class="advanced">
+        <summary>Opciones avanzadas</summary>
+        <Input
+          label="ID de la aplicación de Microsoft"
+          bind:value={msClientId}
+          placeholder="00000000-0000-0000-0000-000000000000"
+          hint="Solo si tienes tu propia aplicación registrada en Azure. Déjalo vacío para no usar Microsoft."
+        />
+      </details>
 
       <div class="readonly">
         <span class="label">Carpeta de datos</span>
@@ -211,6 +223,20 @@
   .hint {
     color: var(--text-secondary);
     margin-top: 8px;
+  }
+
+  .advanced {
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 6px 16px 14px;
+    color: var(--text-secondary);
+  }
+
+  .advanced summary {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
   }
 
   .readonly {

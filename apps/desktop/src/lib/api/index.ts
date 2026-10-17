@@ -2,6 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type {
   AccountRecord,
+  AuthEvent,
+  AuthState,
+  MicrosoftStatus,
   ExportSummary,
   Instance,
   InstanceChanges,
@@ -60,6 +63,11 @@ export const api = {
   accountsList: () => call<AccountRecord[]>('accounts_list'),
   accountsDefault: () => call<string | null>('accounts_default'),
   accountsCreateLocal: (name: string) => call<AccountRecord>('accounts_create_local', { name }),
+  microsoftStatus: () => call<MicrosoftStatus>('microsoft_status'),
+  accountsMicrosoftBeginLogin: () => call<void>('accounts_microsoft_begin_login'),
+  accountsMicrosoftCancelLogin: () => call<void>('accounts_microsoft_cancel_login'),
+  accountsAuthState: (id: string) => call<AuthState>('accounts_auth_state', { id }),
+  accountsRemove: (id: string) => call<void>('accounts_remove', { id }),
   accountsSetDefault: (id: string) => call<void>('accounts_set_default', { id }),
   instancesList: () => call<Instance[]>('instances_list'),
   instancesCreate: (name: string, version: string, loader: LoaderKind = 'vanilla') =>
@@ -92,6 +100,7 @@ export const api = {
 
 export const events = {
   onLaunchState: (h: (e: LaunchStateEvent) => void) => subscribe('launch://state', h),
+  onAuthState: (h: (e: AuthEvent) => void) => subscribe('auth://state', h),
   onInstallProgress: (h: (e: ProgressEvent) => void) => subscribe('install://progress', h),
   onRepairProgress: (h: (e: ProgressEvent) => void) => subscribe('repair://progress', h),
 }
