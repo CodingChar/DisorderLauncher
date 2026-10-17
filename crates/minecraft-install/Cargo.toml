@@ -13,3 +13,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 sha1 = { workspace = true }
 reqwest = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+zip = { workspace = true }

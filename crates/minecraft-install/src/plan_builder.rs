@@ -1,7 +1,15 @@
 use crate::rules::{current_os_name, rules_allow};
-use crate::{Artifact, InstallPlan};
+use crate::{Artifact, InstallPlan, NativeExtraction};
 use minecraft_meta::VersionDescriptor;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+fn native_arch_bits() -> &'static str {
+    if cfg!(target_pointer_width = "64") {
+        "64"
+    } else {
+        "32"
+    }
+}
 
 pub fn build_install_plan(
     descriptor: &VersionDescriptor,
@@ -30,6 +38,7 @@ pub fn build_install_plan(
 
     let mut libraries = Vec::new();
     let mut natives = Vec::new();
+    let mut native_extractions = Vec::new();
 
     for lib in &descriptor.libraries {
         if let Some(rules) = &lib.rules {
@@ -48,20 +57,32 @@ pub fn build_install_plan(
                 });
             }
 
-            if let Some(native_key) = lib.natives.as_ref().and_then(|n| n.get(current_os_name())) {
-                if let Some(classifiers) = &downloads.classifiers {
-                    if let Some(native_artifact) = classifiers.get(native_key) {
-                        natives.push(Artifact {
-                            url: native_artifact.url.clone(),
-                            path: natives_dir.join(
-                                PathBuf::from(&native_artifact.path)
-                                    .file_name()
-                                    .unwrap_or_default(),
-                            ),
-                            size: Some(native_artifact.size),
-                            sha1: Some(native_artifact.sha1.clone()),
-                        });
-                    }
+            if let Some(native_key) = lib
+                .natives
+                .as_ref()
+                .and_then(|n| n.get(current_os_name()))
+                .map(|key| key.replace("${arch}", native_arch_bits()))
+            {
+                if let Some(native_artifact) = downloads
+                    .classifiers
+                    .as_ref()
+                    .and_then(|c| c.get(&native_key))
+                {
+                    let jar = libraries_dir.join(&native_artifact.path);
+                    natives.push(Artifact {
+                        url: native_artifact.url.clone(),
+                        path: jar.clone(),
+                        size: Some(native_artifact.size),
+                        sha1: Some(native_artifact.sha1.clone()),
+                    });
+                    native_extractions.push(NativeExtraction {
+                        jar,
+                        exclude: lib
+                            .extract
+                            .as_ref()
+                            .map(|e| e.exclude.clone())
+                            .unwrap_or_default(),
+                    });
                 }
             }
         }
@@ -79,6 +100,8 @@ pub fn build_install_plan(
         asset_index,
         assets: Vec::new(),
         natives,
+        native_extractions,
+        natives_dir,
         java_major_version,
     }
 }

@@ -36,5 +36,4 @@ Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin dupl
 
 ## Pendiente conocido
 
-- Los natives de versiones anteriores a 1.19 se descargan pero no se extraen (afecta versiones antiguas).
 - El progreso del instalador es por fase (conteo de archivos), no por bytes.

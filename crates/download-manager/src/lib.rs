@@ -1,5 +1,6 @@
 mod error;
 mod manager;
+pub mod archive;
 
 pub use error::*;
 pub use manager::*;

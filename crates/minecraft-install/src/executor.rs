@@ -1,6 +1,7 @@
 use crate::error::InstallError;
 use crate::plan_builder::build_asset_artifacts;
 use crate::{Artifact, InstallPhase, InstallPlan, InstallProgress};
+use download_manager::archive::{extract_zip, ExtractOptions};
 use download_manager::{DownloadManager, DownloadTask};
 use std::path::Path;
 use std::sync::Arc;
@@ -81,6 +82,7 @@ impl InstallExecutor {
             });
             self.download_artifacts(&plan.natives, &progress, InstallPhase::Natives)
                 .await?;
+            extract_natives(plan).await?;
         }
 
         progress(InstallProgress {
@@ -126,4 +128,24 @@ impl InstallExecutor {
 
         Ok(())
     }
+}
+
+/// Extrae los jars de natives en el directorio de natives de la version.
+/// Se reextrae siempre: es barato y evita DLL obsoletas tras una reparacion.
+pub async fn extract_natives(plan: &InstallPlan) -> Result<(), InstallError> {
+    let natives_dir = plan.natives_dir.clone();
+    let extractions = plan.native_extractions.clone();
+
+    tokio::task::spawn_blocking(move || -> Result<(), InstallError> {
+        for item in extractions {
+            let options = ExtractOptions {
+                exclude_prefixes: item.exclude,
+                ..ExtractOptions::default()
+            };
+            extract_zip(&item.jar, &natives_dir, &options)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| InstallError::Io(std::io::Error::other(e.to_string())))?
 }

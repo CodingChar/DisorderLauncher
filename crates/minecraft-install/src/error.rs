@@ -4,6 +4,8 @@ pub enum InstallError {
     Meta(#[from] minecraft_meta::MetaError),
     #[error("download error: {0}")]
     Download(#[from] download_manager::DownloadError),
+    #[error("archive error: {0}")]
+    Archive(#[from] download_manager::archive::ArchiveError),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("json error: {0}")]

@@ -427,6 +427,10 @@ pub async fn installation_complete(plan: &InstallPlan, data_dir: &Path) -> bool 
         }
     }
 
+    if !plan.natives.is_empty() && !dir_has_entries(&plan.natives_dir).await {
+        return false;
+    }
+
     let Ok(data) = tokio::fs::read_to_string(&plan.asset_index.path).await else {
         return false;
     };
@@ -439,6 +443,13 @@ pub async fn installation_complete(plan: &InstallPlan, data_dir: &Path) -> bool 
         }
     }
     true
+}
+
+async fn dir_has_entries(dir: &Path) -> bool {
+    match tokio::fs::read_dir(dir).await {
+        Ok(mut entries) => matches!(entries.next_entry().await, Ok(Some(_))),
+        Err(_) => false,
+    }
 }
 
 async fn is_file(path: &Path) -> bool {
