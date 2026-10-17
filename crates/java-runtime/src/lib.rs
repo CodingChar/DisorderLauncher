@@ -1,3 +1,13 @@
+mod error;
+mod detect;
+mod adoptium;
+mod manager;
+
+pub use error::*;
+pub use detect::*;
+pub use adoptium::*;
+pub use manager::*;
+
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
