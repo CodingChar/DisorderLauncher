@@ -3,6 +3,10 @@
 Estado a 2026-10-17. Fuente de verdad del avance; el plan original esta en `PLAN_TECNICO.md` y `spec/13_LONG_SPRINTS.md`.
 Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqueado por algo externo · ⬜ pendiente.
 
+## Reforma visual (maqueta `DisorderLauncherUI`)
+
+En curso desde 2026-10-17. Estado, reglas y mapa en [`UI_MIGRATION.md`](UI_MIGRATION.md): **leelo antes de tocar `apps/desktop/src`**. No cambia contratos IPC ni logica.
+
 ## Resumen
 
 | Sprint | Contenido | Estado |

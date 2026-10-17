@@ -4,8 +4,10 @@
 
 Interfaz profesional, monocromática, clara e intuitiva.
 
-Referencia:
-`reference/disorderlaucher_reference.html`
+Referencia vigente: la maqueta `DisorderLauncherUI/` (reforma documentada en `docs/UI_MIGRATION.md`).
+Referencia historica: `reference/disorderlaucher_reference.html` (diseno anterior).
+
+Implementacion: clases globales y tokens en `apps/desktop/src/app.css`. Sin fuentes ni recursos remotos.
 
 ## Tipografía
 
@@ -49,13 +51,27 @@ Texto:
 }
 ```
 
+## Tema azul oscuro
+
+Tema incluido `disorderlaucher.default.blue` (modo oscuro), accesible desde el boton de la luna en la cabecera y desde Ajustes:
+
+```json
+{ "background": "#0B1220", "surface": "#111D30", "surfaceAlt": "#192940", "surfaceRaised": "#243954",
+  "textPrimary": "#E4EDF9", "textSecondary": "#9CADC6", "border": "#283C57", "borderStrong": "#526E92",
+  "action": "#B8D4FA", "actionText": "#0B1729" }
+```
+
+## Estructura de la interfaz
+
+Barra lateral (marca, navegacion, estado sin conexion, ajustes, ayuda, perfil activo, version) + cabecera (migas, estado, tema, perfil) + contenido con `page-heading` y pie.
+Navegacion: Inicio, Mis instancias, Explorar, Herramientas, Perfiles, Skins; Ajustes y Ayuda abajo.
+
 ## Política de bordes
 
 - 0 px: estructuras técnicas específicas.
-- 8 px: inputs.
-- 10-12 px: botones.
-- 16-18 px: tarjetas secundarias.
-- 20-26 px: superficies principales.
+- 7-8 px: inputs y botones.
+- 11-13 px: tarjetas y paneles.
+- 18 px: superficies principales.
 - 50%: solo círculos funcionales.
 
 Equilibrar recto/redondeado.

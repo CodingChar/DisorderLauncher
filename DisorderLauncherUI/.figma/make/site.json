@@ -1,0 +1,10 @@
+{
+  "description": "Provides a user-friendly Minecraft launcher interface design to streamline game access and enhance player experience with intuitive controls.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

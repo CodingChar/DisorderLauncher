@@ -4,6 +4,9 @@
 
 Lee TODOS los .md en `docs/spec/` antes de modificar codigo.
 
+**Reforma visual en curso/hecha**: antes de tocar `apps/desktop/src` lee `docs/UI_MIGRATION.md` (reglas, mapa y estado).
+La maqueta `DisorderLauncherUI/` es la referencia visual; la fuente de verdad del estilo en la app es `apps/desktop/src/app.css`.
+
 ## Prioridad de autenticacion
 
 1. Offline Gaming funcional.
@@ -37,6 +40,7 @@ Trabaja por verticales grandes. En cada sprint:
 ## UX
 
 Usuario objetivo no tecnico. No mostrar terminos internos salvo pantalla avanzada.
+Estilo: clases globales de `app.css` y tokens CSS (nada de colores fijos, fuentes remotas ni datos simulados en la app). Ver `docs/UI_MIGRATION.md`.
 
 ## Stack
 
@@ -61,6 +65,8 @@ Usuario objetivo no tecnico. No mostrar terminos internos salvo pantalla avanzad
 ```
 docs/spec/           especificacion tecnica (00-13)
 docs/adr/            decisiones arquitectonicas
+docs/UI_MIGRATION.md reforma visual (maqueta -> app): reglas y estado
+DisorderLauncherUI/  maqueta visual (solo referencia, no se importa)
 docs/reference/      HTML de referencia visual
 theme_examples/      JSON de temas de ejemplo
 ```
