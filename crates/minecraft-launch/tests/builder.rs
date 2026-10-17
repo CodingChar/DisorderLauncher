@@ -223,3 +223,37 @@ fn game_assets_dir_override_is_used_for_legacy_indexes() {
     assert!(Path::new(arg_after(&overridden.game_args, "--assetsDir")).ends_with("game/resources"));
     let _ = version;
 }
+
+#[test]
+fn overlay_replaces_main_class_prioritizes_libraries_and_appends_args() {
+    use minecraft_launch::LaunchOverlay;
+    use minecraft_meta::{Arguments, ArgumentValue, Library};
+
+    let version: VersionDescriptor = serde_json::from_str(MODERN).unwrap();
+    let overlay_lib: Library = serde_json::from_value(serde_json::json!({
+        "name": "com.mojang:a:2", "url": "https://maven.example.com/"
+    }))
+    .unwrap();
+    let extra: Library = serde_json::from_value(serde_json::json!({
+        "name": "net.fabricmc:fabric-loader:0.16.0", "url": "https://maven.fabricmc.net/"
+    }))
+    .unwrap();
+
+    let mut c = ctx();
+    c.overlay = Some(LaunchOverlay {
+        main_class: Some("net.fabricmc.loader.impl.launch.knot.KnotClient".into()),
+        libraries: vec![extra, overlay_lib],
+        arguments: Some(Arguments {
+            game: vec![ArgumentValue::Simple("--fabric-flag".into())],
+            jvm: vec![ArgumentValue::Simple("-DFabricMcEmu=x".into())],
+        }),
+    });
+    let plan = LaunchPlanBuilder::build(&version, &identity("0"), &java(), &c).unwrap();
+
+    assert_eq!(plan.main_class, "net.fabricmc.loader.impl.launch.knot.KnotClient");
+    assert!(plan.jvm_args.contains(&"-DFabricMcEmu=x".to_string()));
+    assert_eq!(plan.game_args.last().unwrap(), "--fabric-flag");
+
+    let names: Vec<String> = plan.classpath.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
+    assert_eq!(names, ["fabric-loader-0.16.0.jar", "a-2.jar", "1.21.jar"]);
+}

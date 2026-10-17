@@ -109,6 +109,13 @@ pub struct Library {
     pub natives: Option<HashMap<String, String>>,
     #[serde(default)]
     pub extract: Option<ExtractConfig>,
+    /// Librerias estilo Maven (loaders): URL base del repositorio.
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub sha1: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,8 +2,10 @@ use crate::{LaunchError, Placeholders};
 use identity_api::ResolvedIdentity;
 use java_runtime::JavaInstallation;
 use minecraft_meta::rules::{rules_allow_with, RuleFeatures};
-use minecraft_meta::{ArgumentValue, ArgumentValueInner, VersionDescriptor};
-use std::collections::HashMap;
+use minecraft_meta::{
+    library_key, resolve_library, ArgumentValue, ArgumentValueInner, Arguments, Library, VersionDescriptor,
+};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -85,6 +87,15 @@ pub struct MemorySettings {
     pub max_mb: Option<u32>,
 }
 
+/// Cambios que un loader (Fabric, Quilt...) aplica sobre una version vanilla: otra clase
+/// principal, librerias propias (que tienen prioridad en el classpath) y argumentos extra.
+#[derive(Debug, Clone, Default)]
+pub struct LaunchOverlay {
+    pub main_class: Option<String>,
+    pub libraries: Vec<Library>,
+    pub arguments: Option<Arguments>,
+}
+
 /// Datos de entorno del launcher que no vienen de la version ni de la identidad.
 #[derive(Debug, Clone)]
 pub struct LaunchContext {
@@ -97,6 +108,7 @@ pub struct LaunchContext {
     /// Valor de `${game_assets}` cuando el indice de assets es legacy
     /// (`map_to_resources` -> `<gameDir>/resources`). Por defecto `assets/virtual/<indice>`.
     pub game_assets_dir: Option<PathBuf>,
+    pub overlay: Option<LaunchOverlay>,
     pub launcher_name: String,
     pub launcher_version: String,
 }
@@ -109,6 +121,7 @@ impl LaunchContext {
             memory: MemorySettings::default(),
             window_size: None,
             game_assets_dir: None,
+            overlay: None,
             launcher_name: "DisorderLauncher".to_string(),
             launcher_version: env!("CARGO_PKG_VERSION").to_string(),
         }
@@ -131,7 +144,7 @@ impl LaunchPlanBuilder {
         let assets_root = ctx.data_dir.join("assets");
         let client_jar = versions_dir.join(format!("{}.jar", version.id));
 
-        let classpath = build_classpath(version, &ctx.data_dir, client_jar);
+        let classpath = build_classpath(version, ctx.overlay.as_ref(), &ctx.data_dir, client_jar);
 
         let mut features = RuleFeatures::none();
         if ctx.window_size.is_some() {
@@ -165,7 +178,11 @@ impl LaunchPlanBuilder {
             placeholders.set("resolution_height", h.to_string());
         }
 
-        let (raw_jvm, raw_game) = collect_raw_args(version, &features)?;
+        let (mut raw_jvm, mut raw_game) = collect_raw_args(version, &features)?;
+        if let Some(extra) = ctx.overlay.as_ref().and_then(|o| o.arguments.as_ref()) {
+            raw_jvm.extend(expand_arguments(&extra.jvm, &features));
+            raw_game.extend(expand_arguments(&extra.game, &features));
+        }
 
         let mut jvm_args = Vec::new();
         if let Some(min) = ctx.memory.min_mb {
@@ -192,7 +209,11 @@ impl LaunchPlanBuilder {
 
         Ok(LaunchPlan {
             java_path: java.executable(),
-            main_class: version.main_class.clone(),
+            main_class: ctx
+                .overlay
+                .as_ref()
+                .and_then(|o| o.main_class.clone())
+                .unwrap_or_else(|| version.main_class.clone()),
             classpath,
             jvm_args,
             game_args,
@@ -207,23 +228,37 @@ fn path_str(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-fn build_classpath(version: &VersionDescriptor, data_dir: &Path, client_jar: PathBuf) -> Vec<PathBuf> {
+fn build_classpath(
+    version: &VersionDescriptor,
+    overlay: Option<&LaunchOverlay>,
+    data_dir: &Path,
+    client_jar: PathBuf,
+) -> Vec<PathBuf> {
     let libraries_dir = data_dir.join("libraries");
     let mut classpath: Vec<PathBuf> = Vec::new();
 
-    for lib in &version.libraries {
+    let overlay_libs = overlay.map(|o| o.libraries.as_slice()).unwrap_or_default();
+    let overlay_keys: HashSet<String> = overlay_libs.iter().map(|l| library_key(&l.name)).collect();
+
+    let mut push = |lib: &Library| {
         if let Some(rules) = &lib.rules {
             if !rules_allow_with(rules, &RuleFeatures::none()) {
-                continue;
+                return;
             }
         }
-        let Some(artifact) = lib.downloads.as_ref().and_then(|d| d.artifact.as_ref()) else {
-            continue;
-        };
-        let path = libraries_dir.join(&artifact.path);
+        let Some(resolved) = resolve_library(lib) else { return };
+        let path = libraries_dir.join(&resolved.path);
         if !classpath.contains(&path) {
             classpath.push(path);
         }
+    };
+
+    for lib in overlay_libs {
+        push(lib);
+    }
+    // La version del loader gana: se omite la libreria vanilla equivalente.
+    for lib in version.libraries.iter().filter(|l| !overlay_keys.contains(&library_key(&l.name))) {
+        push(lib);
     }
 
     classpath.push(client_jar);

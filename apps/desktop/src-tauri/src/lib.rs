@@ -32,6 +32,8 @@ pub fn run() {
       commands::accounts_set_default,
       commands::instances_list,
       commands::instances_create,
+      commands::loaders_supported,
+      commands::loaders_list_versions,
       commands::instances_update,
       commands::instances_delete,
       commands::instances_duplicate,

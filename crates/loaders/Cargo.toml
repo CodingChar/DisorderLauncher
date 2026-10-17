@@ -1,0 +1,21 @@
+[package]
+name = "loaders"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+minecraft-meta = { path = "../minecraft-meta" }
+minecraft-launch = { path = "../minecraft-launch" }
+download-manager = { path = "../download-manager" }
+instance-manager = { path = "../instance-manager" }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

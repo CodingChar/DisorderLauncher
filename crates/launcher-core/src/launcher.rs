@@ -14,6 +14,7 @@ use instance_manager::{
     MemoryPolicy, NewInstance,
 };
 use java_runtime::{JavaInstallation, JavaManager, JavaRequirement};
+use loaders::{FabricProvider, LoaderInstallContext, LoaderProvider, LoaderVersion};
 use minecraft_install::{
     build_asset_artifacts, build_install_plan, legacy_assets_present, materialize_legacy_assets,
     InstallExecutor, InstallPhase, InstallPlan,
@@ -41,6 +42,7 @@ pub struct Launcher {
     accounts: Arc<dyn AccountRepository>,
     instances: Arc<FileInstanceRepository>,
     registry: IdentityRegistry,
+    loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>>,
     java: JavaManager,
     events: Arc<dyn LauncherEvents>,
     manifest_url: String,
@@ -61,7 +63,11 @@ impl Launcher {
         registry.register(Arc::new(LocalIdentityProvider));
         registry.register(Arc::new(MicrosoftIdentityProvider));
 
+        let mut loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>> = HashMap::new();
+        loader_providers.insert(LoaderKind::Fabric, Arc::new(FabricProvider::new(http.clone())));
+
         Self {
+            loader_providers,
             accounts: Arc::new(FileAccountRepository::new(paths.accounts_dir())),
             instances: Arc::new(FileInstanceRepository::new(paths.instances_dir())),
             java: JavaManager::new(http.clone(), paths.runtimes_dir()),
@@ -154,23 +160,67 @@ impl Launcher {
         Ok(self.instances.list().await?)
     }
 
-    /// Crea una instancia Vanilla asociada al perfil predeterminado.
-    pub async fn instances_create(&self, name: &str, version: &str) -> Result<Instance, LauncherError> {
+    /// Crea una instancia asociada al perfil predeterminado. Para loaders sin version
+    /// explicita se elige la ultima estable compatible con `version`.
+    pub async fn instances_create(
+        &self,
+        name: &str,
+        version: &str,
+        loader: LoaderKind,
+        loader_version: Option<String>,
+    ) -> Result<Instance, LauncherError> {
         let profile_id = self
             .accounts
             .get_default()
             .await?
             .ok_or(LauncherError::NoDefaultProfile)?;
+
+        let loader_version = match loader {
+            LoaderKind::Vanilla => None,
+            kind => match loader_version {
+                Some(v) => Some(v),
+                None => Some(self.latest_stable_loader(kind, version).await?.version),
+            },
+        };
+
         Ok(self
             .instances
             .create(NewInstance {
                 name: name.to_string(),
                 minecraft_version: version.to_string(),
-                loader: LoaderKind::Vanilla,
-                loader_version: None,
+                loader,
+                loader_version,
                 profile_id,
             })
             .await?)
+    }
+
+    fn loader_provider(&self, kind: LoaderKind) -> Result<&Arc<dyn LoaderProvider>, LauncherError> {
+        self.loader_providers.get(&kind).ok_or(LauncherError::LoaderNotSupported)
+    }
+
+    async fn latest_stable_loader(&self, kind: LoaderKind, version: &str) -> Result<LoaderVersion, LauncherError> {
+        let versions = self.loader_provider(kind)?.versions(version).await?;
+        versions
+            .iter()
+            .find(|v| v.stable)
+            .or_else(|| versions.first())
+            .cloned()
+            .ok_or_else(|| LauncherError::LoaderUnavailable("Fabric".into()))
+    }
+
+    /// Versiones del loader para una version de Minecraft (la mas reciente primero).
+    pub async fn loader_versions(&self, kind: LoaderKind, version: &str) -> Result<Vec<LoaderVersion>, LauncherError> {
+        Ok(self.loader_provider(kind)?.versions(version).await?)
+    }
+
+    /// Loaders que este launcher sabe instalar.
+    pub fn supported_loaders(&self) -> Vec<LoaderKind> {
+        let mut kinds: Vec<LoaderKind> = std::iter::once(LoaderKind::Vanilla)
+            .chain(self.loader_providers.keys().copied())
+            .collect();
+        kinds.sort_by_key(|k| format!("{k:?}"));
+        kinds
     }
 
     /// Edita una instancia. Se rechaza mientras el juego corre o se prepara.
@@ -447,6 +497,7 @@ impl Launcher {
             self.install(id, &mut install_plan, &data_dir).await?;
         }
 
+        let overlay = self.prepare_loader(instance, &data_dir).await?;
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
 
         self.emit_state(id, LaunchState::PreparingJava);
@@ -454,6 +505,7 @@ impl Launcher {
 
         let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
         ctx.game_assets_dir = game_assets_dir;
+        ctx.overlay = overlay;
         ctx.memory = match &instance.memory {
             MemoryPolicy::Fixed { min_mb, max_mb } => {
                 MemorySettings { min_mb: Some(*min_mb), max_mb: Some(*max_mb) }
@@ -490,6 +542,49 @@ impl Launcher {
             })
             .await?;
         Ok(())
+    }
+
+    /// Instala (si hace falta) el loader de la instancia y devuelve su overlay de lanzamiento.
+    /// Con la instalacion ya en disco no usa la red.
+    async fn prepare_loader(
+        &self,
+        instance: &Instance,
+        data_dir: &Path,
+    ) -> Result<Option<minecraft_launch::LaunchOverlay>, LauncherError> {
+        if instance.loader == LoaderKind::Vanilla {
+            return Ok(None);
+        }
+        let provider = self.loader_provider(instance.loader)?;
+        let loader_version = match &instance.loader_version {
+            Some(v) => v.clone(),
+            None => self.latest_stable_loader(instance.loader, &instance.minecraft_version).await?.version,
+        };
+
+        if let Some(installed) = provider
+            .load_installed(data_dir, &instance.minecraft_version, &loader_version)
+            .await?
+        {
+            return Ok(Some(installed.overlay));
+        }
+
+        self.emit_state(&instance.id, LaunchState::Installing);
+        let events = Arc::clone(&self.events);
+        let id = instance.id.clone();
+        let ctx = LoaderInstallContext {
+            data_dir,
+            minecraft_version: &instance.minecraft_version,
+            loader_version: &loader_version,
+            concurrency: self.settings().download_profile.concurrency(),
+            progress: Arc::new(move |completed, total| {
+                events.install_progress(InstallProgressEvent {
+                    instance_id: id.clone(),
+                    phase: "loader",
+                    completed,
+                    total,
+                })
+            }),
+        };
+        Ok(Some(provider.install(&ctx).await?.overlay))
     }
 
     /// Versiones muy antiguas esperan sus assets en `<gameDir>/resources`: es por instancia.

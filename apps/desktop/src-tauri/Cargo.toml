@@ -21,5 +21,6 @@ tracing-subscriber = { workspace = true }
 launcher-core = { path = "../../../crates/launcher-core" }
 identity-api = { path = "../../../crates/identity-api" }
 instance-manager = { path = "../../../crates/instance-manager" }
+loaders = { path = "../../../crates/loaders" }
 account-storage = { path = "../../../crates/account-storage" }
 minecraft-meta = { path = "../../../crates/minecraft-meta" }

@@ -44,6 +44,12 @@ pub enum LauncherError {
     #[error("No se pudo iniciar Minecraft.")]
     LaunchFailed,
 
+    #[error("Ese tipo de instancia aun no esta disponible.")]
+    LoaderNotSupported,
+
+    #[error("{0} no esta disponible para esta version de Minecraft.")]
+    LoaderUnavailable(String),
+
     #[error("La cuenta no esta disponible: {0}")]
     Identity(String),
 
@@ -164,6 +170,20 @@ impl From<diagnostics::RepairError> for LauncherError {
     fn from(e: diagnostics::RepairError) -> Self {
         match e {
             diagnostics::RepairError::Install(inner) => inner.into(),
+        }
+    }
+}
+
+impl From<loaders::LoaderError> for LauncherError {
+    fn from(e: loaders::LoaderError) -> Self {
+        use loaders::LoaderError as E;
+        tracing::error!(error = %e, "error de loader");
+        match e {
+            E::Http(h) if is_network(&h) => Self::Offline,
+            E::Download(download_manager::DownloadError::Http(h)) if is_network(&h) => Self::Offline,
+            E::DownloadFailures(_) => Self::Offline,
+            E::NoVersionFor(_) => Self::LoaderUnavailable("Fabric".into()),
+            _ => Self::InstallFailed,
         }
     }
 }

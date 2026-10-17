@@ -1,4 +1,4 @@
-use instance_manager::{InstanceRepository, JavaSelection};
+use instance_manager::{InstanceRepository, JavaSelection, LoaderKind};
 use launcher_core::{
     installation_complete, GameOutputEvent, InstallProgressEvent, LaunchState, LaunchStateEvent,
     Launcher, LauncherError, LauncherEvents, LauncherPaths, OutputStream,
@@ -117,12 +117,12 @@ async fn account_json_uses_camel_case_without_secrets() {
 async fn instance_requires_a_profile() {
     let (_d, launcher, _) = launcher();
     assert!(matches!(
-        launcher.instances_create("Mi mundo", "1.21").await,
+        launcher.instances_create("Mi mundo", "1.21", LoaderKind::Vanilla, None).await,
         Err(LauncherError::NoDefaultProfile)
     ));
 
     let account = launcher.accounts_create_local("David").await.unwrap();
-    let instance = launcher.instances_create("Mi mundo", "1.21").await.unwrap();
+    let instance = launcher.instances_create("Mi mundo", "1.21", LoaderKind::Vanilla, None).await.unwrap();
     assert_eq!(instance.profile_id, account.id);
     assert_eq!(launcher.instances_list().await.unwrap().len(), 1);
 }
@@ -157,7 +157,7 @@ async fn installed_instance_prepares_launch_without_network() {
     let jre = fake_installation(&launcher, dir.path());
 
     launcher.accounts_create_local("Steve").await.unwrap();
-    let instance = launcher.instances_create("Offline", "1.99").await.unwrap();
+    let instance = launcher.instances_create("Offline", "1.99", LoaderKind::Vanilla, None).await.unwrap();
     let updated = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir())
         .update(
             &instance.id,
@@ -198,7 +198,7 @@ async fn installation_complete_detects_missing_files() {
 async fn launch_reports_offline_failure_and_can_be_retried() {
     let (_d, launcher, events) = launcher();
     launcher.accounts_create_local("Steve").await.unwrap();
-    let instance = launcher.instances_create("Sin red", "1.21").await.unwrap();
+    let instance = launcher.instances_create("Sin red", "1.21", LoaderKind::Vanilla, None).await.unwrap();
 
     launcher.launch(&instance.id).await.unwrap();
     let state = wait_for_state(&events, |s| matches!(s, LaunchState::Failed { .. })).await;
@@ -258,7 +258,7 @@ async fn real_vanilla_install_launch_and_stop() {
     let launcher = Arc::new(Launcher::new(LauncherPaths::new(dir.path()), events.clone()));
 
     launcher.accounts_create_local("Steve").await.unwrap();
-    let instance = launcher.instances_create("E2E", "1.0").await.unwrap();
+    let instance = launcher.instances_create("E2E", "1.0", LoaderKind::Vanilla, None).await.unwrap();
     launcher.launch(&instance.id).await.unwrap();
 
     let deadline = std::time::Instant::now() + Duration::from_secs(900);
@@ -314,7 +314,7 @@ async fn instance_crud_validates_profile_and_java() {
     let (dir, launcher, _) = launcher();
     let first = launcher.accounts_create_local("David").await.unwrap();
     let second = launcher.accounts_create_local("Alex").await.unwrap();
-    let instance = launcher.instances_create("Base", "1.21").await.unwrap();
+    let instance = launcher.instances_create("Base", "1.21", LoaderKind::Vanilla, None).await.unwrap();
     assert_eq!(instance.profile_id, first.id);
 
     let updated = launcher
@@ -357,7 +357,7 @@ async fn instance_crud_validates_profile_and_java() {
 async fn busy_instance_cannot_be_edited_or_deleted() {
     let (_d, launcher, events) = launcher();
     launcher.accounts_create_local("Steve").await.unwrap();
-    let instance = launcher.instances_create("Ocupada", "1.21").await.unwrap();
+    let instance = launcher.instances_create("Ocupada", "1.21", LoaderKind::Vanilla, None).await.unwrap();
 
     launcher.launch(&instance.id).await.unwrap();
     // Inmediatamente despues de aceptar el launch la instancia esta reservada.
@@ -392,4 +392,55 @@ async fn settings_persist_across_launcher_restarts_and_validate_java() {
     assert!(matches!(second.settings_update(bad).await, Err(LauncherError::InvalidInput(_))));
     assert_eq!(second.settings().theme, Theme::Light, "un fallo no altera los ajustes vigentes");
     assert_eq!(second.settings_snapshot().data_dir, dir.path().display().to_string());
+}
+
+/// Fabric real de punta a punta. Usa `DISORDER_E2E_DIR` (si existe) como raiz para reutilizar descargas:
+/// `DISORDER_E2E_DIR=target/e2e-data cargo test -p launcher-core --test launcher -- --ignored --nocapture real_fabric`
+#[tokio::test]
+#[ignore = "requiere internet, descarga ~250 MB la primera vez y abre una ventana de Minecraft unos segundos"]
+async fn real_fabric_install_launch_and_stop() {
+    let temp;
+    let root = match std::env::var("DISORDER_E2E_DIR") {
+        Ok(dir) => std::path::PathBuf::from(dir),
+        Err(_) => {
+            temp = tempfile::tempdir().unwrap();
+            temp.path().to_path_buf()
+        }
+    };
+    let events = Arc::new(Collector::default());
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(&root), events.clone()));
+
+    if launcher.accounts_list().await.unwrap().is_empty() {
+        launcher.accounts_create_local("Steve").await.unwrap();
+    }
+    let instance = launcher
+        .instances_create("E2E Fabric", "1.14.4", LoaderKind::Fabric, None)
+        .await
+        .unwrap();
+    assert_eq!(instance.loader, LoaderKind::Fabric);
+    assert!(instance.loader_version.is_some());
+
+    launcher.launch(&instance.id).await.unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(1500);
+    let first = loop {
+        {
+            let states = events.states.lock().unwrap();
+            if let Some(e) = states.iter().find(|e| matches!(e.state, LaunchState::Running { .. } | LaunchState::Failed { .. } | LaunchState::Exited { .. })) {
+                break e.state.clone();
+            }
+        }
+        assert!(std::time::Instant::now() < deadline, "timeout");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    assert!(matches!(first, LaunchState::Running { .. }), "{first:?}");
+
+    tokio::time::sleep(Duration::from_secs(15)).await;
+    let output = events.output.lock().unwrap().join("\n");
+    println!("salida del juego:\n{output}");
+    let alive = events.states.lock().unwrap().iter().all(|e| !matches!(e.state, LaunchState::Exited { .. }));
+    let _ = launcher.stop(&instance.id);
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+
+    assert!(output.to_lowercase().contains("fabric"), "el juego debio cargar Fabric");
+    assert!(alive, "el juego se cerro solo antes de tiempo");
 }

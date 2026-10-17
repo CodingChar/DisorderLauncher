@@ -44,8 +44,30 @@ pub async fn instances_create(
   state: State<'_, AppState>,
   name: String,
   version: String,
+  loader: Option<instance_manager::LoaderKind>,
+  loader_version: Option<String>,
 ) -> Result<Instance, String> {
-  state.launcher.instances_create(&name, &version).await.map_err(user_message)
+  state
+    .launcher
+    .instances_create(&name, &version, loader.unwrap_or(instance_manager::LoaderKind::Vanilla), loader_version)
+    .await
+    .map_err(user_message)
+}
+
+/// Loaders disponibles (siempre incluye `vanilla`).
+#[tauri::command]
+pub async fn loaders_supported(state: State<'_, AppState>) -> Result<Vec<instance_manager::LoaderKind>, String> {
+  Ok(state.launcher.supported_loaders())
+}
+
+/// Versiones del loader para una version de Minecraft.
+#[tauri::command]
+pub async fn loaders_list_versions(
+  state: State<'_, AppState>,
+  loader: instance_manager::LoaderKind,
+  minecraft_version: String,
+) -> Result<Vec<loaders::LoaderVersion>, String> {
+  state.launcher.loader_versions(loader, &minecraft_version).await.map_err(user_message)
 }
 
 #[tauri::command]
