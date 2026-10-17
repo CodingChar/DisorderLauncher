@@ -517,3 +517,132 @@ async fn unsupported_loaders_are_rejected_at_creation() {
     ));
     assert_eq!(launcher.supported_loaders(), vec![LoaderKind::Fabric, LoaderKind::Quilt, LoaderKind::Vanilla]);
 }
+
+fn write_mrpack(path: &std::path::Path, index_json: &str, entries: &[(&str, &[u8])]) {
+    use std::io::Write;
+    let mut writer = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    writer.start_file("modrinth.index.json", options).unwrap();
+    writer.write_all(index_json.as_bytes()).unwrap();
+    for (name, data) in entries {
+        writer.start_file(*name, options).unwrap();
+        writer.write_all(data).unwrap();
+    }
+    writer.finish().unwrap();
+}
+
+fn pack_index(files: &str, deps: &str) -> String {
+    format!(r#"{{"formatVersion":1,"game":"minecraft","versionId":"1.0.0","name":"Pack de prueba","files":[{files}],"dependencies":{{{deps}}}}}"#)
+}
+
+#[tokio::test]
+async fn imports_a_modpack_into_a_new_fabric_instance() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let pack = dir.path().join("pack.mrpack");
+    write_mrpack(
+        &pack,
+        &pack_index("", r#""minecraft":"1.20.1","fabric-loader":"0.15.0""#),
+        &[("overrides/config/pack.toml", b"hola"), ("overrides/options.txt", b"o")],
+    );
+
+    let instance = launcher.modpack_import(&pack).await.unwrap();
+    assert_eq!(instance.name, "Pack de prueba");
+    assert_eq!(instance.minecraft_version, "1.20.1");
+    assert_eq!(instance.loader, LoaderKind::Fabric);
+    assert_eq!(instance.loader_version.as_deref(), Some("0.15.0"));
+    assert_eq!(std::fs::read(instance.game_dir.join("config/pack.toml")).unwrap(), b"hola");
+    assert_eq!(launcher.instances_list().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn import_rejects_unsupported_or_unsafe_packs_without_leaving_instances() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+
+    let forge = dir.path().join("forge.mrpack");
+    write_mrpack(&forge, &pack_index("", r#""minecraft":"1.20.1","forge":"47.2.0""#), &[]);
+    match launcher.modpack_import(&forge).await {
+        Err(LauncherError::InvalidInput(msg)) => assert!(msg.contains("Forge"), "{msg}"),
+        other => panic!("{other:?}"),
+    }
+
+    let evil = dir.path().join("evil.mrpack");
+    let file = r#"{"path":"../../evil.jar","hashes":{"sha1":"aa","sha512":"bb"},"downloads":["https://cdn.modrinth.com/a.jar"],"fileSize":1}"#;
+    write_mrpack(&evil, &pack_index(file, r#""minecraft":"1.20.1""#), &[]);
+    assert!(matches!(launcher.modpack_import(&evil).await, Err(LauncherError::InvalidInput(_))));
+
+    let not_a_pack = dir.path().join("x.mrpack");
+    std::fs::write(&not_a_pack, "no es un zip").unwrap();
+    assert!(matches!(launcher.modpack_import(&not_a_pack).await, Err(LauncherError::InvalidInput(_))));
+
+    assert!(launcher.instances_list().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn failed_download_rolls_back_the_created_instance() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let pack = dir.path().join("broken.mrpack");
+    let file = r#"{"path":"mods/missing.jar","hashes":{"sha1":"da39a3ee5e6b4b0d3255bfef95601890afd80709","sha512":"bb"},"downloads":["https://cdn.modrinth.com/data/no-such-project/versions/none/missing.jar"],"fileSize":1}"#;
+    write_mrpack(&pack, &pack_index(file, r#""minecraft":"1.20.1""#), &[("overrides/config/a.toml", b"a")]);
+
+    assert!(launcher.modpack_import(&pack).await.is_err());
+    assert!(launcher.instances_list().await.unwrap().is_empty(), "rollback: sin instancias a medias");
+    let leftovers = std::fs::read_dir(launcher.paths().instances_dir()).map(|d| d.count()).unwrap_or(0);
+    assert_eq!(leftovers, 0, "rollback: sin carpetas a medias");
+}
+
+#[tokio::test]
+async fn exported_instance_can_be_imported_again() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let source = launcher
+        .instances_create("Mi coleccion", "1.20.1", LoaderKind::Fabric, Some("0.15.0".into()))
+        .await
+        .unwrap();
+    write_mod(&source.game_dir.join("mods"), "local.jar", r#"{"id":"local","name":"Local"}"#);
+    std::fs::write(source.game_dir.join("config").join("a.toml"), "x").unwrap();
+    std::fs::create_dir_all(source.game_dir.join("saves").join("w")).unwrap();
+    std::fs::write(source.game_dir.join("saves").join("w").join("level.dat"), "mundo").unwrap();
+
+    let pack = dir.path().join("export").join("pack.mrpack");
+    let summary = launcher.modpack_export(&source.id, &pack).await.unwrap();
+    assert_eq!(summary.remote_files, 0);
+    assert!(summary.bundled_files >= 2);
+
+    let copy = launcher.modpack_import(&pack).await.unwrap();
+    assert_ne!(copy.id, source.id);
+    assert_eq!(copy.loader_version.as_deref(), Some("0.15.0"));
+    assert!(copy.game_dir.join("mods/local.jar").is_file());
+    assert!(copy.game_dir.join("config/a.toml").is_file());
+    assert!(!copy.game_dir.join("saves/w/level.dat").exists(), "los mundos no se exportan");
+}
+
+/// Instala Fabric API desde Modrinth, exporta (el mod debe ir referenciado por URL+hash) y reimporta.
+/// `cargo test -p launcher-core --test launcher -- --ignored real_modpack`
+#[tokio::test]
+#[ignore = "requiere internet"]
+async fn real_modpack_export_and_import_use_modrinth_references() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let source = launcher
+        .instances_create("Real", "1.20.1", LoaderKind::Fabric, Some("0.15.0".into()))
+        .await
+        .unwrap();
+    let installed = launcher.mods_install(&source.id, "P7dR8mSH").await.unwrap();
+    assert!(installed.iter().any(|m| m.title.to_lowercase().contains("fabric api")));
+
+    let pack = dir.path().join("real.mrpack");
+    let summary = launcher.modpack_export(&source.id, &pack).await.unwrap();
+    assert_eq!(summary.remote_files, 1, "Fabric API va por URL y hash, no dentro del paquete");
+
+    let index = modpacks::read_index(&pack).unwrap();
+    assert!(index.files[0].downloads[0].starts_with("https://cdn.modrinth.com/"));
+    assert!(!index.files[0].hashes.sha512.is_empty());
+
+    let copy = launcher.modpack_import(&pack).await.unwrap();
+    let mods = launcher.mods_list(&copy.id).await.unwrap();
+    assert_eq!(mods.mods.len(), 1);
+    assert_eq!(mods.mods[0].name, "Fabric API");
+}

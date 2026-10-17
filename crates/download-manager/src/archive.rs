@@ -18,6 +18,8 @@ pub enum ArchiveError {
     UnsafeEntry(String),
     #[error("el archivo descomprimido supera el limite permitido")]
     TooLarge,
+    #[error("el archivo contiene demasiadas entradas")]
+    TooManyEntries,
 }
 
 #[derive(Debug, Clone)]
@@ -25,13 +27,21 @@ pub struct ExtractOptions {
     /// Prefijos de entrada que se omiten (p. ej. `META-INF/`).
     pub exclude_prefixes: Vec<String>,
     pub max_uncompressed_bytes: u64,
+    /// Maximo de entradas del archivo (proteccion frente a zip bombs de muchos archivos).
+    pub max_entries: usize,
 }
 
 impl Default for ExtractOptions {
     fn default() -> Self {
-        Self { exclude_prefixes: Vec::new(), max_uncompressed_bytes: DEFAULT_MAX_UNCOMPRESSED }
+        Self {
+            exclude_prefixes: Vec::new(),
+            max_uncompressed_bytes: DEFAULT_MAX_UNCOMPRESSED,
+            max_entries: DEFAULT_MAX_ENTRIES,
+        }
     }
 }
+
+pub const DEFAULT_MAX_ENTRIES: usize = 50_000;
 
 /// Extrae `archive` en `dest` y devuelve cuantos archivos escribio. Bloqueante:
 /// llamar desde `spawn_blocking` en contextos async.
@@ -40,8 +50,22 @@ pub fn extract_zip(
     dest: &Path,
     options: &ExtractOptions,
 ) -> Result<usize, ArchiveError> {
+    extract_zip_prefixed(archive, "", dest, options)
+}
+
+/// Como `extract_zip`, pero solo extrae las entradas bajo `prefix` (p. ej. `overrides/`) y
+/// las coloca en `dest` sin ese prefijo. `prefix` vacio extrae todo.
+pub fn extract_zip_prefixed(
+    archive: &Path,
+    prefix: &str,
+    dest: &Path,
+    options: &ExtractOptions,
+) -> Result<usize, ArchiveError> {
     let file = fs::File::open(archive)?;
     let mut zip = zip::ZipArchive::new(file)?;
+    if zip.len() > options.max_entries {
+        return Err(ArchiveError::TooManyEntries);
+    }
     fs::create_dir_all(dest)?;
 
     let mut written = 0usize;
@@ -56,9 +80,14 @@ pub fn extract_zip(
             .ok_or_else(|| ArchiveError::UnsafeEntry(entry.name().to_string()))?;
 
         let name = relative.to_string_lossy().replace('\\', "/");
+        let Some(name) = name.strip_prefix(prefix).map(str::to_string) else { continue };
+        if name.is_empty() {
+            continue;
+        }
         if options.exclude_prefixes.iter().any(|p| name.starts_with(p.as_str())) {
             continue;
         }
+        let relative = std::path::PathBuf::from(&name);
         // Enlaces simbolicos: nunca se materializan.
         if entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) {
             continue;
@@ -153,6 +182,42 @@ mod tests {
         build_zip(&zip_path, &[("/abs.txt", b"pwn")]);
         let err = extract_zip(&zip_path, &dir.path().join("out"), &ExtractOptions::default()).unwrap_err();
         assert!(matches!(err, ArchiveError::UnsafeEntry(_)));
+    }
+
+    #[test]
+    fn prefixed_extraction_strips_prefix_and_skips_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("pack.zip");
+        build_zip(
+            &zip_path,
+            &[("overrides/config/a.toml", b"a"), ("overrides/options.txt", b"o"), ("modrinth.index.json", b"{}"), ("other/x", b"x")],
+        );
+        let dest = dir.path().join("game");
+        let n = extract_zip_prefixed(&zip_path, "overrides/", &dest, &ExtractOptions::default()).unwrap();
+        assert_eq!(n, 2);
+        assert!(dest.join("config/a.toml").is_file());
+        assert!(dest.join("options.txt").is_file());
+        assert!(!dest.join("modrinth.index.json").exists());
+        assert!(!dest.join("other").exists());
+    }
+
+    #[test]
+    fn prefixed_traversal_is_still_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("evil.zip");
+        build_zip(&zip_path, &[("overrides/../../escape.txt", b"x")]);
+        let err = extract_zip_prefixed(&zip_path, "overrides/", &dir.path().join("g"), &ExtractOptions::default()).unwrap_err();
+        assert!(matches!(err, ArchiveError::UnsafeEntry(_)));
+    }
+
+    #[test]
+    fn entry_count_limit_is_enforced() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("many.zip");
+        build_zip(&zip_path, &[("a", b"1"), ("b", b"2"), ("c", b"3")]);
+        let options = ExtractOptions { max_entries: 2, ..Default::default() };
+        let err = extract_zip(&zip_path, &dir.path().join("o"), &options).unwrap_err();
+        assert!(matches!(err, ArchiveError::TooManyEntries));
     }
 
     #[test]

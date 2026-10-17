@@ -208,3 +208,46 @@ pub async fn mods_update(state: State<'_, AppState>, id: String, file: String) -
 pub async fn mods_rollback(state: State<'_, AppState>, id: String, file: String) -> Result<(), String> {
   state.launcher.mods_rollback(&id, &file).await.map_err(user_message)
 }
+
+/// Abre el selector de archivos y crea una instancia a partir del `.mrpack` elegido.
+/// Devuelve `None` si el usuario cancela. El avance llega por `install://progress` (fase `modpack`).
+#[tauri::command]
+pub async fn modpacks_import(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Option<Instance>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app
+    .dialog()
+    .file()
+    .add_filter("Modpack de Modrinth", &["mrpack"])
+    .blocking_pick_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  state.launcher.modpack_import(&path).await.map(Some).map_err(user_message)
+}
+
+/// Pide dónde guardar el `.mrpack` y exporta la instancia. `None` si el usuario cancela.
+#[tauri::command]
+pub async fn modpacks_export(
+  app: tauri::AppHandle,
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<Option<launcher_core::ExportSummary>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let name = state
+    .launcher
+    .instances_list()
+    .await
+    .map_err(user_message)?
+    .into_iter()
+    .find(|i| i.id == id)
+    .map(|i| i.name)
+    .unwrap_or_else(|| "modpack".to_string());
+  let picked = app
+    .dialog()
+    .file()
+    .add_filter("Modpack de Modrinth", &["mrpack"])
+    .set_file_name(format!("{name}.mrpack"))
+    .blocking_save_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo usar esa ubicación.".to_string())?;
+  state.launcher.modpack_export(&id, &path).await.map(Some).map_err(user_message)
+}

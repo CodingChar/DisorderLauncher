@@ -211,6 +211,20 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       pendingUpdates.add(args.file)
       return null
     }
+    case 'modpacks_import': {
+      if (!defaultId) throw 'Primero crea un perfil para poder jugar.'
+      const id = `inst_${++counter}`
+      for (let i = 0; i <= 10; i++) {
+        emit('install://progress', { instanceId: id, phase: 'modpack', completed: i * 5, total: 50 })
+        await sleep(80)
+      }
+      const now = new Date().toISOString()
+      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, createdAt: now, updatedAt: now }
+      instances = [...instances, inst]
+      return inst
+    }
+    case 'modpacks_export':
+      return { remoteFiles: 12, bundledFiles: 5 }
     case 'settings_get':
       return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
     case 'settings_update':

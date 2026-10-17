@@ -5,6 +5,7 @@
   import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import Input from '../lib/components/Input.svelte'
   import Select from '../lib/components/Select.svelte'
+  import { api } from '../lib/api'
   import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
@@ -93,6 +94,20 @@
     }
   }
 
+  async function exportPack() {
+    if (!instance) return
+    error = null
+    notice = null
+    try {
+      const summary = await api.modpacksExport(instance.id)
+      if (summary) {
+        notice = `Modpack guardado: ${summary.remoteFiles} mods por enlace y ${summary.bundledFiles} archivos incluidos.`
+      }
+    } catch (e) {
+      error = (e as Error).message
+    }
+  }
+
   async function remove() {
     if (!instance) return
     confirmDelete = false
@@ -163,6 +178,7 @@
       <h3>Más acciones</h3>
       <div class="row">
         <Button disabled={busy} onclick={duplicate}>Duplicar</Button>
+        <Button disabled={busy} onclick={exportPack}>Exportar como modpack…</Button>
         <Button disabled={busy} onclick={() => (confirmDelete = true)}>Eliminar…</Button>
       </div>
     </Card>

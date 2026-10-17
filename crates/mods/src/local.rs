@@ -57,8 +57,13 @@ impl ModManager {
         &self.mods_dir
     }
 
-    pub(crate) fn lock_path(&self) -> PathBuf {
+    /// Archivo con el registro de origen de los mods instalados desde Modrinth.
+    pub fn lock_file(&self) -> PathBuf {
         self.state_dir.join("mods.json")
+    }
+
+    pub(crate) fn lock_path(&self) -> PathBuf {
+        self.lock_file()
     }
 
     pub(crate) fn backup_dir(&self) -> PathBuf {

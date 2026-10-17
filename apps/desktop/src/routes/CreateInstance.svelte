@@ -3,6 +3,7 @@
   import Button from '../lib/components/Button.svelte'
   import Card from '../lib/components/Card.svelte'
   import Input from '../lib/components/Input.svelte'
+  import ProgressBar from '../lib/components/ProgressBar.svelte'
   import Select from '../lib/components/Select.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
@@ -14,6 +15,7 @@
   let loader = $state<LoaderKind>('vanilla')
   let error = $state<string | null>(null)
   let busy = $state(false)
+  let importing = $state(false)
 
   const loaderOptions = [
     { value: 'vanilla', label: 'Minecraft original (sin mods)' },
@@ -30,6 +32,20 @@
   $effect(() => {
     if (!version && versions.list.length > 0) version = versions.list[0].id
   })
+
+  async function importPack() {
+    if (importing) return
+    importing = true
+    error = null
+    try {
+      const instance = await instances.importModpack()
+      if (instance) nav.go('home')
+    } catch (e) {
+      error = (e as Error).message
+    } finally {
+      importing = false
+    }
+  }
 
   async function create() {
     if (busy) return
@@ -90,6 +106,17 @@
       </div>
     </form>
   </Card>
+
+  <Card>
+    <h3>¿Tienes un modpack?</h3>
+    <p class="note">Importa un archivo <strong>.mrpack</strong> (Modrinth) y se crea la instancia con todo lo necesario.</p>
+    {#if importing && instances.importPercent !== null}
+      <ProgressBar percent={instances.importPercent} label="Importando modpack" />
+    {/if}
+    <div class="row">
+      <Button disabled={importing || busy} onclick={importPack}>{importing ? 'Importando…' : 'Importar modpack…'}</Button>
+    </div>
+  </Card>
 </div>
 
 <style>
@@ -122,6 +149,11 @@
   .row {
     display: flex;
     gap: 12px;
+  }
+
+  h3 {
+    font-size: 18px;
+    margin-bottom: 6px;
   }
 
   .note,

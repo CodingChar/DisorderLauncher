@@ -53,6 +53,8 @@ pub struct VersionFile {
 pub struct Hashes {
     #[serde(default)]
     pub sha1: Option<String>,
+    #[serde(default)]
+    pub sha512: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

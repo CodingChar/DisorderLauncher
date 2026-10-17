@@ -1,4 +1,4 @@
-import { api } from '../api'
+import { api, events } from '../api'
 import type { Instance, InstanceChanges, LoaderKind } from '../types'
 
 class InstancesStore {
@@ -6,6 +6,8 @@ class InstancesStore {
   selectedId = $state<string | null>(null)
   loaded = $state(false)
   loadError = $state<string | null>(null)
+  /** Avance de la importacion de un modpack en curso (0-100), o `null`. */
+  importPercent = $state<number | null>(null)
 
   selected = $derived(this.list.find((i) => i.id === this.selectedId) ?? this.list[0] ?? null)
 
@@ -44,6 +46,25 @@ class InstancesStore {
     await this.load()
     this.selectedId = copy.id
     return copy
+  }
+
+  /** Abre el selector de modpack y crea la instancia. `null` si el usuario cancela. */
+  async importModpack() {
+    this.importPercent = 0
+    const stop = await events.onInstallProgress((e) => {
+      if (e.phase === 'modpack' && e.total > 0) this.importPercent = Math.round((e.completed / e.total) * 100)
+    })
+    try {
+      const instance = await api.modpacksImport()
+      if (instance) {
+        await this.load()
+        this.selectedId = instance.id
+      }
+      return instance
+    } finally {
+      stop()
+      this.importPercent = null
+    }
   }
 
   select(id: string) {

@@ -16,6 +16,7 @@ members = [
     "crates/diagnostics",
     "crates/loaders",
     "crates/mods",
+    "crates/modpacks",
     "apps/desktop/src-tauri",
 ]
 

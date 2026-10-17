@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type {
   AccountRecord,
+  ExportSummary,
   Instance,
   InstanceChanges,
   InstalledMod,
@@ -78,6 +79,8 @@ export const api = {
   modsCheckUpdates: (id: string) => call<UpdateInfo[]>('mods_check_updates', { id }),
   modsUpdate: (id: string, file: string) => call<InstalledMod>('mods_update', { id, file }),
   modsRollback: (id: string, file: string) => call<void>('mods_rollback', { id, file }),
+  modpacksImport: () => call<Instance | null>('modpacks_import'),
+  modpacksExport: (id: string) => call<ExportSummary | null>('modpacks_export', { id }),
   settingsGet: () => call<SettingsSnapshot>('settings_get'),
   settingsUpdate: (settings: Settings) => call<SettingsSnapshot>('settings_update', { settings }),
   listVersions: (includeAll = false) => call<VersionEntry[]>('minecraft_list_versions', { includeAll }),

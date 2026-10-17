@@ -38,14 +38,14 @@ const DEFAULT_JAVA_MAJOR: u32 = 8;
 /// identidad, instalacion, Java y lanzamiento. No conoce Tauri.
 pub struct Launcher {
     paths: LauncherPaths,
-    http: reqwest::Client,
+    pub(crate) http: reqwest::Client,
     accounts: Arc<dyn AccountRepository>,
     pub(crate) instances: Arc<FileInstanceRepository>,
     pub(crate) mods_service: mods::ModsService,
     registry: IdentityRegistry,
     loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>>,
     java: JavaManager,
-    events: Arc<dyn LauncherEvents>,
+    pub(crate) events: Arc<dyn LauncherEvents>,
     manifest_url: String,
     settings: Mutex<Settings>,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
@@ -198,7 +198,7 @@ impl Launcher {
             .await?)
     }
 
-    fn loader_provider(&self, kind: LoaderKind) -> Result<&Arc<dyn LoaderProvider>, LauncherError> {
+    pub(crate) fn loader_provider(&self, kind: LoaderKind) -> Result<&Arc<dyn LoaderProvider>, LauncherError> {
         self.loader_providers.get(&kind).ok_or(LauncherError::LoaderNotSupported)
     }
 
@@ -663,7 +663,7 @@ impl Launcher {
         });
     }
 
-    fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
+    pub(crate) fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
         self.running.lock().unwrap_or_else(|p| p.into_inner())
     }
 }

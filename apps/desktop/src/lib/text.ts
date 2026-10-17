@@ -4,6 +4,7 @@ import type { InstallPhase } from './types'
 export const phaseLabel: Record<InstallPhase, string> = {
   metadata: 'Preparando la descarga',
   loader: 'Descargando el cargador de mods',
+  modpack: 'Descargando los archivos del modpack',
   client: 'Descargando el juego',
   libraries: 'Descargando componentes',
   assetIndex: 'Preparando recursos',

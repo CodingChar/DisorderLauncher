@@ -54,6 +54,7 @@ export type ErrorKind = 'offline' | 'repairable' | 'other'
 export type InstallPhase =
   | 'metadata'
   | 'loader'
+  | 'modpack'
   | 'client'
   | 'libraries'
   | 'assetIndex'
@@ -165,4 +166,9 @@ export interface UpdateInfo {
 export interface LoaderVersion {
   version: string
   stable: boolean
+}
+
+export interface ExportSummary {
+  remoteFiles: number
+  bundledFiles: number
 }
