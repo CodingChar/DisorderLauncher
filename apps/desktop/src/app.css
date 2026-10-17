@@ -86,3 +86,25 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+.skip {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  background: var(--action);
+  color: var(--action-text);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.skip:focus {
+  transform: none;
+}
+
+main:focus,
+h1:focus {
+  outline: none;
+}

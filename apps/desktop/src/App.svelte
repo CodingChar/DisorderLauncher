@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import './app.css'
   import Button from './lib/components/Button.svelte'
   import ProfileBadge from './lib/components/ProfileBadge.svelte'
@@ -24,6 +24,22 @@
 
   const needsProfile = $derived(accounts.loaded && accounts.list.length === 0)
 
+  // Al cambiar de pantalla el foco pasa al titulo: lectores de pantalla y teclado no se quedan
+  // en un boton que ya no existe.
+  let firstView = true
+  $effect(() => {
+    nav.view
+    if (firstView) {
+      firstView = false
+      return
+    }
+    tick().then(() => {
+      const heading = document.querySelector<HTMLElement>('main h1')
+      heading?.setAttribute('tabindex', '-1')
+      heading?.focus({ preventScroll: true })
+    })
+  })
+
   onMount(async () => {
     await sessions.init()
     await Promise.all([settings.load(), accounts.load(), instances.load()])
@@ -42,6 +58,7 @@
 {:else if needsProfile}
   <Welcome />
 {:else}
+  <a class="skip" href="#main" onclick={(e) => { e.preventDefault(); document.getElementById('main')?.focus() }}>Saltar al contenido</a>
   <div class="shell">
     <aside class="sidebar">
       <div class="brand">
@@ -66,7 +83,7 @@
       {/if}
     </aside>
 
-    <main class="main">
+    <main class="main" id="main" tabindex="-1">
       {#if nav.view === 'home'}
         <Home />
       {:else if nav.view === 'create'}
