@@ -21,6 +21,8 @@
     { value: 'vanilla', label: 'Minecraft original (sin mods)' },
     { value: 'fabric', label: 'Fabric (permite instalar mods)' },
     { value: 'quilt', label: 'Quilt (compatible con mods de Fabric)' },
+    { value: 'forge', label: 'Forge (mods de Forge)' },
+    { value: 'neoforge', label: 'NeoForge (mods recientes, desde 1.20.2)' },
   ]
   const options = $derived(versions.list.map((v) => ({ value: v.id, label: v.id })))
 

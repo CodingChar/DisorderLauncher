@@ -16,6 +16,14 @@ pub enum LoaderError {
     ProfileMismatch,
     #[error("origen de descarga no permitido: {0}")]
     UntrustedSource(String),
+    #[error("falta Java para instalar este loader")]
+    JavaRequired,
+    #[error("el instalador del loader fallo: {0}")]
+    InstallerFailed(String),
+    #[error("el instalador del loader tardo demasiado")]
+    InstallerTimeout,
+    #[error("la suma de verificacion del instalador no coincide")]
+    ChecksumMismatch,
     #[error("{0} archivos del loader no se pudieron descargar")]
     DownloadFailures(usize),
 }

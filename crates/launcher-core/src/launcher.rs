@@ -15,7 +15,7 @@ use instance_manager::{
     MemoryPolicy, NewInstance,
 };
 use java_runtime::{JavaInstallation, JavaManager, JavaRequirement};
-use loaders::{FabricProvider, LoaderInstallContext, LoaderProvider, LoaderVersion, QuiltProvider};
+use loaders::{FabricProvider, ForgeProvider, LoaderInstallContext, LoaderProvider, LoaderVersion, NeoForgeProvider, QuiltProvider};
 use minecraft_install::{
     build_asset_artifacts, build_install_plan, legacy_assets_present, materialize_legacy_assets,
     InstallExecutor, InstallPhase, InstallPlan,
@@ -88,6 +88,8 @@ impl Launcher {
         let mut loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>> = HashMap::new();
         loader_providers.insert(LoaderKind::Fabric, Arc::new(FabricProvider::create(http.clone())));
         loader_providers.insert(LoaderKind::Quilt, Arc::new(QuiltProvider::create(http.clone())));
+        loader_providers.insert(LoaderKind::Forge, Arc::new(ForgeProvider::create(http.clone())));
+        loader_providers.insert(LoaderKind::NeoForge, Arc::new(NeoForgeProvider::create(http.clone())));
 
         Self {
             loader_providers,
@@ -313,7 +315,7 @@ impl Launcher {
             .find(|v| v.stable)
             .or_else(|| versions.first())
             .cloned()
-            .ok_or_else(|| LauncherError::LoaderUnavailable(format!("{kind:?}")))
+            .ok_or_else(|| LauncherError::LoaderUnavailable(loader_label(kind)))
     }
 
     /// Versiones del loader para una version de Minecraft (la mas reciente primero).
@@ -604,11 +606,12 @@ impl Launcher {
             self.install(id, &mut install_plan, &data_dir).await?;
         }
 
-        let overlay = self.prepare_loader(instance, &data_dir).await?;
-        let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
-
+        // Java antes que el loader: los instaladores de Forge/NeoForge se ejecutan con el.
         self.emit_state(id, LaunchState::PreparingJava);
         let java = self.select_java(instance, &descriptor).await?;
+
+        let overlay = self.prepare_loader(instance, &data_dir, &java).await?;
+        let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
 
         let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
         ctx.game_assets_dir = game_assets_dir;
@@ -657,10 +660,12 @@ impl Launcher {
         &self,
         instance: &Instance,
         data_dir: &Path,
+        java: &JavaInstallation,
     ) -> Result<Option<minecraft_launch::LaunchOverlay>, LauncherError> {
         if instance.loader == LoaderKind::Vanilla {
             return Ok(None);
         }
+        let java_executable = Some(java.executable());
         let provider = self.loader_provider(instance.loader)?;
         let loader_version = match &instance.loader_version {
             Some(v) => v.clone(),
@@ -682,6 +687,7 @@ impl Launcher {
             minecraft_version: &instance.minecraft_version,
             loader_version: &loader_version,
             concurrency: self.settings().download_profile.concurrency(),
+            java_executable: java_executable.as_deref(),
             progress: Arc::new(move |completed, total| {
                 events.install_progress(InstallProgressEvent {
                     instance_id: id.clone(),
@@ -770,6 +776,18 @@ impl Launcher {
     pub(crate) fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
         self.running.lock().unwrap_or_else(|p| p.into_inner())
     }
+}
+
+/// Nombre legible del cargador de mods.
+pub(crate) fn loader_label(kind: LoaderKind) -> String {
+    match kind {
+        LoaderKind::Vanilla => "Minecraft",
+        LoaderKind::Fabric => "Fabric",
+        LoaderKind::Forge => "Forge",
+        LoaderKind::NeoForge => "NeoForge",
+        LoaderKind::Quilt => "Quilt",
+    }
+    .to_string()
 }
 
 fn phase_name(phase: InstallPhase) -> &'static str {

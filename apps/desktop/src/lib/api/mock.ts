@@ -224,7 +224,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return { found: 2, fixed: 2, remaining: 0 } satisfies RepairSummary
     }
     case 'loaders_supported':
-      return ['fabric', 'quilt', 'vanilla']
+      return ['fabric', 'forge', 'neoforge', 'quilt', 'vanilla']
     case 'mods_list': {
       const inst = instances.find((i) => i.id === args.id)
       const mods = installedMods.get(args.id) ?? []

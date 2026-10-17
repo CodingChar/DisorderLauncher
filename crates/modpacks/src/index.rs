@@ -67,16 +67,16 @@ impl ModpackIndex {
         self.dependencies.get("minecraft").map(String::as_str).ok_or(ModpackError::NotAModpack)
     }
 
-    /// `None` para modpacks vanilla. Los loaders aun sin soporte devuelven error legible.
+    /// `None` para modpacks vanilla.
     pub fn loader(&self) -> Result<Option<RequiredLoader>, ModpackError> {
-        for (key, kind) in [("fabric-loader", LoaderKind::Fabric), ("quilt-loader", LoaderKind::Quilt)] {
+        for (key, kind) in [
+            ("fabric-loader", LoaderKind::Fabric),
+            ("quilt-loader", LoaderKind::Quilt),
+            ("neoforge", LoaderKind::NeoForge),
+            ("forge", LoaderKind::Forge),
+        ] {
             if let Some(version) = self.dependencies.get(key) {
                 return Ok(Some(RequiredLoader { kind, version: version.clone() }));
-            }
-        }
-        for (key, name) in [("forge", "Forge"), ("neoforge", "NeoForge")] {
-            if self.dependencies.contains_key(key) {
-                return Err(ModpackError::UnsupportedLoader(name.to_string()));
             }
         }
         Ok(None)
@@ -179,9 +179,11 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_loaders_have_readable_errors_and_vanilla_is_none() {
+    fn forge_family_loaders_are_recognised_and_vanilla_is_none() {
         let forge = parse_index(index_json("", r#""minecraft":"1.20.1","forge":"47.2.0""#).as_bytes()).unwrap();
-        assert!(matches!(forge.loader(), Err(ModpackError::UnsupportedLoader(n)) if n == "Forge"));
+        assert_eq!(forge.loader().unwrap(), Some(RequiredLoader { kind: LoaderKind::Forge, version: "47.2.0".into() }));
+        let neo = parse_index(index_json("", r#""minecraft":"1.21.1","neoforge":"21.1.172""#).as_bytes()).unwrap();
+        assert_eq!(neo.loader().unwrap(), Some(RequiredLoader { kind: LoaderKind::NeoForge, version: "21.1.172".into() }));
         let vanilla = parse_index(index_json("", r#""minecraft":"1.20.1""#).as_bytes()).unwrap();
         assert_eq!(vanilla.loader().unwrap(), None);
     }

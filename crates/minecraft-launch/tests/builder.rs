@@ -247,6 +247,7 @@ fn overlay_replaces_main_class_prioritizes_libraries_and_appends_args() {
             game: vec![ArgumentValue::Simple("--fabric-flag".into())],
             jvm: vec![ArgumentValue::Simple("-DFabricMcEmu=x".into())],
         }),
+        minecraft_arguments: None,
     });
     let plan = LaunchPlanBuilder::build(&version, &identity("0"), &java(), &c).unwrap();
 
@@ -256,4 +257,53 @@ fn overlay_replaces_main_class_prioritizes_libraries_and_appends_args() {
 
     let names: Vec<String> = plan.classpath.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
     assert_eq!(names, ["fabric-loader-0.16.0.jar", "a-2.jar", "1.21.jar"]);
+}
+
+#[test]
+fn forge_style_module_path_placeholders_are_resolved() {
+    use minecraft_launch::LaunchOverlay;
+    use minecraft_meta::{ArgumentValue, Arguments};
+
+    let version: VersionDescriptor = serde_json::from_str(MODERN).unwrap();
+    let mut c = ctx();
+    c.overlay = Some(LaunchOverlay {
+        main_class: Some("cpw.mods.bootstraplauncher.BootstrapLauncher".into()),
+        libraries: vec![],
+        arguments: Some(Arguments {
+            game: vec![ArgumentValue::Simple("--launchTarget".into()), ArgumentValue::Simple("forgeclient".into())],
+            jvm: vec![
+                ArgumentValue::Simple("-DlibraryDirectory=${library_directory}".into()),
+                ArgumentValue::Simple("-p".into()),
+                ArgumentValue::Simple("${library_directory}/a.jar${classpath_separator}${library_directory}/b.jar".into()),
+            ],
+        }),
+        minecraft_arguments: None,
+    });
+    let plan = LaunchPlanBuilder::build(&version, &identity("0"), &java(), &c).unwrap();
+
+    let sep = if cfg!(windows) { ";" } else { ":" };
+    assert!(plan.jvm_args.iter().any(|a| a.starts_with("-DlibraryDirectory=") && a.ends_with("libraries")));
+    let module_path = arg_after(&plan.jvm_args, "-p");
+    assert!(module_path.contains(&format!("a.jar{sep}")) && module_path.ends_with("/b.jar"), "{module_path}");
+    assert_eq!(&plan.game_args[plan.game_args.len() - 2..], ["--launchTarget", "forgeclient"]);
+    assert!(!plan.jvm_args.iter().chain(&plan.game_args).any(|a| a.contains("${")));
+}
+
+#[test]
+fn legacy_overlay_arguments_replace_the_vanilla_ones() {
+    use minecraft_launch::LaunchOverlay;
+
+    let version: VersionDescriptor = serde_json::from_str(LEGACY).unwrap();
+    let mut c = ctx();
+    c.overlay = Some(LaunchOverlay {
+        main_class: Some("net.minecraft.launchwrapper.Launch".into()),
+        libraries: vec![],
+        arguments: None,
+        minecraft_arguments: Some("--username ${auth_player_name} --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker".into()),
+    });
+    let plan = LaunchPlanBuilder::build(&version, &identity("0"), &java(), &c).unwrap();
+
+    assert_eq!(plan.main_class, "net.minecraft.launchwrapper.Launch");
+    assert_eq!(arg_after(&plan.game_args, "--tweakClass"), "net.minecraftforge.fml.common.launcher.FMLTweaker");
+    assert!(!plan.game_args.contains(&"--gameDir".to_string()), "los argumentos de vanilla se sustituyen");
 }

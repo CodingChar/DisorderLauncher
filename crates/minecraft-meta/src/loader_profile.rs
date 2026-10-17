@@ -12,6 +12,10 @@ pub struct LoaderProfile {
     pub main_class: String,
     #[serde(default)]
     pub arguments: Option<Arguments>,
+    /// Perfiles antiguos (Forge <= 1.12): cadena completa de argumentos de juego que
+    /// sustituye a la de vanilla.
+    #[serde(default)]
+    pub minecraft_arguments: Option<String>,
     #[serde(default)]
     pub libraries: Vec<Library>,
 }

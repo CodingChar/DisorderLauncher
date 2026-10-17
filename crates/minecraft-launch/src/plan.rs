@@ -94,6 +94,8 @@ pub struct LaunchOverlay {
     pub main_class: Option<String>,
     pub libraries: Vec<Library>,
     pub arguments: Option<Arguments>,
+    /// Argumentos de juego como cadena (formato antiguo); si existe, sustituye a los de vanilla.
+    pub minecraft_arguments: Option<String>,
 }
 
 /// Datos de entorno del launcher que no vienen de la version ni de la identidad.
@@ -171,6 +173,8 @@ impl LaunchPlanBuilder {
             .unwrap_or_else(|| assets_root.join("virtual").join(&version.asset_index.id));
         placeholders.set("game_assets", path_str(&game_assets));
         placeholders.set("natives_directory", path_str(&natives_dir));
+        placeholders.set("library_directory", path_str(&ctx.data_dir.join("libraries")));
+        placeholders.set("classpath_separator", if cfg!(windows) { ";" } else { ":" });
         placeholders.set("launcher_name", &ctx.launcher_name);
         placeholders.set("launcher_version", &ctx.launcher_version);
         if let Some((w, h)) = ctx.window_size {
@@ -179,6 +183,9 @@ impl LaunchPlanBuilder {
         }
 
         let (mut raw_jvm, mut raw_game) = collect_raw_args(version, &features)?;
+        if let Some(legacy) = ctx.overlay.as_ref().and_then(|o| o.minecraft_arguments.as_deref()) {
+            raw_game = legacy.split_whitespace().map(str::to_string).collect();
+        }
         if let Some(extra) = ctx.overlay.as_ref().and_then(|o| o.arguments.as_ref()) {
             raw_jvm.extend(expand_arguments(&extra.jvm, &features));
             raw_game.extend(expand_arguments(&extra.game, &features));

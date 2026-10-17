@@ -96,7 +96,32 @@ pub fn overlay_from_profile(profile: &LoaderProfile) -> LaunchOverlay {
         main_class: Some(profile.main_class.clone()),
         libraries: profile.libraries.clone(),
         arguments: profile.arguments.clone(),
+        minecraft_arguments: profile.minecraft_arguments.clone(),
     }
+}
+
+/// Perfil leido de disco cuyas librerias estan todas presentes.
+pub struct DiskProfile {
+    pub profile: LoaderProfile,
+}
+
+/// Lee `versions/<id>/<id>.json` y comprueba que existan todas las librerias que declara.
+/// `None` si falta el perfil, esta danado o falta alguna libreria (instalacion incompleta).
+pub async fn load_profile_from_disk(data_dir: &Path, profile_id: &str) -> Result<Option<DiskProfile>, LoaderError> {
+    let path = data_dir.join("versions").join(profile_id).join(format!("{profile_id}.json"));
+    let Ok(data) = tokio::fs::read(&path).await else { return Ok(None) };
+    let Ok(profile) = serde_json::from_slice::<LoaderProfile>(&data) else { return Ok(None) };
+
+    let libraries_dir = data_dir.join("libraries");
+    for lib in &profile.libraries {
+        if let Some(resolved) = resolve_library(lib) {
+            let present = tokio::fs::metadata(libraries_dir.join(&resolved.path)).await.map(|m| m.is_file()).unwrap_or(false);
+            if !present {
+                return Ok(None);
+            }
+        }
+    }
+    Ok(Some(DiskProfile { profile }))
 }
 
 pub fn parse_loader_versions(json: &[u8]) -> Result<Vec<LoaderVersion>, LoaderError> {
@@ -182,25 +207,8 @@ impl LoaderProvider for ProfileProvider {
         validate_component(loader_version)?;
 
         let profile_id = self.profile_id(minecraft_version, loader_version);
-        let Ok(data) = tokio::fs::read(Self::profile_path(data_dir, &profile_id)).await else {
-            return Ok(None);
-        };
-        let Ok(profile) = serde_json::from_slice::<LoaderProfile>(&data) else {
-            return Ok(None);
-        };
-
-        let libraries_dir = data_dir.join("libraries");
-        for lib in &profile.libraries {
-            if let Some(resolved) = resolve_library(lib) {
-                let present = tokio::fs::metadata(libraries_dir.join(&resolved.path))
-                    .await
-                    .map(|m| m.is_file())
-                    .unwrap_or(false);
-                if !present {
-                    return Ok(None);
-                }
-            }
-        }
-        Ok(Some(InstalledLoader { overlay: overlay_from_profile(&profile), profile_id }))
+        Ok(load_profile_from_disk(data_dir, &profile_id)
+            .await?
+            .map(|p| InstalledLoader { overlay: overlay_from_profile(&p.profile), profile_id }))
     }
 }

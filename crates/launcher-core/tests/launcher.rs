@@ -508,14 +508,13 @@ async fn vanilla_instances_do_not_support_mods() {
 }
 
 #[tokio::test]
-async fn unsupported_loaders_are_rejected_at_creation() {
+async fn loader_support_list_and_vanilla_needs_no_provider() {
     let (_d, launcher, _) = launcher();
     launcher.accounts_create_local("Steve").await.unwrap();
-    assert!(matches!(
-        launcher.instances_create("Forge", "1.20.1", LoaderKind::Forge, None).await,
-        Err(LauncherError::LoaderNotSupported)
-    ));
-    assert_eq!(launcher.supported_loaders(), vec![LoaderKind::Fabric, LoaderKind::Quilt, LoaderKind::Vanilla]);
+    // Con version de loader explicita no se consulta la red.
+    let forge = launcher.instances_create("Forge", "1.20.1", LoaderKind::Forge, Some("47.3.0".into())).await.unwrap();
+    assert_eq!((forge.loader, forge.loader_version.as_deref()), (LoaderKind::Forge, Some("47.3.0")));
+    assert_eq!(launcher.supported_loaders(), vec![LoaderKind::Fabric, LoaderKind::Forge, LoaderKind::NeoForge, LoaderKind::Quilt, LoaderKind::Vanilla]);
 }
 
 fn write_mrpack(path: &std::path::Path, index_json: &str, entries: &[(&str, &[u8])]) {
@@ -559,13 +558,6 @@ async fn imports_a_modpack_into_a_new_fabric_instance() {
 async fn import_rejects_unsupported_or_unsafe_packs_without_leaving_instances() {
     let (dir, launcher, _) = launcher();
     launcher.accounts_create_local("Steve").await.unwrap();
-
-    let forge = dir.path().join("forge.mrpack");
-    write_mrpack(&forge, &pack_index("", r#""minecraft":"1.20.1","forge":"47.2.0""#), &[]);
-    match launcher.modpack_import(&forge).await {
-        Err(LauncherError::InvalidInput(msg)) => assert!(msg.contains("Forge"), "{msg}"),
-        other => panic!("{other:?}"),
-    }
 
     let evil = dir.path().join("evil.mrpack");
     let file = r#"{"path":"../../evil.jar","hashes":{"sha1":"aa","sha512":"bb"},"downloads":["https://cdn.modrinth.com/a.jar"],"fileSize":1}"#;
@@ -760,4 +752,65 @@ async fn startup_notices_report_quarantined_profiles_once_and_keep_working() {
     assert!(notices[0].contains("danado"));
     assert!(launcher.startup_notices().await.is_empty(), "el aviso se entrega una sola vez");
     assert_eq!(launcher.accounts_list().await.unwrap().len(), 1);
+}
+
+/// Lanza una instancia con un loader real y comprueba que el juego lo carga. Reutiliza `DISORDER_E2E_DIR`.
+async fn run_loader_e2e(kind: LoaderKind, mc: &str, expected_in_output: &[&str]) {
+    let temp;
+    let root = match std::env::var("DISORDER_E2E_DIR") {
+        Ok(dir) => std::path::PathBuf::from(dir),
+        Err(_) => {
+            temp = tempfile::tempdir().unwrap();
+            temp.path().to_path_buf()
+        }
+    };
+    let events = Arc::new(Collector::default());
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(&root), events.clone()));
+    if launcher.accounts_list().await.unwrap().is_empty() {
+        launcher.accounts_create_local("Steve").await.unwrap();
+    }
+
+    let versions = launcher.loader_versions(kind, mc).await.unwrap();
+    println!("{kind:?} {mc}: {} versiones, la mas reciente {}", versions.len(), versions[0].version);
+    let instance = launcher.instances_create(&format!("E2E {kind:?}"), mc, kind, None).await.unwrap();
+    println!("version elegida: {:?}", instance.loader_version);
+
+    launcher.launch(&instance.id).await.unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(2400);
+    let first = loop {
+        {
+            let states = events.states.lock().unwrap();
+            if let Some(e) = states.iter().find(|e| matches!(e.state, LaunchState::Running { .. } | LaunchState::Failed { .. } | LaunchState::Exited { .. })) {
+                break e.state.clone();
+            }
+        }
+        assert!(std::time::Instant::now() < deadline, "timeout");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    assert!(matches!(first, LaunchState::Running { .. }), "{first:?}");
+
+    tokio::time::sleep(Duration::from_secs(25)).await;
+    let output = events.output.lock().unwrap().join("\n");
+    println!("salida del juego:\n{}", output.lines().take(60).collect::<Vec<_>>().join("\n"));
+    let alive = events.states.lock().unwrap().iter().all(|e| !matches!(e.state, LaunchState::Exited { .. }));
+    let _ = launcher.stop(&instance.id);
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+
+    let lower = output.to_lowercase();
+    for needle in expected_in_output {
+        assert!(lower.contains(&needle.to_lowercase()), "la salida debia contener {needle:?}");
+    }
+    assert!(alive, "el juego se cerro solo antes de tiempo");
+}
+
+#[tokio::test]
+#[ignore = "requiere internet, ejecuta el instalador oficial de Forge y abre Minecraft unos segundos"]
+async fn real_forge_install_launch_and_stop() {
+    run_loader_e2e(LoaderKind::Forge, "1.14.4", &["forge"]).await;
+}
+
+#[tokio::test]
+#[ignore = "requiere internet (~600 MB la primera vez), ejecuta el instalador de NeoForge y abre Minecraft unos segundos"]
+async fn real_neoforge_install_launch_and_stop() {
+    run_loader_e2e(LoaderKind::NeoForge, "1.21.1", &["neoforge"]).await;
 }

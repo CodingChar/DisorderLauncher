@@ -59,8 +59,11 @@
     <Card><p class="muted">No hay ninguna instancia seleccionada.</p></Card>
   {:else if overview && !overview.supported}
     <Card>
-      <h3>Esta instancia no admite mods</h3>
-      <p class="muted">Para usar mods crea una instancia de tipo <strong>Fabric</strong> o <strong>Quilt</strong>.</p>
+      <h3>La gestión de mods no está disponible aquí</h3>
+      <p class="muted">
+        Instalar y actualizar mods desde el launcher funciona con instancias <strong>Fabric</strong> o <strong>Quilt</strong>.
+        En Forge y NeoForge puedes copiar tus mods a la carpeta de la instancia.
+      </p>
       <div class="row">
         <Button variant="primary" onclick={() => nav.go('create')}>Crear instancia con mods</Button>
         <Button variant="ghost" onclick={() => nav.go('home')}>Volver</Button>

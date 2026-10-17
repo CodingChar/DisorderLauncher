@@ -3,10 +3,12 @@
 
 mod error;
 mod fabric;
+mod forge;
 mod trust;
 
 pub use error::*;
 pub use fabric::*;
+pub use forge::*;
 pub use trust::*;
 
 use instance_manager::LoaderKind;
@@ -26,6 +28,8 @@ pub struct LoaderInstallContext<'a> {
     pub minecraft_version: &'a str,
     pub loader_version: &'a str,
     pub concurrency: usize,
+    /// Java con el que se ejecuta el instalador (Forge/NeoForge). Fabric y Quilt no lo usan.
+    pub java_executable: Option<&'a Path>,
     /// `(completados, total)` de la descarga de librerias.
     pub progress: Arc<dyn Fn(usize, usize) + Send + Sync>,
 }

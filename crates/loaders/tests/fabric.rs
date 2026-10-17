@@ -98,6 +98,7 @@ async fn real_fabric_install() {
         minecraft_version: "1.20.1",
         loader_version: &latest_stable.version,
         concurrency: 4,
+        java_executable: None,
         progress: Arc::new(|_, _| {}),
     };
     let installed = provider.install(&ctx).await.unwrap();
@@ -140,6 +141,7 @@ async fn real_quilt_install() {
         minecraft_version: "1.20.1",
         loader_version: &stable.version,
         concurrency: 4,
+        java_executable: None,
         progress: Arc::new(|_, _| {}),
     };
     let installed = provider.install(&ctx).await.unwrap();
