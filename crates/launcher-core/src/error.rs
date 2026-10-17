@@ -138,3 +138,11 @@ impl From<java_runtime::JavaError> for LauncherError {
         }
     }
 }
+
+impl From<diagnostics::RepairError> for LauncherError {
+    fn from(e: diagnostics::RepairError) -> Self {
+        match e {
+            diagnostics::RepairError::Install(inner) => inner.into(),
+        }
+    }
+}

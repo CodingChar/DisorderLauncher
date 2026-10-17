@@ -32,6 +32,7 @@ pub fn run() {
       commands::instances_create,
       commands::instances_launch,
       commands::instances_stop,
+      commands::instances_repair,
       commands::minecraft_list_versions,
     ])
     .run(tauri::generate_context!())

@@ -1,6 +1,6 @@
 use crate::{
-    GameOutputEvent, InstallProgressEvent, IdentityRegistry, LaunchState, LaunchStateEvent,
-    LauncherError, LauncherEvents, LauncherPaths, OutputStream,
+    GameOutputEvent, IdentityRegistry, InstallProgressEvent, LaunchState, LaunchStateEvent,
+    LauncherError, LauncherEvents, LauncherPaths, OutputStream, RepairSummary,
 };
 use account_storage::{AccountRepository, FileAccountRepository};
 use chrono::Utc;
@@ -256,6 +256,52 @@ impl Launcher {
             this.running_guard().remove(&id);
         });
         Ok(())
+    }
+
+    /// Verifica la instalacion de una instancia y redescarga lo que falte o este danado.
+    /// No se puede reparar mientras el juego corre o se prepara.
+    pub async fn repair_instance(&self, instance_id: &str) -> Result<RepairSummary, LauncherError> {
+        let instance = self
+            .instances
+            .get(instance_id)
+            .await?
+            .ok_or(LauncherError::InstanceNotFound)?;
+
+        {
+            let mut running = self.running_guard();
+            if running.contains_key(&instance.id) {
+                return Err(LauncherError::AlreadyRunning);
+            }
+            running.insert(instance.id.clone(), None);
+        }
+        let result = self.repair_inner(&instance).await;
+        self.running_guard().remove(&instance.id);
+        result
+    }
+
+    async fn repair_inner(&self, instance: &Instance) -> Result<RepairSummary, LauncherError> {
+        let descriptor = self.resolve_descriptor(&instance.minecraft_version).await?;
+        let data_dir = self.paths.minecraft_dir();
+        let mut plan = build_install_plan(&descriptor, &data_dir);
+
+        let events = Arc::clone(&self.events);
+        let id = instance.id.clone();
+        let executor = InstallExecutor::new(self.http.clone(), self.download_concurrency);
+        let report = diagnostics::repair_installation(&executor, &mut plan, &data_dir, move |p| {
+            events.repair_progress(InstallProgressEvent {
+                instance_id: id.clone(),
+                phase: phase_name(p.phase),
+                completed: p.completed,
+                total: p.total,
+            })
+        })
+        .await?;
+
+        Ok(RepairSummary {
+            found: report.found,
+            fixed: report.fixed(),
+            remaining: report.after.issues.len() + usize::from(report.after.assets_unchecked),
+        })
     }
 
     /// Cierra el juego de una instancia en ejecucion.

@@ -4,6 +4,7 @@ use launcher_core::{
 use tauri::{AppHandle, Emitter};
 
 pub const INSTALL_PROGRESS: &str = "install://progress";
+pub const REPAIR_PROGRESS: &str = "repair://progress";
 pub const LAUNCH_STATE: &str = "launch://state";
 pub const LAUNCH_STDOUT: &str = "launch://stdout";
 pub const LAUNCH_STDERR: &str = "launch://stderr";
@@ -22,6 +23,10 @@ impl TauriEvents {
 impl LauncherEvents for TauriEvents {
   fn install_progress(&self, event: InstallProgressEvent) {
     let _ = self.app.emit(INSTALL_PROGRESS, event);
+  }
+
+  fn repair_progress(&self, event: InstallProgressEvent) {
+    let _ = self.app.emit(REPAIR_PROGRESS, event);
   }
 
   fn launch_state(&self, event: LaunchStateEvent) {

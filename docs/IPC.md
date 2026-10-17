@@ -16,6 +16,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `instances_create` | `name`, `version` | `Instance` (Vanilla, perfil predeterminado) |
 | `instances_launch` | `id` | `void` — inicia en segundo plano; el avance llega por eventos |
 | `instances_stop` | `id` | `void` |
+| `instances_repair` | `id` | `{ found, fixed, remaining }` — verifica hashes y redescarga lo danado |
 | `minecraft_list_versions` | `includeAll?` | `VersionEntry[]` (solo `release` salvo `includeAll`) |
 
 Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin duplicados (sin distinguir mayusculas).
@@ -25,6 +26,7 @@ Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin dupl
 | Evento | Payload |
 |---|---|
 | `install://progress` | `{ instanceId, phase, completed, total }` — `phase`: `client`, `libraries`, `assetIndex`, `assets`, `natives`, `verify` |
+| `repair://progress` | igual que `install://progress` |
 | `launch://state` | `{ instanceId, state }` — `state`: `preparing`, `installing`, `preparingJava`, `starting`, `running` (+`pid`), `exited` (+`code`), `failed` (+`message`) |
 | `launch://stdout` / `launch://stderr` | `{ instanceId, line }` (secretos redactados; tambien se guarda en `instances/<id>/logs/latest.log`) |
 

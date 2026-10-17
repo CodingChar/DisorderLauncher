@@ -59,6 +59,15 @@ pub async fn instances_stop(state: State<'_, AppState>, id: String) -> Result<()
   state.launcher.stop(&id).map_err(user_message)
 }
 
+/// Verifica y repara la instalacion; el avance llega por `repair://progress`.
+#[tauri::command]
+pub async fn instances_repair(
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<launcher_core::RepairSummary, String> {
+  state.launcher.repair_instance(&id).await.map_err(user_message)
+}
+
 /// Por defecto solo versiones estables; `include_all` agrega snapshots y antiguas.
 #[tauri::command]
 pub async fn minecraft_list_versions(

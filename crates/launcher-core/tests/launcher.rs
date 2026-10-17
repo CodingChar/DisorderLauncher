@@ -238,3 +238,9 @@ async fn real_manifest_lists_releases_and_resolves_a_descriptor() {
     assert!(releases.iter().any(|v| v.id == "1.21"));
     assert!(launcher.paths().manifest_cache().is_file());
 }
+
+#[tokio::test]
+async fn repair_of_unknown_instance_fails_cleanly() {
+    let (_d, launcher, _) = launcher();
+    assert!(matches!(launcher.repair_instance("inst_nope").await, Err(LauncherError::InstanceNotFound)));
+}

@@ -48,6 +48,19 @@ pub trait LauncherEvents: Send + Sync {
     fn install_progress(&self, event: InstallProgressEvent);
     fn launch_state(&self, event: LaunchStateEvent);
     fn game_output(&self, stream: OutputStream, event: GameOutputEvent);
+    /// Avance de una reparacion (mismo formato que el de instalacion).
+    fn repair_progress(&self, _event: InstallProgressEvent) {}
+}
+
+/// Resultado de reparar una instancia, pensado para mostrarse al usuario.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RepairSummary {
+    /// Archivos con problemas antes de reparar.
+    pub found: usize,
+    pub fixed: usize,
+    /// Problemas que siguen sin resolverse.
+    pub remaining: usize,
 }
 
 pub struct NoopEvents;
