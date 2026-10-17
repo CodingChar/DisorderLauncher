@@ -69,7 +69,7 @@ Java ≥ 9 aceptado para versiones de Java 8 · runtimes gestionados redescargad
 - ⬜ Redirecciones: el hash protege la integridad pero no se restringe el host final tras un redirect.
 - ⬜ Mods de Forge/NeoForge: no se administran desde el launcher (solo Fabric/Quilt); hay que copiarlos a la carpeta.
 - ⬜ Skins locales: se guardan y previsualizan; verlas dentro del juego exige un mod compatible.
-- ⬜ Editor de skins: sin alternativa de teclado para dibujar pixel a pixel.
+- 🟡 Editor de skins: alternativa de teclado hecha (flechas mueven el cursor, Mayús salta 8, Intro/Espacio pintan; probada solo por compilacion, falta revisarla a mano).
 - ⬜ Tema: `typography.scale` y `density` se validan pero aun no se aplican a la interfaz.
 - ⬜ Rendimiento: verificar ~2000 assets tarda ≈ 4,5–6 s (E/S de archivos en Windows).
 - ⬜ `style-src 'unsafe-inline'` sigue necesario por los estilos de Svelte.

@@ -68,6 +68,10 @@
   let previewSrc = $state('')
 
   let canvas = $state<HTMLCanvasElement>()
+  // Cursor del teclado sobre el lienzo (pixel) y su descripcion para lectores de pantalla.
+  let cursor = $state<[number, number]>([8, 8])
+  let cursorNote = $state('')
+  let canvasFocused = $state(false)
   let painting = false
   let lastPoint: [number, number] | null = null
 
@@ -134,6 +138,8 @@
     void showOverlay
     void layer
     void model
+    void cursor
+    void canvasFocused
     if (!canvas) return
     const ctx = canvas.getContext('2d')!
     const z = zoom
@@ -161,6 +167,14 @@
           ctx.fillRect(x * z, y * z, z, z)
         }
       }
+    }
+    if (canvasFocused) {
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 2
+      ctx.strokeRect(cursor[0] * z + 1, cursor[1] * z + 1, z - 2, z - 2)
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 1
+      ctx.strokeRect(cursor[0] * z + 3, cursor[1] * z + 3, z - 6, z - 6)
     }
     if (grid && z >= 8) {
       ctx.strokeStyle = 'rgba(255,255,255,0.08)'
@@ -201,7 +215,11 @@
     if (!p) return
     e.preventDefault()
     canvas?.setPointerCapture(e.pointerId)
+    beginAt(p)
+  }
 
+  /** Aplica la herramienta activa en un pixel; el trazo de lapiz/borrador queda abierto hasta `endStroke`. */
+  function beginAt(p: [number, number]) {
     if (tool === 'picker') {
       const [r, g, b, a] = getPixel(img, p[0], p[1])
       if (a > 0) color = rgbaToHex([r, g, b, a])
@@ -230,6 +248,23 @@
     painting = true
     lastPoint = null
     stroke(p)
+  }
+
+  // Alternativa de teclado: flechas mueven el cursor (Mayus = 8 pixeles) y Enter o Espacio pintan.
+  function onCanvasKey(e: KeyboardEvent) {
+    if (loading || e.ctrlKey || e.metaKey || e.altKey) return
+    const step = e.shiftKey ? 8 : 1
+    const move: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
+    const delta = move[e.key]
+    if (delta) {
+      e.preventDefault()
+      cursor = [Math.max(0, Math.min(SIZE - 1, cursor[0] + delta[0])), Math.max(0, Math.min(SIZE - 1, cursor[1] + delta[1]))]
+      cursorNote = `Pixel ${cursor[0] + 1}, ${cursor[1] + 1}`
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      beginAt(cursor)
+      endStroke()
+    }
   }
 
   function stroke(p: [number, number]) {
@@ -387,12 +422,17 @@
           bind:this={canvas}
           width={SIZE * zoom}
           height={SIZE * zoom}
-          aria-label="Lienzo de la skin de 64 por 64 píxeles. Se dibuja con el ratón o un lápiz táctil."
+          tabindex="0"
+          aria-label="Lienzo de la skin de 64 por 64 píxeles. Se dibuja con el ratón o un lápiz táctil; con el teclado, flechas para moverte (Mayús salta 8 píxeles) y Intro o Espacio para pintar."
+          onkeydown={onCanvasKey}
+          onfocus={() => (canvasFocused = true)}
+          onblur={() => (canvasFocused = false)}
           onpointerdown={onPointerDown}
           onpointermove={onPointerMove}
           style:cursor={tool === 'picker' ? 'copy' : 'crosshair'}
         ></canvas>
       </div>
+      <p class="sr-only" role="status" aria-live="polite">{cursorNote}</p>
 
       <div class="bar">
         <Button disabled={!canUndo} onclick={undo}>Deshacer</Button>
@@ -562,6 +602,15 @@
     width: 18px;
     height: 18px;
     accent-color: var(--action);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .canvas-wrap {
