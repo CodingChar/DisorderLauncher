@@ -12,3 +12,4 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 sha1 = { workspace = true }
+reqwest = { workspace = true }
