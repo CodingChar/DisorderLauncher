@@ -221,3 +221,16 @@ export type AuthEvent =
   | { state: 'connected'; accountId: string; name: string }
   | { state: 'cancelled' }
   | { state: 'failed'; message: string }
+
+export type SkinModel = 'classic' | 'slim'
+
+export interface SkinAsset {
+  id: string
+  name: string
+  model: SkinModel
+  source: 'local' | 'microsoftProfile'
+  width: number
+  height: number
+  createdAt: string
+  updatedAt: string
+}

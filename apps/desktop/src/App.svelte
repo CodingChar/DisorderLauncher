@@ -13,6 +13,7 @@
   import Home from './routes/Home.svelte'
   import Mods from './routes/Mods.svelte'
   import Settings from './routes/Settings.svelte'
+  import Skins from './routes/Skins.svelte'
   import { settings } from './lib/stores/settings.svelte'
   import Welcome from './routes/Welcome.svelte'
 
@@ -20,6 +21,7 @@
     { view: 'home', label: 'Inicio' },
     { view: 'create', label: 'Nueva instancia' },
     { view: 'accounts', label: 'Perfiles' },
+    { view: 'skins', label: 'Skins' },
     { view: 'settings', label: 'Ajustes' },
   ]
 
@@ -94,6 +96,8 @@
         <EditInstance />
       {:else if nav.view === 'mods'}
         <Mods />
+      {:else if nav.view === 'skins'}
+        <Skins />
       {:else if nav.view === 'settings'}
         <Settings />
       {:else}

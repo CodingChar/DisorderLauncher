@@ -1,7 +1,7 @@
 // Backend simulado SOLO para desarrollo en navegador (sin Tauri). No se incluye en
 // builds de produccion: api/index.ts lo importa de forma dinamica bajo import.meta.env.DEV.
 
-import type { AccountRecord, Instance, ProgressEvent, RepairSummary, VersionEntry } from '../types'
+import type { AccountRecord, Instance, ProgressEvent, RepairSummary, SkinAsset, VersionEntry } from '../types'
 
 type Handler = (payload: any) => void
 const handlers = new Map<string, Set<Handler>>()
@@ -22,6 +22,7 @@ let accounts: AccountRecord[] = []
 let defaultId: string | null = null
 let instances: Instance[] = []
 let counter = 0
+let mockSkins: { asset: SkinAsset; url: string }[] = []
 let msLoginPending = false
 const msExpired = new Set<string>()
 let mockThemes: any[] = [
@@ -67,6 +68,34 @@ async function simulateLaunch(instanceId: string) {
   state({ state: 'running', pid: 1234 })
   await sleep(3000)
   state({ state: 'exited', code: 0 })
+}
+
+
+/** PNG de 64x64 generado en el navegador (solo para la vista previa de desarrollo). */
+function makeMockSkin(seed: number): string {
+  const palettes = [
+    ['#c68e6b', '#3b2a1a', '#2f6bb0', '#2a2f6b'],
+    ['#e0ac84', '#d9b44a', '#8a2f5c', '#3a3a4a'],
+    ['#a56b4a', '#111111', '#2f8f5b', '#1d3b2a'],
+  ]
+  const [skin, hair, shirt, pants] = palettes[seed % palettes.length]
+  const c = document.createElement('canvas')
+  c.width = 64
+  c.height = 64
+  const g = c.getContext('2d')!
+  const r = (col: string, x: number, y: number, w: number, h: number) => {
+    g.fillStyle = col
+    g.fillRect(x, y, w, h)
+  }
+  r(skin, 8, 8, 8, 8)
+  r(hair, 8, 8, 8, 2)
+  r(shirt, 20, 20, 8, 12)
+  r(skin, 44, 20, 4, 12)
+  r(skin, 36, 52, 4, 12)
+  r(pants, 4, 20, 4, 12)
+  r(pants, 20, 52, 4, 12)
+  r(hair, 40, 8, 8, 3)
+  return c.toDataURL('image/png')
 }
 
 export async function mockCall(cmd: string, args: Record<string, any> = {}): Promise<any> {
@@ -281,6 +310,38 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
     }
     case 'modpacks_export':
       return { remoteFiles: 12, bundledFiles: 5 }
+    case 'skins_list':
+      return mockSkins.map((s) => s.asset)
+    case 'skins_import': {
+      const n = mockSkins.length + 1
+      const asset = { id: `skin_${String(n).padStart(32, '0')}`, name: `Skin importada ${n}`, model: (n % 2 ? 'classic' : 'slim') as 'classic' | 'slim', source: 'local' as const, width: 64, height: 64, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      mockSkins.push({ asset, url: makeMockSkin(n) })
+      return asset
+    }
+    case 'skins_read':
+      return mockSkins.find((s) => s.asset.id === args.id)?.url ?? ''
+    case 'skins_rename': {
+      const s = mockSkins.find((x) => x.asset.id === args.id)
+      if (!s) throw 'No se encontro esa skin.'
+      s.asset = { ...s.asset, name: args.name }
+      return s.asset
+    }
+    case 'skins_set_model': {
+      const s = mockSkins.find((x) => x.asset.id === args.id)
+      if (!s) throw 'No se encontro esa skin.'
+      s.asset = { ...s.asset, model: args.model }
+      return s.asset
+    }
+    case 'skins_remove':
+      mockSkins = mockSkins.filter((s) => s.asset.id !== args.id)
+      accounts = accounts.map((a) => (a.providerData.type === 'local' && a.providerData.skinId === args.id ? { ...a, providerData: { ...a.providerData, skinId: null } } : a))
+      return null
+    case 'skins_export':
+      return true
+    case 'accounts_set_skin': {
+      accounts = accounts.map((a) => (a.id === args.accountId && a.providerData.type === 'local' ? { ...a, providerData: { ...a.providerData, skinId: args.skinId } } : a))
+      return null
+    }
     case 'themes_list':
       return mockThemes
     case 'themes_import': {
