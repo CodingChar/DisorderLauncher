@@ -1,5 +1,5 @@
 use crate::file::InstanceFile;
-use crate::model::{validate_memory, validate_name, validate_required};
+use crate::model::{validate_memory, validate_name, validate_required, validate_version};
 use crate::{
     Instance, InstanceError, InstanceUpdate, JavaSelection, MemoryPolicy, NewInstance,
 };
@@ -109,7 +109,7 @@ impl InstanceRepository for FileInstanceRepository {
 
     async fn create(&self, new: NewInstance) -> Result<Instance, InstanceError> {
         let name = validate_name(&new.name)?;
-        validate_required("la version de Minecraft", &new.minecraft_version)?;
+        let minecraft_version = validate_version(&new.minecraft_version)?;
         validate_required("el perfil", &new.profile_id)?;
 
         let id = format!("{ID_PREFIX}{}", uuid::Uuid::new_v4().simple());
@@ -118,7 +118,7 @@ impl InstanceRepository for FileInstanceRepository {
         let instance = Instance {
             id,
             name,
-            minecraft_version: new.minecraft_version.trim().to_string(),
+            minecraft_version,
             loader: new.loader,
             loader_version: new.loader_version,
             profile_id: new.profile_id,
@@ -142,8 +142,7 @@ impl InstanceRepository for FileInstanceRepository {
             instance.name = validate_name(&name)?;
         }
         if let Some(version) = changes.minecraft_version {
-            validate_required("la version de Minecraft", &version)?;
-            instance.minecraft_version = version.trim().to_string();
+            instance.minecraft_version = validate_version(&version)?;
         }
         if let Some(profile_id) = changes.profile_id {
             validate_required("el perfil", &profile_id)?;
@@ -348,6 +347,24 @@ mod tests {
             ..Default::default()
         };
         assert!(matches!(repo.update(&inst.id, bad_mem).await, Err(InstanceError::Invalid(_))));
+    }
+
+    #[tokio::test]
+    async fn minecraft_versions_cannot_be_paths() {
+        let (_d, repo) = repo();
+        for bad in ["../../x", "1.21/../x", r"a\b", ".hidden", "", "a/b", "v?x", &"9".repeat(65)] {
+            let mut new = new_instance("A");
+            new.minecraft_version = bad.to_string();
+            assert!(matches!(repo.create(new).await, Err(InstanceError::Invalid(_))), "{bad}");
+        }
+        for ok in ["1.21.4", "24w14a", "b1.7.3", "3D Shareware v1.34", "1.14.4-pre1", "rd-132211"] {
+            let mut new = new_instance("A");
+            new.minecraft_version = ok.to_string();
+            assert!(repo.create(new).await.is_ok(), "{ok}");
+        }
+        let inst = repo.create(new_instance("B")).await.unwrap();
+        let bad = InstanceUpdate { minecraft_version: Some("../x".into()), ..Default::default() };
+        assert!(matches!(repo.update(&inst.id, bad).await, Err(InstanceError::Invalid(_))));
     }
 
     #[tokio::test]

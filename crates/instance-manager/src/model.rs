@@ -102,6 +102,19 @@ pub(crate) fn validate_memory(memory: &MemoryPolicy) -> Result<(), InstanceError
     Ok(())
 }
 
+/// La version de Minecraft se usa como nombre de carpeta (`versions/<id>/`): solo letras, numeros,
+/// espacio y `. - _ +`; sin `..`, separadores ni punto inicial. Admite ids como `1.21.4`, `24w14a`,
+/// `b1.7.3` o `3D Shareware v1.34`.
+pub(crate) fn validate_version(version: &str) -> Result<String, InstanceError> {
+    let v = version.trim();
+    let ok = !v.is_empty()
+        && v.len() <= 64
+        && !v.starts_with('.')
+        && !v.contains("..")
+        && v.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+' | ' '));
+    if ok { Ok(v.to_string()) } else { Err(InstanceError::Invalid("la version de Minecraft no es valida".into())) }
+}
+
 pub(crate) fn validate_required(field: &str, value: &str) -> Result<(), InstanceError> {
     if value.trim().is_empty() {
         return Err(InstanceError::Invalid(format!("{field} es obligatorio")));
