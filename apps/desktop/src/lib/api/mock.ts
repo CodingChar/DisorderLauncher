@@ -34,6 +34,10 @@ async function simulateLaunch(instanceId: string) {
   const state = (s: Record<string, unknown>) => emit('launch://state', { instanceId: instanceId, ...s })
   state({ state: 'preparing' })
   await sleep(400)
+  if (instances.find((i) => i.id === instanceId)?.name.toLowerCase().includes('sin red')) {
+    state({ state: 'failed', message: 'Necesitas conexion a internet para descargar los archivos que faltan.', kind: 'offline' })
+    return
+  }
   state({ state: 'installing' })
   const phases: ProgressEvent['phase'][] = ['client', 'libraries', 'assets']
   for (const phase of phases) {

@@ -46,6 +46,9 @@ export interface VersionEntry {
   releaseTime: string
 }
 
+/** Que accion ofrecer ante un fallo: reintentar con internet, reparar archivos u otra cosa. */
+export type ErrorKind = 'offline' | 'repairable' | 'other'
+
 export type InstallPhase =
   | 'metadata'
   | 'client'
@@ -69,7 +72,7 @@ export type LaunchStateEvent = { instanceId: string } & (
   | { state: 'starting' }
   | { state: 'running'; pid: number }
   | { state: 'exited'; code: number | null }
-  | { state: 'failed'; message: string }
+  | { state: 'failed'; message: string; kind: ErrorKind }
 )
 
 export interface RepairSummary {

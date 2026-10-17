@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from '../lib/components/Button.svelte'
   import Card from '../lib/components/Card.svelte'
+  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import InstanceCard from '../lib/components/InstanceCard.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
   import { loaderLabel, phaseLabel } from '../lib/text'
@@ -43,6 +44,27 @@
     }
   })
 
+  // Un fallo (o un cierre inesperado) se muestra en un dialogo con la accion adecuada.
+  const crashed = $derived(session?.phase === 'exited' && !!session.exitCode && session.exitCode !== 0)
+  const failure = $derived.by(() => {
+    if (session?.phase === 'failed') {
+      const message = session.message ?? 'No se pudo iniciar Minecraft.'
+      return { message, retry: session.kind === 'offline', repair: session.kind === 'repairable' }
+    }
+    if (crashed) {
+      return { message: 'Minecraft se cerró de forma inesperada. Reparar la instancia suele solucionarlo.', retry: false, repair: true }
+    }
+    return null
+  })
+
+  function onFailureConfirm() {
+    if (!instance || !failure) return
+    const id = instance.id
+    sessions.dismiss(id)
+    if (failure.retry) sessions.launch(id)
+    else if (failure.repair) sessions.repair(id)
+  }
+
   const isProblem = $derived(
     session?.phase === 'failed' || (session?.phase === 'exited' && !!session.exitCode && session.exitCode !== 0),
   )
@@ -81,6 +103,16 @@
         </div>
       </div>
     </Card>
+
+    <ConfirmDialog
+      open={failure !== null}
+      title={failure?.retry ? 'Sin conexión' : 'Algo salió mal'}
+      message={failure?.message ?? ''}
+      confirmLabel={failure?.retry ? 'Reintentar' : failure?.repair ? 'Reparar' : 'Entendido'}
+      cancelLabel={failure?.retry || failure?.repair ? 'Cerrar' : ''}
+      onconfirm={onFailureConfirm}
+      oncancel={() => instance && sessions.dismiss(instance.id)}
+    />
 
     <section aria-labelledby="recent">
       <div class="section-head">

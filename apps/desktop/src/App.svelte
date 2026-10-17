@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import './app.css'
+  import Button from './lib/components/Button.svelte'
   import ProfileBadge from './lib/components/ProfileBadge.svelte'
   import { accounts } from './lib/stores/accounts.svelte'
   import { instances } from './lib/stores/instances.svelte'
@@ -32,7 +33,12 @@
 {#if !accounts.loaded}
   <div class="boot" role="status">Cargando…</div>
 {:else if accounts.loadError}
-  <div class="boot" role="alert">{accounts.loadError}</div>
+  <div class="boot" role="alert">
+    <div class="boot-box">
+      <p>{accounts.loadError}</p>
+      <Button onclick={() => accounts.load()}>Reintentar</Button>
+    </div>
+  </div>
 {:else if needsProfile}
   <Welcome />
 {:else}
@@ -84,6 +90,17 @@
     color: var(--text-secondary);
     padding: 24px;
     text-align: center;
+  }
+
+  .boot-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .boot-box p {
+    margin: 0;
   }
 
   .shell {

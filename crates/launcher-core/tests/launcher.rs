@@ -204,7 +204,7 @@ async fn launch_reports_offline_failure_and_can_be_retried() {
     let state = wait_for_state(&events, |s| matches!(s, LaunchState::Failed { .. })).await;
     assert_eq!(
         state,
-        LaunchState::Failed { message: LauncherError::Offline.to_string() }
+        LaunchState::Failed { message: LauncherError::Offline.to_string(), kind: launcher_core::ErrorKind::Offline }
     );
 
     // La instancia vuelve a quedar libre tras el fallo.

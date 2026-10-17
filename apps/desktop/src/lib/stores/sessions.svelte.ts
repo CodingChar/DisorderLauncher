@@ -1,5 +1,5 @@
 import { api, events } from '../api'
-import type { InstallPhase } from '../types'
+import type { ErrorKind, InstallPhase } from '../types'
 
 export type SessionPhase =
   | 'preparing'
@@ -14,6 +14,7 @@ export type SessionPhase =
 export interface Session {
   phase: SessionPhase
   message?: string
+  kind?: ErrorKind
   exitCode?: number | null
   progress?: { phase: InstallPhase; completed: number; total: number }
 }
@@ -24,6 +25,8 @@ const BUSY: SessionPhase[] = ['preparing', 'installing', 'preparingJava', 'start
 class SessionsStore {
   byInstance = $state<Record<string, Session>>({})
   private started = false
+  /** Instancias que el usuario pidio cerrar: su salida no es un fallo. */
+  private stopping = new Set<string>()
 
   get(id: string): Session | undefined {
     return this.byInstance[id]
@@ -42,11 +45,13 @@ class SessionsStore {
         const prev = this.byInstance[e.instanceId]
         switch (e.state) {
           case 'failed':
-            this.set(e.instanceId, { phase: 'failed', message: e.message })
+            this.set(e.instanceId, { phase: 'failed', message: e.message, kind: e.kind })
             break
-          case 'exited':
-            this.set(e.instanceId, { phase: 'exited', exitCode: e.code })
+          case 'exited': {
+            const requested = this.stopping.delete(e.instanceId)
+            this.set(e.instanceId, { phase: 'exited', exitCode: requested ? 0 : e.code })
             break
+          }
           default:
             this.set(e.instanceId, { phase: e.state, progress: e.state === 'installing' ? prev?.progress : undefined })
         }
@@ -61,15 +66,23 @@ class SessionsStore {
     try {
       await api.instancesLaunch(id)
     } catch (e) {
-      this.set(id, { phase: 'failed', message: (e as Error).message })
+      this.set(id, { phase: 'failed', message: (e as Error).message, kind: 'other' })
     }
   }
 
+  /** Cierra el aviso de error y devuelve la instancia a su estado normal. */
+  dismiss(id: string) {
+    const { [id]: _removed, ...rest } = this.byInstance
+    this.byInstance = rest
+  }
+
   async stop(id: string) {
+    this.stopping.add(id)
     try {
       await api.instancesStop(id)
     } catch (e) {
-      this.set(id, { phase: 'failed', message: (e as Error).message })
+      this.stopping.delete(id)
+      this.set(id, { phase: 'failed', message: (e as Error).message, kind: 'other' })
     }
   }
 
@@ -87,7 +100,7 @@ class SessionsStore {
               : 'No se pudo reparar todo. Revisa tu conexión a internet e inténtalo otra vez.',
       })
     } catch (e) {
-      this.set(id, { phase: 'failed', message: (e as Error).message })
+      this.set(id, { phase: 'failed', message: (e as Error).message, kind: 'repairable' })
     }
   }
 

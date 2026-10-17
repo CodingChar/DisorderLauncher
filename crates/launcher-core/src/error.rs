@@ -51,6 +51,27 @@ pub enum LauncherError {
     Storage,
 }
 
+/// Que accion puede ofrecer la interfaz ante un fallo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorKind {
+    /// Falta conexion: reintentar cuando haya internet.
+    Offline,
+    /// Archivos del juego danados o incompletos: reparar.
+    Repairable,
+    Other,
+}
+
+impl LauncherError {
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::Offline => ErrorKind::Offline,
+            Self::CorruptDownload | Self::InstallFailed | Self::MissingGameFiles => ErrorKind::Repairable,
+            _ => ErrorKind::Other,
+        }
+    }
+}
+
 impl From<account_storage::StorageError> for LauncherError {
     fn from(e: account_storage::StorageError) -> Self {
         tracing::error!(error = %e, "error de almacenamiento de cuentas");

@@ -18,7 +18,7 @@ pub enum LaunchState {
     Starting,
     Running { pid: u32 },
     Exited { code: Option<i32> },
-    Failed { message: String },
+    Failed { message: String, kind: crate::ErrorKind },
 }
 
 #[derive(Debug, Clone, Serialize)]

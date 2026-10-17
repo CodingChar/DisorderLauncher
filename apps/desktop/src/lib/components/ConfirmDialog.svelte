@@ -28,7 +28,9 @@
   <h3 id="{uid}-title">{title}</h3>
   <p id="{uid}-msg">{message}</p>
   <div class="actions">
-    <Button variant="ghost" onclick={oncancel}>{cancelLabel}</Button>
+    {#if cancelLabel}
+      <Button variant="ghost" onclick={oncancel}>{cancelLabel}</Button>
+    {/if}
     <Button variant="primary" onclick={onconfirm}>{confirmLabel}</Button>
   </div>
 </dialog>

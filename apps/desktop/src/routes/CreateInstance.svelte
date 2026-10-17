@@ -61,6 +61,11 @@
           <p>{versions.error}</p>
           <Button onclick={() => versions.load()}>Reintentar</Button>
         </div>
+      {:else if options.length === 0}
+        <div class="note-block">
+          <p>No hay versiones disponibles por ahora. Comprueba tu conexión a internet.</p>
+          <Button onclick={() => versions.load()}>Buscar de nuevo</Button>
+        </div>
       {:else}
         <Select label="Versión de Minecraft" bind:value={version} {options} />
       {/if}

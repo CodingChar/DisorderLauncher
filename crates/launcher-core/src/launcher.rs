@@ -324,7 +324,7 @@ impl Launcher {
         tokio::spawn(async move {
             let id = instance.id.clone();
             if let Err(e) = this.run(&instance).await {
-                this.emit_state(&id, LaunchState::Failed { message: e.to_string() });
+                this.emit_state(&id, LaunchState::Failed { message: e.to_string(), kind: e.kind() });
             }
             this.running_guard().remove(&id);
         });
