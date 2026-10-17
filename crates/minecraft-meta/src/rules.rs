@@ -17,7 +17,8 @@ pub fn current_arch() -> &'static str {
     } else if cfg!(target_arch = "x86") {
         "x86"
     } else if cfg!(target_arch = "aarch64") {
-        "aarch64"
+        // Mojang etiqueta las librerias ARM con `arm64` (no `aarch64`).
+        "arm64"
     } else {
         "unknown"
     }
@@ -109,6 +110,18 @@ mod tests {
             }),
             features: feature.map(|(k, v)| HashMap::from([(k.to_string(), v)])),
         }
+    }
+
+    #[test]
+    fn arm_rules_use_mojangs_arm64_name() {
+        let arm_rule = Rule {
+            action: "allow".into(),
+            os: Some(OsRule { name: None, version: None, arch: Some("arm64".into()) }),
+            features: None,
+        };
+        // Solo coincide en equipos ARM; en x64 una regla `arm64` no aplica.
+        assert_eq!(rules_allow(&[arm_rule]), cfg!(target_arch = "aarch64"));
+        assert_ne!(current_arch(), "aarch64");
     }
 
     #[test]
