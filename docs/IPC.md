@@ -18,7 +18,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `accounts_auth_state` | `id` | `AuthState` (`LocalReady`, `MicrosoftAuthenticated`, `MicrosoftExpired`, `MicrosoftOfflineCachedIdentity`, `{Error: ...}`) |
 | `accounts_remove` | `id` | `void` — falla si alguna instancia usa el perfil; olvida los tokens de Microsoft |
 | `instances_list` | — | `Instance[]` |
-| `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto), `fabric` o `quilt`; sin `loaderVersion` se usa la ultima estable |
+| `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto), `fabric`, `quilt`, `forge` o `neoforge`; sin `loaderVersion` se usa la ultima estable |
 | `loaders_supported` | — | `LoaderKind[]` (siempre incluye `vanilla`) |
 | `loaders_list_versions` | `loader`, `minecraftVersion` | `{ version, stable }[]` |
 | `instances_update` | `id`, `changes` | `Instance` — `changes` (todos opcionales): `name`, `minecraftVersion`, `profileId`, `java` (`{mode:'auto'}` o `{mode:'path', path}`), `memory` (`{mode:'auto'}` o `{mode:'fixed', minMb, maxMb}`) |

@@ -6,7 +6,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 
 | Plataforma | Compila + tests | Flujo real (instalar y jugar) | UI en navegador |
 |---|---|---|---|
-| Windows 10 (x64) | ✅ | ✅ Vanilla 1.0 (Java 8 gestionado), Fabric 1.14.4 | 🖐 Chromium (con backend simulado) |
+| Windows 10 (x64) | ✅ | ✅ Vanilla 1.0 (Java 8), Fabric 1.14.4, Forge 1.14.4, NeoForge 1.21.1 (Java 21) | 🖐 Chromium (con backend simulado) |
 | Linux | ⚠️ (CI configurado, sin ejecutar) | ⚠️ | ⚠️ |
 | macOS | ⚠️ (sin CI) | ⚠️ | ⚠️ |
 | Ventana nativa de Tauri (Windows) | ✅ build release + MSI | 🖐 arranque del `.exe` verificado via CDP: pantalla de bienvenida bajo la CSP de produccion, IPC real (`accounts_list`, `settings_get`, `themes_list`, `loaders_supported`, `microsoft_status`) y 0 errores de consola | 🖐 |
@@ -20,7 +20,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 | Vanilla (install/launch/repair) | ✅ | ✅ 1.0 | Allowlist Mojang verificada con descarga real |
 | Java gestionado (Adoptium) | ✅ checksum, seleccion | ✅ Java 8 | |
 | Fabric / Quilt | ✅ | ✅ Fabric (juego), Quilt (instalacion) | |
-| NeoForge / Forge | ❌ | ❌ | Requiere procesar instaladores |
+| NeoForge / Forge | ✅ versiones, URLs, checksum, ids | ✅ Forge 1.14.4 (Java 8) y NeoForge 1.21.1 (Java 21): el juego carga el loader | Via instalador oficial (ADR-002); mods administrados solo en Fabric/Quilt |
 | Mods + Modrinth | ✅ resolver, locales, updates | ✅ busqueda, instalacion, actualizar, volver atras | |
 | Modpacks `.mrpack` | ✅ import/export/rollback | ✅ export+import con referencias Modrinth | |
 | Temas | ✅ validacion y almacen | 🖐 aplicacion en UI | |
@@ -31,7 +31,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 
 - Rust: **257 pruebas pasan**, 0 fallan, 11 `#[ignore]` (requieren internet/ventana, se ejecutan a mano).
 - Frontend: 18 pruebas (Vitest) de la logica del editor; `svelte-check` sin errores.
-- Pruebas reales (manuales): `real_vanilla_install_launch_and_stop`, `real_fabric_install_launch_and_stop`, `real_fabric_install`, `real_quilt_install`, `real_modpack_export_and_import_use_modrinth_references`, `real_manifest_…`, y las de Modrinth en `crates/mods/tests/real_modrinth.rs`.
+- Pruebas reales (manuales): `real_vanilla_install_launch_and_stop`, `real_fabric_install_launch_and_stop`, `real_forge_install_launch_and_stop`, `real_neoforge_install_launch_and_stop`, `real_fabric_install`, `real_quilt_install`, `real_modpack_export_and_import_use_modrinth_references`, `real_manifest_…`, y las de Modrinth en `crates/mods/tests/real_modrinth.rs`.
 
 ## Rendimiento (Windows 10, release)
 
