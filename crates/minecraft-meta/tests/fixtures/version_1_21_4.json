@@ -1,0 +1,85 @@
+{
+  "id": "1.21.4",
+  "type": "release",
+  "mainClass": "net.minecraft.client.main.Main",
+  "minimumLauncherVersion": 21,
+  "complianceLevel": 1,
+  "downloads": {
+    "client": {
+      "sha1": "abcdef1234567890",
+      "size": 26000000,
+      "url": "https://piston-data.mojang.com/v1/objects/abc/client.jar"
+    }
+  },
+  "libraries": [
+    {
+      "name": "com.mojang:logging:1.0.0",
+      "downloads": {
+        "artifact": {
+          "path": "com/mojang/logging/1.0.0/logging-1.0.0.jar",
+          "sha1": "libhash1",
+          "size": 15000,
+          "url": "https://libraries.minecraft.net/com/mojang/logging/1.0.0/logging-1.0.0.jar"
+        }
+      }
+    },
+    {
+      "name": "org.lwjgl:lwjgl:3.3.3",
+      "downloads": {
+        "artifact": {
+          "path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar",
+          "sha1": "libhash2",
+          "size": 800000,
+          "url": "https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar"
+        },
+        "classifiers": {
+          "natives-windows": {
+            "path": "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar",
+            "sha1": "nativehash",
+            "size": 300000,
+            "url": "https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar"
+          }
+        }
+      },
+      "natives": {
+        "windows": "natives-windows"
+      },
+      "rules": [
+        {
+          "action": "allow",
+          "os": { "name": "windows" }
+        }
+      ]
+    }
+  ],
+  "assetIndex": {
+    "id": "18",
+    "sha1": "assetindexhash",
+    "size": 450000,
+    "totalSize": 600000000,
+    "url": "https://piston-meta.mojang.com/v1/packages/assets/18.json"
+  },
+  "assets": "18",
+  "arguments": {
+    "game": [
+      "--username",
+      "${auth_player_name}",
+      "--version",
+      "${version_name}",
+      {
+        "rules": [{ "action": "allow", "features": { "is_demo_user": true } }],
+        "value": "--demo"
+      }
+    ],
+    "jvm": [
+      "-Djava.library.path=${natives_directory}",
+      "-Dminecraft.launcher.brand=${launcher_name}",
+      "-cp",
+      "${classpath}"
+    ]
+  },
+  "javaVersion": {
+    "component": "java-runtime-delta",
+    "majorVersion": 21
+  }
+}
