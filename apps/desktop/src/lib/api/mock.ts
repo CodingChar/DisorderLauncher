@@ -374,6 +374,8 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       mockThemes = mockThemes.filter((t) => t.id !== args.id)
       if (settings.themeId === args.id) settings = { ...settings, themeId: null }
       return null
+    case 'startup_notices':
+      return []
     case 'settings_get':
       return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
     case 'settings_update':

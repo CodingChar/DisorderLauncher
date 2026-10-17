@@ -71,6 +71,7 @@ pub fn run() {
       commands::themes_list,
       commands::themes_import,
       commands::themes_remove,
+      commands::startup_notices,
       commands::settings_get,
       commands::settings_update,
     ])

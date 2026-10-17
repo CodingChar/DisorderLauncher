@@ -12,6 +12,8 @@ pub enum DownloadError {
     },
     #[error("url must use https: {0}")]
     InsecureUrl(String),
+    #[error("download host not allowed: {0}")]
+    UntrustedHost(String),
     #[error("all retries exhausted for {url}: {last_error}")]
     RetriesExhausted { url: String, last_error: String },
 }

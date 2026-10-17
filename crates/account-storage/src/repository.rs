@@ -8,6 +8,8 @@ pub enum StorageError {
     Serialization(#[from] serde_json::Error),
     #[error("not found: {0}")]
     NotFound(String),
+    #[error("invalid account id")]
+    InvalidId,
 }
 
 #[async_trait::async_trait]

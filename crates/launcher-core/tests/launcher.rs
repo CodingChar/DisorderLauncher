@@ -748,3 +748,16 @@ async fn editor_save_creates_and_updates_skins_with_validation() {
     assert!(matches!(launcher.skins_save(None, "x", b"no es png", skins::SkinModel::Classic).await, Err(LauncherError::InvalidInput(_))));
     assert!(matches!(launcher.skins_save(Some("skin_00000000000000000000000000000000"), "x", &png, skins::SkinModel::Classic).await, Err(LauncherError::InvalidInput(_))));
 }
+
+#[tokio::test]
+async fn startup_notices_report_quarantined_profiles_once_and_keep_working() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    std::fs::write(dir.path().join("accounts").join("acc_roto.json"), "{ no es json").unwrap();
+
+    let notices = launcher.startup_notices().await;
+    assert_eq!(notices.len(), 1, "{notices:?}");
+    assert!(notices[0].contains("danado"));
+    assert!(launcher.startup_notices().await.is_empty(), "el aviso se entrega una sola vez");
+    assert_eq!(launcher.accounts_list().await.unwrap().len(), 1);
+}

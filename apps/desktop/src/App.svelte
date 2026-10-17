@@ -3,6 +3,7 @@
   import './app.css'
   import Button from './lib/components/Button.svelte'
   import ProfileBadge from './lib/components/ProfileBadge.svelte'
+  import { api } from './lib/api'
   import { accounts } from './lib/stores/accounts.svelte'
   import { instances } from './lib/stores/instances.svelte'
   import { nav, type View } from './lib/stores/nav.svelte'
@@ -26,6 +27,7 @@
     { view: 'settings', label: 'Ajustes' },
   ]
 
+  let notices = $state<string[]>([])
   const needsProfile = $derived(accounts.loaded && accounts.list.length === 0)
 
   // Al cambiar de pantalla el foco pasa al titulo: lectores de pantalla y teclado no se quedan
@@ -48,6 +50,7 @@
     await sessions.init()
     await accounts.listen()
     await Promise.all([settings.load(), accounts.load(), instances.load(), accounts.loadMicrosoft()])
+    notices = await api.startupNotices().catch(() => [])
   })
 </script>
 
@@ -89,6 +92,12 @@
     </aside>
 
     <main class="main" id="main" tabindex="-1">
+      {#if notices.length > 0}
+        <div class="notice-bar" role="status">
+          <div>{#each notices as n (n)}<p>{n}</p>{/each}</div>
+          <button type="button" onclick={() => (notices = [])}>Entendido</button>
+        </div>
+      {/if}
       {#if nav.view === 'home'}
         <Home />
       {:else if nav.view === 'create'}
@@ -205,6 +214,31 @@
   .profile-box {
     border-top: 1px solid var(--border);
     padding-top: 14px;
+  }
+
+  .notice-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px dashed var(--text-primary);
+    border-radius: var(--r-md);
+    padding: 10px 14px;
+    margin-bottom: 18px;
+  }
+
+  .notice-bar p {
+    margin: 2px 0;
+  }
+
+  .notice-bar button {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-alt);
+    color: var(--text-primary);
+    flex: none;
   }
 
   .main {

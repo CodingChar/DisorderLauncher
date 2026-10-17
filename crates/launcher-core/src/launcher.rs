@@ -40,7 +40,7 @@ const DEFAULT_JAVA_MAJOR: u32 = 8;
 pub struct Launcher {
     paths: LauncherPaths,
     pub(crate) http: reqwest::Client,
-    pub(crate) accounts: Arc<dyn AccountRepository>,
+    pub(crate) accounts: Arc<FileAccountRepository>,
     pub(crate) instances: Arc<FileInstanceRepository>,
     pub(crate) mods_service: mods::ModsService,
     pub(crate) registry: IdentityRegistry,
@@ -64,6 +64,16 @@ impl Launcher {
         let http = reqwest::Client::builder()
             .user_agent(concat!("DisorderLauncher/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(Duration::from_secs(15))
+            // Nunca se sigue una redireccion hacia http (degradar el cifrado) y se limita la cadena.
+            .redirect(reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.url().scheme() != "https" {
+                    attempt.error("redireccion a un destino sin cifrar")
+                } else if attempt.previous().len() >= 5 {
+                    attempt.stop()
+                } else {
+                    attempt.follow()
+                }
+            }))
             .build()
             .unwrap_or_default();
 
@@ -99,6 +109,29 @@ impl Launcher {
             running: Mutex::new(HashMap::new()),
             paths,
         }
+    }
+
+    /// Avisos de recuperacion del almacenamiento (datos danados apartados, formatos futuros).
+    /// Se leen una sola vez: llamar despues de cargar las cuentas.
+    pub async fn startup_notices(&self) -> Vec<String> {
+        // Leer las cuentas dispara migraciones y cuarentenas.
+        let _ = self.accounts.list().await;
+        let mut messages = Vec::new();
+        for notice in self.accounts.take_notices() {
+            match notice {
+                account_storage::StorageNotice::Quarantined { .. } => messages.push(
+                    "Un perfil guardado estaba danado y se aparto para no bloquear el resto. Tus demas perfiles no se vieron afectados.".to_string(),
+                ),
+                account_storage::StorageNotice::NewerFormat { .. } => messages.push(
+                    "Hay datos creados por una version mas nueva del launcher. No se han modificado.".to_string(),
+                ),
+                account_storage::StorageNotice::Migrated { account, from_version } => {
+                    tracing::info!(%account, from_version, "perfil migrado al formato actual");
+                }
+            }
+        }
+        messages.dedup();
+        messages
     }
 
     /// Carga los ajustes guardados. Llamar una vez al iniciar la app.

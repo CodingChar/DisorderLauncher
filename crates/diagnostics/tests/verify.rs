@@ -113,3 +113,46 @@ async fn repair_of_healthy_installation_is_a_noop_without_network() {
     assert_eq!(report.found, 0);
     assert!(report.is_fully_repaired());
 }
+
+/// Medicion de referencia (no es un test de CI): verificar ~2000 assets de 64 KB (~125 MB).
+/// `cargo test -p diagnostics --test verify --release -- --ignored --nocapture perf`
+#[tokio::test]
+#[ignore = "medicion de rendimiento"]
+async fn perf_verify_two_thousand_assets() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut objects = Vec::new();
+    for i in 0..2000u32 {
+        let data = vec![(i % 251) as u8; 64 * 1024 + (i as usize % 7)];
+        let hash = sha1_of(&data);
+        write(&dir.path().join("assets/objects").join(&hash[..2]).join(&hash), &data);
+        objects.push(format!("\"a{i}\":{{\"hash\":\"{hash}\",\"size\":{}}}", data.len()));
+    }
+    let index = format!("{{\"objects\":{{{}}}}}", objects.join(","));
+    write(&dir.path().join("assets/indexes/idx.json"), index.as_bytes());
+
+    let descriptor: minecraft_meta::VersionDescriptor = serde_json::from_str(&format!(
+        r#"{{"id":"1.99","type":"release","mainClass":"M","downloads":{{"client":{{"sha1":"aa","size":1,"url":"https://x/c.jar"}}}},
+        "assetIndex":{{"id":"idx","sha1":"{}","size":{},"totalSize":1,"url":"https://x/i.json"}},"assets":"idx","minecraftArguments":"","libraries":[]}}"#,
+        sha1_of(index.as_bytes()),
+        index.len()
+    ))
+    .unwrap();
+    let plan = build_install_plan(&descriptor, dir.path());
+
+    let started = std::time::Instant::now();
+    let report = verify_installation(&plan, dir.path()).await;
+    println!("verificados {} archivos en {:?} (problemas: {})", report.ok + report.issues.len(), started.elapsed(), report.issues.len());
+    assert!(report.ok >= 2000);
+}
+
+#[test]
+#[ignore = "medicion de rendimiento"]
+fn perf_sha1_throughput_in_memory() {
+    let data = vec![7u8; 64 * 1024];
+    let started = std::time::Instant::now();
+    for _ in 0..2000 {
+        std::hint::black_box(sha1_of(&data));
+    }
+    let secs = started.elapsed().as_secs_f64();
+    println!("sha1 en memoria: {:.0} MB/s", 125.0 / secs);
+}

@@ -2,6 +2,7 @@
 //! La skin local se guarda y previsualiza; no se afirma que este registrada en Microsoft
 //! ni que se muestre dentro del juego sin un mecanismo compatible (spec 03 §12, spec 10).
 
+use account_storage::AccountRepository;
 use crate::{Launcher, LauncherError};
 use identity_api::{IdentityProviderKind, ProviderAccountData};
 use skins::{SkinAsset, SkinError, SkinModel};

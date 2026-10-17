@@ -401,3 +401,9 @@ pub async fn skins_save(
     .map_err(|_| "La imagen no es valida.".to_string())?;
   state.launcher.skins_save(id.as_deref(), &name, &bytes, model).await.map_err(user_message)
 }
+
+/// Avisos de recuperacion de datos al iniciar (perfiles danados apartados, etc.). Se leen una vez.
+#[tauri::command]
+pub async fn startup_notices(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+  Ok(state.launcher.startup_notices().await)
+}

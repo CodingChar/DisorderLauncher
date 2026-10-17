@@ -105,6 +105,7 @@ export const api = {
   themesList: () => call<ThemeEntry[]>('themes_list'),
   themesImport: () => call<ThemeEntry | null>('themes_import'),
   themesRemove: (id: string) => call<void>('themes_remove', { id }),
+  startupNotices: () => call<string[]>('startup_notices'),
   settingsGet: () => call<SettingsSnapshot>('settings_get'),
   settingsUpdate: (settings: Settings) => call<SettingsSnapshot>('settings_update', { settings }),
   listVersions: (includeAll = false) => call<VersionEntry[]>('minecraft_list_versions', { includeAll }),

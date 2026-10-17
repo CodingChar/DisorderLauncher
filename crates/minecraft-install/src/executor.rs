@@ -8,6 +8,9 @@ use std::path::Path;
 use std::sync::Arc;
 use tokio::fs;
 
+/// Dominios desde los que Mojang publica clientes, librerias y assets.
+const MOJANG_HOSTS: &[&str] = &["mojang.com", "minecraft.net"];
+
 pub struct InstallExecutor {
     download_manager: DownloadManager,
     concurrency: usize,
@@ -16,7 +19,8 @@ pub struct InstallExecutor {
 impl InstallExecutor {
     pub fn new(http: reqwest::Client, concurrency: usize) -> Self {
         Self {
-            download_manager: DownloadManager::new(http),
+            // Los artefactos de Minecraft solo se descargan de los dominios de Mojang/Microsoft.
+            download_manager: DownloadManager::new(http).with_allowed_host_suffixes(MOJANG_HOSTS),
             concurrency,
         }
     }

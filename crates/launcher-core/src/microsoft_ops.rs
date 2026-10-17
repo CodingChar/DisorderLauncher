@@ -1,6 +1,7 @@
 //! Cuentas Microsoft: inicio de sesion en el navegador del sistema, estado y cierre de sesion.
 //! Los tokens nunca salen de `identity-microsoft` / el almacen seguro del sistema.
 
+use account_storage::AccountRepository;
 use crate::{AuthStateEvent, Launcher, LauncherError};
 use identity_api::{
     AccountRecord, AuthState, IdentityError, IdentityProvider, IdentityProviderKind, ProviderAccountData,

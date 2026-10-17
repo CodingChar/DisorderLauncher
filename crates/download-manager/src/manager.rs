@@ -12,11 +12,29 @@ const BACKOFF_BASE_MS: u64 = 500;
 
 pub struct DownloadManager {
     http: reqwest::Client,
+    /// Si se define, solo se descarga desde estos dominios (o sus subdominios).
+    allowed_host_suffixes: Option<Vec<String>>,
 }
 
 impl DownloadManager {
     pub fn new(http: reqwest::Client) -> Self {
-        Self { http }
+        Self { http, allowed_host_suffixes: None }
+    }
+
+    /// Restringe las descargas a los dominios dados y a sus subdominios
+    /// (`mojang.com` permite `piston-data.mojang.com`, no `evilmojang.com`).
+    pub fn with_allowed_host_suffixes(mut self, suffixes: &[&str]) -> Self {
+        self.allowed_host_suffixes = Some(suffixes.iter().map(|s| s.to_lowercase()).collect());
+        self
+    }
+
+    fn check_host(&self, url: &str) -> Result<(), DownloadError> {
+        let Some(allowed) = &self.allowed_host_suffixes else { return Ok(()) };
+        let host = url::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_lowercase));
+        let permitted = host
+            .as_deref()
+            .is_some_and(|h| allowed.iter().any(|suffix| h == suffix || h.ends_with(&format!(".{suffix}"))));
+        if permitted { Ok(()) } else { Err(DownloadError::UntrustedHost(url.chars().take(80).collect())) }
     }
 
     pub async fn download_all<F>(
@@ -40,6 +58,16 @@ impl DownloadManager {
         let mut handles = Vec::with_capacity(total);
 
         for task in tasks {
+            // Origen no permitido: se rechaza sin abrir ninguna conexion.
+            if let Err(e) = self.check_host(&task.url) {
+                failures.lock().await.push(DownloadFailure {
+                    url: task.url.clone(),
+                    dest: task.dest.clone(),
+                    error: e.to_string(),
+                });
+                completed.fetch_add(1, Ordering::Relaxed);
+                continue;
+            }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let http = self.http.clone();
             let completed = completed.clone();
@@ -49,7 +77,10 @@ impl DownloadManager {
             let skipped = skipped.clone();
 
             let handle = tokio::spawn(async move {
-                if should_skip(&task) {
+                // El hash de archivos grandes no debe bloquear el runtime asincrono.
+                let probe = task.clone();
+                let already_valid = tokio::task::spawn_blocking(move || should_skip(&probe)).await.unwrap_or(false);
+                if already_valid {
                     skipped.fetch_add(1, Ordering::Relaxed);
                     completed.fetch_add(1, Ordering::Relaxed);
                     progress(DownloadProgress {
@@ -211,6 +242,19 @@ fn hex_sha1(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn host_allowlist_accepts_subdomains_but_not_lookalikes() {
+        let m = DownloadManager::new(reqwest::Client::new()).with_allowed_host_suffixes(&["mojang.com", "minecraft.net"]);
+        assert!(m.check_host("https://piston-data.mojang.com/v1/objects/a/client.jar").is_ok());
+        assert!(m.check_host("https://libraries.minecraft.net/x.jar").is_ok());
+        assert!(m.check_host("https://mojang.com/x").is_ok());
+        for bad in ["https://evilmojang.com/x", "https://mojang.com.evil.io/x", "https://example.com/x", "not a url", "https://minecraft.net.attacker.com/x"] {
+            assert!(m.check_host(bad).is_err(), "{bad}");
+        }
+        // Sin lista no se restringe (solo HTTPS en la descarga).
+        assert!(DownloadManager::new(reqwest::Client::new()).check_host("https://example.com/x").is_ok());
+    }
 
     #[test]
     fn hex_sha1_known_value() {
