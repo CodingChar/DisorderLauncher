@@ -54,6 +54,7 @@ pub struct Launcher {
     manifest_url: String,
     settings: Mutex<Settings>,
     pub(crate) theme_store: themes::ThemeStore,
+    pub(crate) skin_library: skins::SkinLibrary,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
     running: Mutex<HashMap<String, Option<GameKiller>>>,
 }
@@ -94,6 +95,7 @@ impl Launcher {
             manifest_url: minecraft_meta::VERSION_MANIFEST_URL.to_string(),
             settings: Mutex::new(Settings::default()),
             theme_store: themes::ThemeStore::new(paths.themes_dir()),
+            skin_library: skins::SkinLibrary::new(paths.skins_dir()),
             running: Mutex::new(HashMap::new()),
             paths,
         }

@@ -38,6 +38,12 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `mods_check_updates` | `id` | `{ file, projectId, title, currentVersion, latestVersion }[]` |
 | `mods_update` | `id`, `file` | `InstalledMod` (guarda la version anterior) |
 | `mods_rollback` | `id`, `file` | `void` (restaura la version anterior) |
+| `skins_list` | — | `{ id, name, model: 'classic' \| 'slim', source, width, height, createdAt, updatedAt }[]` |
+| `skins_import` | — | `SkinAsset \| null` — selector de PNG; se valida la firma real, 64x64 / 64x32 y ≤ 256 KB; se recodifica a RGBA sin metadatos |
+| `skins_read` | `id` | `string` (data URL PNG) |
+| `skins_rename` / `skins_set_model` / `skins_remove` | `id`, … | `SkinAsset` / `SkinAsset` / `void` (quitar desvincula la skin de los perfiles) |
+| `skins_export` | `id` | `boolean` — pide donde guardar |
+| `accounts_set_skin` | `accountId`, `skinId \| null` | `void` — solo perfiles Offline Gaming; no registra nada en Microsoft ni se aplica dentro del juego sin un mod compatible |
 | `themes_list` | — | `{ builtin, id, name, mode, colors, typography, shape, density, effects }[]` — incluidos primero |
 | `themes_import` | — | `Theme \| null` — selector de `.json`; Rust valida (colores `#RRGGBB`, fuentes seguras, rangos, contraste AA, sin campos desconocidos) |
 | `themes_remove` | `id` | `void` (solo temas del usuario; si estaba en uso vuelve al incluido) |

@@ -25,6 +25,7 @@ identity-api = { path = "../../../crates/identity-api" }
 mods = { path = "../../../crates/mods" }
 modpacks = { path = "../../../crates/modpacks" }
 themes = { path = "../../../crates/themes" }
+skins = { path = "../../../crates/skins" }
 instance-manager = { path = "../../../crates/instance-manager" }
 loaders = { path = "../../../crates/loaders" }
 account-storage = { path = "../../../crates/account-storage" }

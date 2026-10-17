@@ -321,3 +321,62 @@ pub async fn accounts_auth_state(state: State<'_, AppState>, id: String) -> Resu
 pub async fn accounts_remove(state: State<'_, AppState>, id: String) -> Result<(), String> {
   state.launcher.accounts_remove(&id).await.map_err(user_message)
 }
+
+#[tauri::command]
+pub async fn skins_list(state: State<'_, AppState>) -> Result<Vec<skins::SkinAsset>, String> {
+  Ok(state.launcher.skins_list().await)
+}
+
+/// Abre el selector de PNG, valida (firma, dimensiones, tamano) y guarda la skin. `None` si se cancela.
+#[tauri::command]
+pub async fn skins_import(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Option<skins::SkinAsset>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app.dialog().file().add_filter("Skin de Minecraft (PNG)", &["png"]).blocking_pick_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  let meta = std::fs::metadata(&path).map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  if meta.len() as usize > skins::MAX_SKIN_BYTES {
+    return Err("Ese archivo es demasiado grande para ser una skin.".to_string());
+  }
+  let bytes = std::fs::read(&path).map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "Skin".to_string());
+  let name: String = name.chars().filter(|c| !c.is_control()).take(48).collect();
+  state.launcher.skins_import(&bytes, &name, None).await.map(Some).map_err(user_message)
+}
+
+/// PNG de la skin como data URL (la imagen ya fue validada y normalizada por el backend).
+#[tauri::command]
+pub async fn skins_read(state: State<'_, AppState>, id: String) -> Result<String, String> {
+  state.launcher.skins_read(&id).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn skins_rename(state: State<'_, AppState>, id: String, name: String) -> Result<skins::SkinAsset, String> {
+  state.launcher.skins_rename(&id, &name).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn skins_set_model(state: State<'_, AppState>, id: String, model: skins::SkinModel) -> Result<skins::SkinAsset, String> {
+  state.launcher.skins_set_model(&id, model).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn skins_remove(state: State<'_, AppState>, id: String) -> Result<(), String> {
+  state.launcher.skins_remove(&id).await.map_err(user_message)
+}
+
+/// Pide donde guardar el PNG y lo exporta. `false` si el usuario cancela.
+#[tauri::command]
+pub async fn skins_export(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> Result<bool, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app.dialog().file().add_filter("Skin de Minecraft (PNG)", &["png"]).set_file_name("skin.png").blocking_save_file();
+  let Some(file) = picked else { return Ok(false) };
+  let path = file.into_path().map_err(|_| "No se pudo usar esa ubicación.".to_string())?;
+  state.launcher.skins_export(&id, &path).await.map_err(user_message)?;
+  Ok(true)
+}
+
+#[tauri::command]
+pub async fn accounts_set_skin(state: State<'_, AppState>, account_id: String, skin_id: Option<String>) -> Result<(), String> {
+  state.launcher.accounts_set_skin(&account_id, skin_id.as_deref()).await.map_err(user_message)
+}

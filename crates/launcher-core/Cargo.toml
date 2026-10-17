@@ -19,6 +19,7 @@ loaders = { path = "../loaders" }
 mods = { path = "../mods" }
 modpacks = { path = "../modpacks" }
 themes = { path = "../themes" }
+skins = { path = "../skins" }
 diagnostics = { path = "../diagnostics" }
 async-trait = { workspace = true }
 sha1 = { workspace = true }

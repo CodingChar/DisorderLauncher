@@ -19,6 +19,10 @@ impl LauncherPaths {
         self.root.join("themes")
     }
 
+    pub fn skins_dir(&self) -> PathBuf {
+        self.root.join("skins")
+    }
+
     pub fn settings_file(&self) -> PathBuf {
         self.root.join("settings.json")
     }

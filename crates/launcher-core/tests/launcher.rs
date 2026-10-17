@@ -673,3 +673,59 @@ async fn custom_themes_can_be_selected_and_falling_back_when_removed() {
     assert_eq!(launcher.settings().theme_id, None);
     assert!(matches!(launcher.themes_remove("disorderlaucher.default.dark").await, Err(LauncherError::InvalidInput(_))));
 }
+
+#[tokio::test]
+async fn skins_link_to_local_profiles_and_unlink_when_removed() {
+    use identity_api::ProviderAccountData;
+    let (_d, launcher, _) = launcher();
+    let account = launcher.accounts_create_local("David").await.unwrap();
+
+    let png = skins::encode_rgba(&vec![200u8; 64 * 64 * 4], 64, 64).unwrap();
+    let skin = launcher.skins_import(&png, "Mi skin", None).await.unwrap();
+    assert_eq!(launcher.skins_list().await.len(), 1);
+    assert!(launcher.skins_read(&skin.id).await.unwrap().starts_with("data:image/png;base64,"));
+
+    // Invalida: no es PNG / dimensiones erroneas.
+    assert!(matches!(launcher.skins_import(b"no png", "x", None).await, Err(LauncherError::InvalidInput(_))));
+    let wrong = skins::encode_rgba(&vec![0u8; 32 * 32 * 4], 32, 32).unwrap();
+    assert!(matches!(launcher.skins_import(&wrong, "x", None).await, Err(LauncherError::InvalidInput(_))));
+
+    launcher.accounts_set_skin(&account.id, Some(&skin.id)).await.unwrap();
+    let skin_of = |records: Vec<identity_api::AccountRecord>| match &records[0].provider_data {
+        ProviderAccountData::Local(d) => d.skin_id.clone(),
+        _ => unreachable!(),
+    };
+    assert_eq!(skin_of(launcher.accounts_list().await.unwrap()), Some(skin.id.clone()));
+    // El registro de la cuenta guarda solo el id, nunca los pixeles.
+    let record = std::fs::read_to_string(launcher.paths().accounts_dir().join(format!("{}.json", account.id))).unwrap();
+    assert!(record.contains(&skin.id) && !record.contains("base64") && !record.contains("PNG"));
+
+    assert!(matches!(launcher.accounts_set_skin(&account.id, Some("skin_00000000000000000000000000000000")).await, Err(LauncherError::InvalidInput(_))));
+
+    launcher.skins_remove(&skin.id).await.unwrap();
+    assert_eq!(skin_of(launcher.accounts_list().await.unwrap()), None, "borrar la skin la desvincula");
+    assert!(launcher.skins_list().await.is_empty());
+}
+
+#[tokio::test]
+async fn microsoft_profiles_do_not_take_local_skins() {
+    use identity_api::{AccountRecord, MicrosoftAccountMetadata, ProviderAccountData};
+    let (_d, launcher, _) = launcher();
+    let accounts = account_storage::FileAccountRepository::new(launcher.paths().accounts_dir());
+    let ms = AccountRecord {
+        id: "acc_ms_x".into(),
+        provider: identity_api::IdentityProviderKind::Microsoft,
+        label: "Notch".into(),
+        created_at: chrono::Utc::now(),
+        last_used_at: None,
+        provider_data: ProviderAccountData::Microsoft(MicrosoftAccountMetadata {
+            minecraft_uuid: None, minecraft_name: None, secure_refresh_token_key: None, last_successful_auth: None,
+        }),
+    };
+    account_storage::AccountRepository::save(&accounts, &ms).await.unwrap();
+
+    let png = skins::encode_rgba(&vec![1u8; 64 * 64 * 4], 64, 64).unwrap();
+    let skin = launcher.skins_import(&png, "S", None).await.unwrap();
+    assert!(matches!(launcher.accounts_set_skin("acc_ms_x", Some(&skin.id)).await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.accounts_set_skin("acc_nope", None).await, Err(LauncherError::AccountNotFound)));
+}

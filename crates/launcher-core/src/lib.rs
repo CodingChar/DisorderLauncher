@@ -8,6 +8,7 @@ mod mods_ops;
 mod paths;
 mod registry;
 mod settings;
+mod skins_ops;
 mod themes_ops;
 
 pub use error::*;
