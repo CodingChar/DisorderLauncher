@@ -42,3 +42,4 @@ zip = "2"
 tempfile = "3"
 url = "2"
 md-5 = "0.10"
+sysinfo = { version = "0.39", default-features = false, features = ["system"] }

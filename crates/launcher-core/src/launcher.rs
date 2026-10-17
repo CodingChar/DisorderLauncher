@@ -1,6 +1,7 @@
 use crate::{
     GameOutputEvent, IdentityRegistry, InstallProgressEvent, LaunchState, LaunchStateEvent,
     LauncherError, LauncherEvents, LauncherPaths, OutputStream, RepairSummary,
+    auto_memory, system_memory_mb,
 };
 use account_storage::{AccountRepository, FileAccountRepository};
 use chrono::Utc;
@@ -8,8 +9,8 @@ use identity_api::{AccountRecord, IdentityProviderKind};
 use identity_local::{new_local_account, LocalIdentityProvider};
 use identity_microsoft::MicrosoftIdentityProvider;
 use instance_manager::{
-    FileInstanceRepository, Instance, InstanceRepository, JavaSelection, LoaderKind, MemoryPolicy,
-    NewInstance,
+    FileInstanceRepository, Instance, InstanceRepository, InstanceUpdate, JavaSelection, LoaderKind,
+    MemoryPolicy, NewInstance,
 };
 use java_runtime::{JavaInstallation, JavaManager, JavaRequirement};
 use minecraft_install::{
@@ -142,6 +143,47 @@ impl Launcher {
                 profile_id,
             })
             .await?)
+    }
+
+    /// Edita una instancia. Se rechaza mientras el juego corre o se prepara.
+    pub async fn instances_update(
+        &self,
+        id: &str,
+        changes: InstanceUpdate,
+    ) -> Result<Instance, LauncherError> {
+        self.ensure_idle(id)?;
+        if let Some(profile_id) = &changes.profile_id {
+            self.accounts
+                .get(profile_id)
+                .await?
+                .ok_or(LauncherError::ProfileMissing)?;
+        }
+        if let Some(JavaSelection::Path { path }) = &changes.java {
+            if !java_runtime::java_executable(path).is_file() {
+                return Err(LauncherError::InvalidInput(
+                    "No se encontro Java en esa carpeta.".into(),
+                ));
+            }
+        }
+        Ok(self.instances.update(id, changes).await?)
+    }
+
+    pub async fn instances_delete(&self, id: &str) -> Result<(), LauncherError> {
+        self.ensure_idle(id)?;
+        Ok(self.instances.delete(id).await?)
+    }
+
+    pub async fn instances_duplicate(&self, id: &str) -> Result<Instance, LauncherError> {
+        self.ensure_idle(id)?;
+        Ok(self.instances.duplicate(id).await?)
+    }
+
+    fn ensure_idle(&self, id: &str) -> Result<(), LauncherError> {
+        if self.running_guard().contains_key(id) {
+            Err(LauncherError::AlreadyRunning)
+        } else {
+            Ok(())
+        }
     }
 
     // ---- Versiones -----------------------------------------------------------
@@ -384,9 +426,12 @@ impl Launcher {
 
         let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
         ctx.game_assets_dir = game_assets_dir;
-        if let MemoryPolicy::Fixed { min_mb, max_mb } = &instance.memory {
-            ctx.memory = MemorySettings { min_mb: Some(*min_mb), max_mb: Some(*max_mb) };
-        }
+        ctx.memory = match &instance.memory {
+            MemoryPolicy::Fixed { min_mb, max_mb } => {
+                MemorySettings { min_mb: Some(*min_mb), max_mb: Some(*max_mb) }
+            }
+            MemoryPolicy::Auto => auto_memory(system_memory_mb()),
+        };
         let plan = LaunchPlanBuilder::build(&descriptor, &identity, &java, &ctx)?;
         plan.validate()?;
 

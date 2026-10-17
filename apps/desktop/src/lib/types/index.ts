@@ -77,3 +77,11 @@ export interface RepairSummary {
   fixed: number
   remaining: number
 }
+
+export interface InstanceChanges {
+  name?: string
+  minecraftVersion?: string
+  profileId?: string
+  java?: JavaSelection
+  memory?: MemoryPolicy
+}

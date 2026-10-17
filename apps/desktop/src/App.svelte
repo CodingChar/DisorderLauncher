@@ -8,6 +8,7 @@
   import { sessions } from './lib/stores/sessions.svelte'
   import AccountPicker from './routes/AccountPicker.svelte'
   import CreateInstance from './routes/CreateInstance.svelte'
+  import EditInstance from './routes/EditInstance.svelte'
   import Home from './routes/Home.svelte'
   import Welcome from './routes/Welcome.svelte'
 
@@ -61,6 +62,8 @@
         <Home />
       {:else if nav.view === 'create'}
         <CreateInstance />
+      {:else if nav.view === 'edit'}
+        <EditInstance />
       {:else}
         <AccountPicker />
       {/if}

@@ -1,4 +1,4 @@
-export type View = 'home' | 'create' | 'accounts'
+export type View = 'home' | 'create' | 'accounts' | 'edit'
 
 class NavStore {
   view = $state<View>('home')

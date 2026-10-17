@@ -14,6 +14,9 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `accounts_set_default` | `id` | `void` |
 | `instances_list` | — | `Instance[]` |
 | `instances_create` | `name`, `version` | `Instance` (Vanilla, perfil predeterminado) |
+| `instances_update` | `id`, `changes` | `Instance` — `changes` (todos opcionales): `name`, `minecraftVersion`, `profileId`, `java` (`{mode:'auto'}` o `{mode:'path', path}`), `memory` (`{mode:'auto'}` o `{mode:'fixed', minMb, maxMb}`) |
+| `instances_delete` | `id` | `void` (borra la instancia y su carpeta) |
+| `instances_duplicate` | `id` | `Instance` (copia los archivos del juego) |
 | `instances_launch` | `id` | `void` — inicia en segundo plano; el avance llega por eventos |
 | `instances_stop` | `id` | `void` |
 | `instances_repair` | `id` | `{ found, fixed, remaining }` — verifica hashes y redescarga lo danado |

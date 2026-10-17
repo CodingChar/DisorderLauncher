@@ -308,3 +308,62 @@ async fn real_vanilla_install_launch_and_stop() {
     println!("log existe: {}", log.is_file());
     assert!(log.is_file());
 }
+
+#[tokio::test]
+async fn instance_crud_validates_profile_and_java() {
+    let (dir, launcher, _) = launcher();
+    let first = launcher.accounts_create_local("David").await.unwrap();
+    let second = launcher.accounts_create_local("Alex").await.unwrap();
+    let instance = launcher.instances_create("Base", "1.21").await.unwrap();
+    assert_eq!(instance.profile_id, first.id);
+
+    let updated = launcher
+        .instances_update(
+            &instance.id,
+            instance_manager::InstanceUpdate {
+                name: Some("Renombrada".into()),
+                profile_id: Some(second.id.clone()),
+                memory: Some(instance_manager::MemoryPolicy::Fixed { min_mb: 512, max_mb: 2048 }),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!((updated.name.as_str(), updated.profile_id.as_str()), ("Renombrada", second.id.as_str()));
+
+    let bad_profile = instance_manager::InstanceUpdate { profile_id: Some("acc_local_nope".into()), ..Default::default() };
+    assert!(matches!(launcher.instances_update(&instance.id, bad_profile).await, Err(LauncherError::ProfileMissing)));
+
+    let bad_java = instance_manager::InstanceUpdate {
+        java: Some(JavaSelection::Path { path: dir.path().join("no-java") }),
+        ..Default::default()
+    };
+    assert!(matches!(launcher.instances_update(&instance.id, bad_java).await, Err(LauncherError::InvalidInput(_))));
+
+    let jre = fake_installation(&launcher, dir.path());
+    let good_java = instance_manager::InstanceUpdate { java: Some(JavaSelection::Path { path: jre }), ..Default::default() };
+    launcher.instances_update(&instance.id, good_java).await.unwrap();
+
+    let copy = launcher.instances_duplicate(&instance.id).await.unwrap();
+    assert_eq!(copy.name, "Renombrada (copia)");
+    assert_eq!(launcher.instances_list().await.unwrap().len(), 2);
+
+    launcher.instances_delete(&copy.id).await.unwrap();
+    assert_eq!(launcher.instances_list().await.unwrap().len(), 1);
+    assert!(matches!(launcher.instances_delete("inst_nope").await, Ok(())));
+}
+
+#[tokio::test]
+async fn busy_instance_cannot_be_edited_or_deleted() {
+    let (_d, launcher, events) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher.instances_create("Ocupada", "1.21").await.unwrap();
+
+    launcher.launch(&instance.id).await.unwrap();
+    // Inmediatamente despues de aceptar el launch la instancia esta reservada.
+    let blocked = launcher.instances_delete(&instance.id).await;
+    let racing_done = events.states.lock().unwrap().iter().any(|e| matches!(e.state, LaunchState::Failed { .. }));
+    if !racing_done {
+        assert!(matches!(blocked, Err(LauncherError::AlreadyRunning)));
+    }
+}

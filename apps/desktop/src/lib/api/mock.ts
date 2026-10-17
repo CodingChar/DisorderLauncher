@@ -98,6 +98,26 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       instances = [...instances, inst]
       return inst
     }
+    case 'instances_update': {
+      const inst = instances.find((i) => i.id === args.id)
+      if (!inst) throw 'No se encontro la instancia.'
+      const c = args.changes ?? {}
+      if (c.name !== undefined && !String(c.name).trim()) throw 'el nombre no puede estar vacio'
+      if (c.java?.mode === 'path' && !String(c.java.path).includes('jre')) throw 'No se encontro Java en esa carpeta.'
+      Object.assign(inst, c, { updatedAt: new Date().toISOString() })
+      instances = [...instances]
+      return inst
+    }
+    case 'instances_delete':
+      instances = instances.filter((i) => i.id !== args.id)
+      return null
+    case 'instances_duplicate': {
+      const src = instances.find((i) => i.id === args.id)
+      if (!src) throw 'No se encontro la instancia.'
+      const copy = { ...src, id: `inst_${++counter}`, name: `${src.name} (copia)` }
+      instances = [...instances, copy]
+      return copy
+    }
     case 'instances_launch':
       void simulateLaunch(args.id)
       return null

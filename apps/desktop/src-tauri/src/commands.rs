@@ -48,6 +48,25 @@ pub async fn instances_create(
   state.launcher.instances_create(&name, &version).await.map_err(user_message)
 }
 
+#[tauri::command]
+pub async fn instances_update(
+  state: State<'_, AppState>,
+  id: String,
+  changes: instance_manager::InstanceUpdate,
+) -> Result<Instance, String> {
+  state.launcher.instances_update(&id, changes).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn instances_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
+  state.launcher.instances_delete(&id).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn instances_duplicate(state: State<'_, AppState>, id: String) -> Result<Instance, String> {
+  state.launcher.instances_duplicate(&id).await.map_err(user_message)
+}
+
 /// Inicia en segundo plano; el avance llega por `install://progress` y `launch://state`.
 #[tauri::command]
 pub async fn instances_launch(state: State<'_, AppState>, id: String) -> Result<(), String> {

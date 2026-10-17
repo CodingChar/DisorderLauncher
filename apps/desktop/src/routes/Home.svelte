@@ -69,6 +69,7 @@
               {busy ? 'Un momento…' : 'JUGAR'}
             </Button>
           {/if}
+          <Button variant="ghost" disabled={busy} onclick={() => nav.go('edit')}>Editar</Button>
           <Button variant="ghost" disabled={busy} onclick={() => sessions.repair(instance.id)}>Reparar</Button>
         </div>
 

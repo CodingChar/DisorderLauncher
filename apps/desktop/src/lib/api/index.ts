@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import type {
   AccountRecord,
   Instance,
+  InstanceChanges,
   LaunchStateEvent,
   ProgressEvent,
   RepairSummary,
@@ -52,6 +53,9 @@ export const api = {
   accountsSetDefault: (id: string) => call<void>('accounts_set_default', { id }),
   instancesList: () => call<Instance[]>('instances_list'),
   instancesCreate: (name: string, version: string) => call<Instance>('instances_create', { name, version }),
+  instancesUpdate: (id: string, changes: InstanceChanges) => call<Instance>('instances_update', { id, changes }),
+  instancesDelete: (id: string) => call<void>('instances_delete', { id }),
+  instancesDuplicate: (id: string) => call<Instance>('instances_duplicate', { id }),
   instancesLaunch: (id: string) => call<void>('instances_launch', { id }),
   instancesStop: (id: string) => call<void>('instances_stop', { id }),
   instancesRepair: (id: string) => call<RepairSummary>('instances_repair', { id }),

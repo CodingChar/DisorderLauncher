@@ -1,5 +1,5 @@
 import { api } from '../api'
-import type { Instance } from '../types'
+import type { Instance, InstanceChanges } from '../types'
 
 class InstancesStore {
   list = $state<Instance[]>([])
@@ -25,6 +25,25 @@ class InstancesStore {
     await this.load()
     this.selectedId = instance.id
     return instance
+  }
+
+  async update(id: string, changes: InstanceChanges) {
+    const instance = await api.instancesUpdate(id, changes)
+    await this.load()
+    return instance
+  }
+
+  async remove(id: string) {
+    await api.instancesDelete(id)
+    if (this.selectedId === id) this.selectedId = null
+    await this.load()
+  }
+
+  async duplicate(id: string) {
+    const copy = await api.instancesDuplicate(id)
+    await this.load()
+    this.selectedId = copy.id
+    return copy
   }
 
   select(id: string) {

@@ -384,7 +384,7 @@ mod tests {
         std::fs::write(inst.game_dir.join("options.txt"), b"x").unwrap();
         repo.update(
             &inst.id,
-            InstanceUpdate { memory: Some(MemoryPolicy::Fixed { min_mb: 1, max_mb: 2 }), ..Default::default() },
+            InstanceUpdate { memory: Some(MemoryPolicy::Fixed { min_mb: 256, max_mb: 1024 }), ..Default::default() },
         )
         .await
         .unwrap();
@@ -393,7 +393,7 @@ mod tests {
         assert_ne!(copy.id, inst.id);
         assert_eq!(copy.name, "Original (copia)");
         assert_eq!(copy.profile_id, inst.profile_id);
-        assert_eq!(copy.memory, MemoryPolicy::Fixed { min_mb: 1, max_mb: 2 });
+        assert_eq!(copy.memory, MemoryPolicy::Fixed { min_mb: 256, max_mb: 1024 });
         assert_eq!(std::fs::read(copy.game_dir.join("mods").join("a.jar")).unwrap(), b"jar");
         assert!(copy.game_dir.join("options.txt").is_file());
         assert!(repo.get(&inst.id).await.unwrap().is_some());

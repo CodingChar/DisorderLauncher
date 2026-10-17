@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 pub const MAX_NAME_LEN: usize = 64;
+/// Minecraft no arranca de forma fiable con menos heap que esto.
+pub const MIN_MAX_MEMORY_MB: u32 = 512;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,7 +60,8 @@ pub struct NewInstance {
 }
 
 /// Cambios parciales; `None` deja el campo como esta.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct InstanceUpdate {
     pub name: Option<String>,
     pub minecraft_version: Option<String>,
@@ -89,6 +92,11 @@ pub(crate) fn validate_memory(memory: &MemoryPolicy) -> Result<(), InstanceError
             return Err(InstanceError::Invalid(
                 "la memoria minima debe ser mayor que 0 y no superar la maxima".into(),
             ));
+        }
+        if *max_mb < MIN_MAX_MEMORY_MB {
+            return Err(InstanceError::Invalid(format!(
+                "la memoria maxima debe ser de al menos {MIN_MAX_MEMORY_MB} MB"
+            )));
         }
     }
     Ok(())
