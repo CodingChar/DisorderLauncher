@@ -17,5 +17,14 @@ download-manager = { path = "../download-manager" }
 instance-manager = { path = "../instance-manager" }
 diagnostics = { path = "../diagnostics" }
 async-trait = { workspace = true }
+sha1 = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

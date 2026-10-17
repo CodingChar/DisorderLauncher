@@ -1,29 +1,11 @@
-use identity_api::{IdentityProvider, IdentityProviderKind};
-use std::collections::HashMap;
-use std::sync::Arc;
+mod error;
+mod events;
+mod launcher;
+mod paths;
+mod registry;
 
-pub struct IdentityRegistry {
-    providers: HashMap<IdentityProviderKind, Arc<dyn IdentityProvider>>,
-}
-
-impl IdentityRegistry {
-    pub fn new() -> Self {
-        Self {
-            providers: HashMap::new(),
-        }
-    }
-
-    pub fn register(&mut self, provider: Arc<dyn IdentityProvider>) {
-        self.providers.insert(provider.kind(), provider);
-    }
-
-    pub fn get(&self, kind: IdentityProviderKind) -> Option<Arc<dyn IdentityProvider>> {
-        self.providers.get(&kind).cloned()
-    }
-}
-
-impl Default for IdentityRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub use error::*;
+pub use events::*;
+pub use launcher::*;
+pub use paths::*;
+pub use registry::*;

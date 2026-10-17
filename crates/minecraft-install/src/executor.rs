@@ -95,8 +95,8 @@ impl InstallExecutor {
     async fn download_artifacts(
         &self,
         artifacts: &[Artifact],
-        _progress: &Arc<impl Fn(InstallProgress) + Send + Sync>,
-        _phase: InstallPhase,
+        progress: &Arc<impl Fn(InstallProgress) + Send + Sync + 'static>,
+        phase: InstallPhase,
     ) -> Result<(), InstallError> {
         let tasks: Vec<DownloadTask> = artifacts
             .iter()
@@ -108,9 +108,16 @@ impl InstallExecutor {
             })
             .collect();
 
+        let progress = progress.clone();
         let report = self
             .download_manager
-            .download_all(tasks, self.concurrency, |_| {})
+            .download_all(tasks, self.concurrency, move |p| {
+                progress(InstallProgress {
+                    phase,
+                    completed: p.completed,
+                    total: p.total,
+                })
+            })
             .await?;
 
         if !report.failed.is_empty() {

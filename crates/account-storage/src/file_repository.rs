@@ -42,7 +42,7 @@ impl AccountRepository for FileAccountRepository {
                 records.push(record);
             }
         }
-        records.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        records.sort_by_key(|r| r.created_at);
         Ok(records)
     }
 

@@ -148,7 +148,12 @@ impl GameHandle {
 
     /// Pide el cierre del proceso. Seguro de llamar varias veces.
     pub async fn kill(&self) {
-        let _ = self.kill_tx.try_send(());
+        self.killer().kill();
+    }
+
+    /// Control clonable para cerrar el proceso desde otra tarea.
+    pub fn killer(&self) -> GameKiller {
+        GameKiller(self.kill_tx.clone())
     }
 
     /// Consume los eventos hasta la salida y devuelve el codigo de salida.
@@ -159,6 +164,15 @@ impl GameHandle {
             }
         }
         None
+    }
+}
+
+#[derive(Clone)]
+pub struct GameKiller(mpsc::Sender<()>);
+
+impl GameKiller {
+    pub fn kill(&self) {
+        let _ = self.0.try_send(());
     }
 }
 

@@ -17,7 +17,9 @@ serde_json = { workspace = true }
 tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
 log = "0.4"
+tracing-subscriber = { workspace = true }
 launcher-core = { path = "../../../crates/launcher-core" }
 identity-api = { path = "../../../crates/identity-api" }
 instance-manager = { path = "../../../crates/instance-manager" }
 account-storage = { path = "../../../crates/account-storage" }
+minecraft-meta = { path = "../../../crates/minecraft-meta" }

@@ -5,7 +5,20 @@ use std::path::Path;
 use tokio::fs;
 
 pub async fn fetch_manifest(http: &reqwest::Client) -> Result<VersionManifest, MetaError> {
-    let manifest = http.get(VERSION_MANIFEST_URL).send().await?.json().await?;
+    fetch_manifest_from(http, VERSION_MANIFEST_URL).await
+}
+
+pub async fn fetch_manifest_from(
+    http: &reqwest::Client,
+    url: &str,
+) -> Result<VersionManifest, MetaError> {
+    let manifest = http
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
     Ok(manifest)
 }
 
@@ -32,7 +45,13 @@ pub async fn fetch_version_descriptor(
     http: &reqwest::Client,
     url: &str,
 ) -> Result<VersionDescriptor, MetaError> {
-    let descriptor = http.get(url).send().await?.json().await?;
+    let descriptor = http
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
     Ok(descriptor)
 }
 

@@ -7,4 +7,5 @@ edition.workspace = true
 identity-api = { path = "../identity-api" }
 async-trait = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
 md-5 = { workspace = true }

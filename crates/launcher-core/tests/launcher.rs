@@ -1,0 +1,240 @@
+use instance_manager::{InstanceRepository, JavaSelection};
+use launcher_core::{
+    installation_complete, GameOutputEvent, InstallProgressEvent, LaunchState, LaunchStateEvent,
+    Launcher, LauncherError, LauncherEvents, LauncherPaths, OutputStream,
+};
+use minecraft_install::build_install_plan;
+use minecraft_meta::VersionDescriptor;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+/// Puerto cerrado: cualquier descarga falla de inmediato, simulando falta de red.
+const NO_NETWORK: &str = "http://127.0.0.1:1/version_manifest_v2.json";
+
+#[derive(Default)]
+struct Collector {
+    states: Mutex<Vec<LaunchStateEvent>>,
+}
+
+impl LauncherEvents for Collector {
+    fn install_progress(&self, _: InstallProgressEvent) {}
+    fn launch_state(&self, event: LaunchStateEvent) {
+        self.states.lock().unwrap().push(event);
+    }
+    fn game_output(&self, _: OutputStream, _: GameOutputEvent) {}
+}
+
+fn launcher() -> (tempfile::TempDir, Arc<Launcher>, Arc<Collector>) {
+    let dir = tempfile::tempdir().unwrap();
+    let events = Arc::new(Collector::default());
+    let launcher = Launcher::new(LauncherPaths::new(dir.path()), events.clone())
+        .with_manifest_url(NO_NETWORK);
+    (dir, Arc::new(launcher), events)
+}
+
+const VERSION_JSON: &str = r#"{
+  "id": "1.99",
+  "type": "release",
+  "mainClass": "net.minecraft.client.main.Main",
+  "downloads": { "client": { "sha1": "aa", "size": 1, "url": "https://example.com/client.jar" } },
+  "assetIndex": { "id": "idx", "sha1": "bb", "size": 1, "totalSize": 1, "url": "https://example.com/idx.json" },
+  "assets": "idx",
+  "libraries": [],
+  "arguments": { "game": ["--username", "${auth_player_name}", "--uuid", "${auth_uuid}"], "jvm": ["-cp", "${classpath}"] }
+}"#;
+
+/// Deja una version "instalada" en disco y devuelve la ruta de un Java falso.
+fn fake_installation(launcher: &Launcher, root: &std::path::Path) -> std::path::PathBuf {
+    let paths = launcher.paths();
+    let descriptor_path = paths.version_descriptor("1.99");
+    std::fs::create_dir_all(descriptor_path.parent().unwrap()).unwrap();
+    std::fs::write(&descriptor_path, VERSION_JSON).unwrap();
+    std::fs::write(descriptor_path.with_file_name("1.99.jar"), b"jar").unwrap();
+
+    let indexes = paths.minecraft_dir().join("assets").join("indexes");
+    std::fs::create_dir_all(&indexes).unwrap();
+    std::fs::write(indexes.join("idx.json"), r#"{"objects":{}}"#).unwrap();
+
+    let jre = root.join("fake-jre");
+    std::fs::create_dir_all(jre.join("bin")).unwrap();
+    std::fs::write(jre.join("bin").join(if cfg!(windows) { "java.exe" } else { "java" }), b"").unwrap();
+    jre
+}
+
+async fn wait_for_state(events: &Collector, pred: impl Fn(&LaunchState) -> bool) -> LaunchState {
+    for _ in 0..100 {
+        if let Some(found) = events.states.lock().unwrap().iter().find(|e| pred(&e.state)) {
+            return found.state.clone();
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("no llego el estado esperado: {:?}", events.states.lock().unwrap());
+}
+
+#[tokio::test]
+async fn first_profile_becomes_default_and_names_are_unique() {
+    let (_d, launcher, _) = launcher();
+
+    let first = launcher.accounts_create_local("David").await.unwrap();
+    let second = launcher.accounts_create_local("Alex").await.unwrap();
+    assert_eq!(launcher.accounts_default().await.unwrap(), Some(first.id.clone()));
+    assert_eq!(launcher.accounts_list().await.unwrap().len(), 2);
+
+    assert!(matches!(
+        launcher.accounts_create_local("david").await,
+        Err(LauncherError::DuplicateProfile)
+    ));
+    assert!(matches!(
+        launcher.accounts_create_local("no valido!").await,
+        Err(LauncherError::InvalidInput(_))
+    ));
+
+    launcher.accounts_set_default(&second.id).await.unwrap();
+    assert_eq!(launcher.accounts_default().await.unwrap(), Some(second.id));
+    assert!(matches!(
+        launcher.accounts_set_default("acc_local_nope").await,
+        Err(LauncherError::ProfileMissing)
+    ));
+}
+
+#[tokio::test]
+async fn account_json_uses_camel_case_without_secrets() {
+    let (_d, launcher, _) = launcher();
+    let account = launcher.accounts_create_local("David").await.unwrap();
+    let json = serde_json::to_value(&account).unwrap();
+
+    assert_eq!(json["provider"], "local");
+    assert_eq!(json["providerData"]["type"], "local");
+    assert_eq!(json["providerData"]["displayName"], "David");
+    assert!(json["providerData"]["localUuid"].is_string());
+    assert!(!json.to_string().to_lowercase().contains("token"));
+}
+
+#[tokio::test]
+async fn instance_requires_a_profile() {
+    let (_d, launcher, _) = launcher();
+    assert!(matches!(
+        launcher.instances_create("Mi mundo", "1.21").await,
+        Err(LauncherError::NoDefaultProfile)
+    ));
+
+    let account = launcher.accounts_create_local("David").await.unwrap();
+    let instance = launcher.instances_create("Mi mundo", "1.21").await.unwrap();
+    assert_eq!(instance.profile_id, account.id);
+    assert_eq!(launcher.instances_list().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn versions_without_network_or_cache_ask_for_connection() {
+    let (_d, launcher, _) = launcher();
+    assert!(matches!(launcher.list_versions(false).await, Err(LauncherError::Offline)));
+}
+
+#[tokio::test]
+async fn versions_fall_back_to_cached_manifest_and_filter_snapshots() {
+    let (_d, launcher, _) = launcher();
+    let cache = launcher.paths().manifest_cache();
+    std::fs::create_dir_all(cache.parent().unwrap()).unwrap();
+    std::fs::write(
+        &cache,
+        r#"{"latest":{"release":"1.21","snapshot":"24w01a"},"versions":[
+          {"id":"24w01a","type":"snapshot","url":"https://x/a","time":"t","releaseTime":"t","sha1":"a"},
+          {"id":"1.21","type":"release","url":"https://x/b","time":"t","releaseTime":"t","sha1":"b"}]}"#,
+    )
+    .unwrap();
+
+    let releases = launcher.list_versions(false).await.unwrap();
+    assert_eq!(releases.iter().map(|v| v.id.as_str()).collect::<Vec<_>>(), ["1.21"]);
+    assert_eq!(launcher.list_versions(true).await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn installed_instance_prepares_launch_without_network() {
+    let (dir, launcher, _) = launcher();
+    let jre = fake_installation(&launcher, dir.path());
+
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher.instances_create("Offline", "1.99").await.unwrap();
+    let updated = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir())
+        .update(
+            &instance.id,
+            instance_manager::InstanceUpdate {
+                java: Some(JavaSelection::Path { path: jre }),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let plan = launcher.prepare_launch(&updated).await.unwrap();
+    let args = plan.command_args().unwrap();
+    let pos = args.iter().position(|a| a == "--username").unwrap();
+    assert_eq!(args[pos + 1], "Steve");
+    assert_eq!(plan.working_directory, updated.game_dir);
+
+    let account = launcher.accounts_list().await.unwrap().remove(0);
+    assert!(account.last_used_at.is_some());
+}
+
+#[tokio::test]
+async fn installation_complete_detects_missing_files() {
+    let (dir, launcher, _) = launcher();
+    let descriptor: VersionDescriptor = serde_json::from_str(VERSION_JSON).unwrap();
+    let data_dir = launcher.paths().minecraft_dir();
+    let plan = build_install_plan(&descriptor, &data_dir);
+    assert!(!installation_complete(&plan, &data_dir).await);
+
+    fake_installation(&launcher, dir.path());
+    assert!(installation_complete(&plan, &data_dir).await);
+
+    std::fs::remove_file(&plan.client.path).unwrap();
+    assert!(!installation_complete(&plan, &data_dir).await);
+}
+
+#[tokio::test]
+async fn launch_reports_offline_failure_and_can_be_retried() {
+    let (_d, launcher, events) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher.instances_create("Sin red", "1.21").await.unwrap();
+
+    launcher.launch(&instance.id).await.unwrap();
+    let state = wait_for_state(&events, |s| matches!(s, LaunchState::Failed { .. })).await;
+    assert_eq!(
+        state,
+        LaunchState::Failed { message: LauncherError::Offline.to_string() }
+    );
+
+    // La instancia vuelve a quedar libre tras el fallo.
+    let mut retried = false;
+    for _ in 0..40 {
+        match launcher.launch(&instance.id).await {
+            Ok(()) => {
+                retried = true;
+                break;
+            }
+            Err(LauncherError::AlreadyRunning) => tokio::time::sleep(Duration::from_millis(25)).await,
+            Err(e) => panic!("{e}"),
+        }
+    }
+    assert!(retried);
+}
+
+#[tokio::test]
+async fn launch_and_stop_of_unknown_instance_fail_cleanly() {
+    let (_d, launcher, _) = launcher();
+    assert!(matches!(launcher.launch("inst_nope").await, Err(LauncherError::InstanceNotFound)));
+    assert!(matches!(launcher.stop("inst_nope"), Err(LauncherError::InstanceNotFound)));
+    assert!(matches!(launcher.launch("../x").await, Err(LauncherError::InstanceNotFound)));
+}
+
+/// Prueba contra los servidores reales de Mojang. Ejecutar con `cargo test -- --ignored`.
+#[tokio::test]
+#[ignore = "requiere internet"]
+async fn real_manifest_lists_releases_and_resolves_a_descriptor() {
+    let dir = tempfile::tempdir().unwrap();
+    let launcher = Launcher::new(LauncherPaths::new(dir.path()), Arc::new(Collector::default()));
+
+    let releases = launcher.list_versions(false).await.unwrap();
+    assert!(releases.iter().any(|v| v.id == "1.21"));
+    assert!(launcher.paths().manifest_cache().is_file());
+}

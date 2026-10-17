@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum IdentityProviderKind {
     Local,
     Microsoft,
@@ -18,6 +19,7 @@ impl fmt::Display for IdentityProviderKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResolvedIdentity {
     pub profile_id: String,
     pub provider: IdentityProviderKind,
@@ -43,6 +45,7 @@ impl fmt::Debug for GameSessionMaterial {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SkinReference {
     pub id: String,
     pub path: Option<String>,
@@ -71,6 +74,7 @@ pub enum AuthErrorKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountRecord {
     pub id: String,
     pub provider: IdentityProviderKind,
@@ -81,7 +85,7 @@ pub struct AccountRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all_fields = "camelCase")]
 pub enum ProviderAccountData {
     #[serde(rename = "local")]
     Local(LocalAccountData),
@@ -90,6 +94,7 @@ pub enum ProviderAccountData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LocalAccountData {
     pub display_name: String,
     pub local_uuid: String,
@@ -97,6 +102,7 @@ pub struct LocalAccountData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MicrosoftAccountMetadata {
     pub minecraft_uuid: Option<String>,
     pub minecraft_name: Option<String>,

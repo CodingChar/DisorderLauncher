@@ -1,0 +1,458 @@
+use crate::{
+    GameOutputEvent, InstallProgressEvent, IdentityRegistry, LaunchState, LaunchStateEvent,
+    LauncherError, LauncherEvents, LauncherPaths, OutputStream,
+};
+use account_storage::{AccountRepository, FileAccountRepository};
+use chrono::Utc;
+use identity_api::{AccountRecord, IdentityProviderKind};
+use identity_local::{new_local_account, LocalIdentityProvider};
+use identity_microsoft::MicrosoftIdentityProvider;
+use instance_manager::{
+    FileInstanceRepository, Instance, InstanceRepository, JavaSelection, LoaderKind, MemoryPolicy,
+    NewInstance,
+};
+use java_runtime::{JavaInstallation, JavaManager, JavaRequirement};
+use minecraft_install::{build_asset_artifacts, build_install_plan, InstallExecutor, InstallPhase, InstallPlan};
+use minecraft_launch::{
+    GameKiller, LaunchContext, LaunchEvent, LaunchPlan, LaunchPlanBuilder, MemorySettings,
+    ProcessRunner,
+};
+use minecraft_meta::{AssetIndex, MetaError, VersionDescriptor, VersionEntry, VersionManifest, VersionType};
+use sha1::{Digest, Sha1};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::io::AsyncWriteExt;
+
+const MANIFEST_TIMEOUT: Duration = Duration::from_secs(20);
+const DEFAULT_JAVA_MAJOR: u32 = 8;
+const DEFAULT_CONCURRENCY: usize = 6;
+
+/// Orquestador de la aplicacion (capa Application de la spec 02): une repositorios,
+/// identidad, instalacion, Java y lanzamiento. No conoce Tauri.
+pub struct Launcher {
+    paths: LauncherPaths,
+    http: reqwest::Client,
+    accounts: Arc<dyn AccountRepository>,
+    instances: Arc<FileInstanceRepository>,
+    registry: IdentityRegistry,
+    java: JavaManager,
+    events: Arc<dyn LauncherEvents>,
+    manifest_url: String,
+    download_concurrency: usize,
+    /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
+    running: Mutex<HashMap<String, Option<GameKiller>>>,
+}
+
+impl Launcher {
+    pub fn new(paths: LauncherPaths, events: Arc<dyn LauncherEvents>) -> Self {
+        let http = reqwest::Client::builder()
+            .user_agent(concat!("DisorderLauncher/", env!("CARGO_PKG_VERSION")))
+            .connect_timeout(Duration::from_secs(15))
+            .build()
+            .unwrap_or_default();
+
+        let mut registry = IdentityRegistry::new();
+        registry.register(Arc::new(LocalIdentityProvider));
+        registry.register(Arc::new(MicrosoftIdentityProvider));
+
+        Self {
+            accounts: Arc::new(FileAccountRepository::new(paths.accounts_dir())),
+            instances: Arc::new(FileInstanceRepository::new(paths.instances_dir())),
+            java: JavaManager::new(http.clone(), paths.runtimes_dir()),
+            registry,
+            http,
+            events,
+            manifest_url: minecraft_meta::VERSION_MANIFEST_URL.to_string(),
+            download_concurrency: DEFAULT_CONCURRENCY,
+            running: Mutex::new(HashMap::new()),
+            paths,
+        }
+    }
+
+    pub fn with_manifest_url(mut self, url: impl Into<String>) -> Self {
+        self.manifest_url = url.into();
+        self
+    }
+
+    pub fn paths(&self) -> &LauncherPaths {
+        &self.paths
+    }
+
+    // ---- Cuentas -------------------------------------------------------------
+
+    pub async fn accounts_list(&self) -> Result<Vec<AccountRecord>, LauncherError> {
+        Ok(self.accounts.list().await?)
+    }
+
+    pub async fn accounts_default(&self) -> Result<Option<String>, LauncherError> {
+        Ok(self.accounts.get_default().await?)
+    }
+
+    /// Crea un perfil Offline Gaming. El primero pasa a ser el predeterminado.
+    pub async fn accounts_create_local(&self, name: &str) -> Result<AccountRecord, LauncherError> {
+        let record = new_local_account(name)?;
+
+        let existing = self.accounts.list().await?;
+        let taken = existing.iter().any(|a| {
+            a.provider == IdentityProviderKind::Local && a.label.eq_ignore_ascii_case(&record.label)
+        });
+        if taken {
+            return Err(LauncherError::DuplicateProfile);
+        }
+
+        self.accounts.save(&record).await?;
+        if self.accounts.get_default().await?.is_none() {
+            self.accounts.set_default(&record.id).await?;
+        }
+        Ok(record)
+    }
+
+    pub async fn accounts_set_default(&self, id: &str) -> Result<(), LauncherError> {
+        match self.accounts.set_default(id).await {
+            Err(account_storage::StorageError::NotFound(_)) => Err(LauncherError::ProfileMissing),
+            other => Ok(other?),
+        }
+    }
+
+    // ---- Instancias ----------------------------------------------------------
+
+    pub async fn instances_list(&self) -> Result<Vec<Instance>, LauncherError> {
+        Ok(self.instances.list().await?)
+    }
+
+    /// Crea una instancia Vanilla asociada al perfil predeterminado.
+    pub async fn instances_create(&self, name: &str, version: &str) -> Result<Instance, LauncherError> {
+        let profile_id = self
+            .accounts
+            .get_default()
+            .await?
+            .ok_or(LauncherError::NoDefaultProfile)?;
+        Ok(self
+            .instances
+            .create(NewInstance {
+                name: name.to_string(),
+                minecraft_version: version.to_string(),
+                loader: LoaderKind::Vanilla,
+                loader_version: None,
+                profile_id,
+            })
+            .await?)
+    }
+
+    // ---- Versiones -----------------------------------------------------------
+
+    /// Lista versiones de Minecraft. Por defecto solo las estables (`release`);
+    /// `include_all` agrega snapshots y versiones historicas.
+    pub async fn list_versions(&self, include_all: bool) -> Result<Vec<VersionEntry>, LauncherError> {
+        let manifest = self.load_manifest().await?;
+        Ok(manifest
+            .versions
+            .into_iter()
+            .filter(|v| include_all || v.version_type == VersionType::Release)
+            .collect())
+    }
+
+    async fn load_manifest(&self) -> Result<VersionManifest, LauncherError> {
+        let cache = self.paths.manifest_cache();
+        let fetched = tokio::time::timeout(
+            MANIFEST_TIMEOUT,
+            minecraft_meta::fetch_manifest_from(&self.http, &self.manifest_url),
+        )
+        .await;
+
+        match fetched {
+            Ok(Ok(manifest)) => {
+                if let Err(e) = minecraft_meta::save_manifest_cache(&manifest, &cache).await {
+                    tracing::warn!(error = %e, "no se pudo guardar el cache del manifiesto");
+                }
+                Ok(manifest)
+            }
+            failure => {
+                tracing::warn!("no se pudo descargar el manifiesto, se usa el cache local");
+                match minecraft_meta::load_cached_manifest(&cache).await {
+                    Ok(manifest) => Ok(manifest),
+                    Err(_) => match failure {
+                        Ok(Err(e)) => Err(e.into()),
+                        _ => Err(LauncherError::Offline),
+                    },
+                }
+            }
+        }
+    }
+
+    /// Descriptor de la version: del disco si ya esta instalada, si no de Mojang
+    /// (verificando su SHA-1 contra el manifiesto) y se persiste.
+    async fn resolve_descriptor(&self, version_id: &str) -> Result<VersionDescriptor, LauncherError> {
+        let path = self.paths.version_descriptor(version_id);
+        if let Ok(cached) = minecraft_meta::load_cached_version_descriptor(&path).await {
+            return Ok(cached);
+        }
+
+        let manifest = self.load_manifest().await?;
+        let entry = manifest
+            .versions
+            .iter()
+            .find(|v| v.id == version_id)
+            .ok_or(LauncherError::VersionUnavailable)?;
+        if !entry.url.starts_with("https://") {
+            return Err(LauncherError::VersionUnavailable);
+        }
+
+        let net = |e: reqwest::Error| LauncherError::from(MetaError::Http(e));
+        let bytes = self
+            .http
+            .get(&entry.url)
+            .send()
+            .await
+            .map_err(net)?
+            .error_for_status()
+            .map_err(net)?
+            .bytes()
+            .await
+            .map_err(net)?;
+
+        let digest = format!("{:x}", Sha1::digest(&bytes));
+        if !digest.eq_ignore_ascii_case(&entry.sha1) {
+            return Err(LauncherError::CorruptDownload);
+        }
+        let descriptor: VersionDescriptor = serde_json::from_slice(&bytes).map_err(MetaError::from)?;
+
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await.map_err(MetaError::from)?;
+        }
+        let part = path.with_extension("json.part");
+        tokio::fs::write(&part, &bytes).await.map_err(MetaError::from)?;
+        tokio::fs::rename(&part, &path).await.map_err(MetaError::from)?;
+        Ok(descriptor)
+    }
+
+    // ---- Lanzamiento ---------------------------------------------------------
+
+    /// Inicia la instancia en segundo plano. Devuelve en cuanto se acepta la
+    /// peticion; el avance y los errores llegan por `LauncherEvents`.
+    pub async fn launch(self: &Arc<Self>, instance_id: &str) -> Result<(), LauncherError> {
+        let instance = self
+            .instances
+            .get(instance_id)
+            .await?
+            .ok_or(LauncherError::InstanceNotFound)?;
+
+        {
+            let mut running = self.running_guard();
+            if running.contains_key(&instance.id) {
+                return Err(LauncherError::AlreadyRunning);
+            }
+            running.insert(instance.id.clone(), None);
+        }
+
+        let this = Arc::clone(self);
+        tokio::spawn(async move {
+            let id = instance.id.clone();
+            if let Err(e) = this.run(&instance).await {
+                this.emit_state(&id, LaunchState::Failed { message: e.to_string() });
+            }
+            this.running_guard().remove(&id);
+        });
+        Ok(())
+    }
+
+    /// Cierra el juego de una instancia en ejecucion.
+    pub fn stop(&self, instance_id: &str) -> Result<(), LauncherError> {
+        match self.running_guard().get(instance_id) {
+            Some(Some(killer)) => {
+                killer.kill();
+                Ok(())
+            }
+            Some(None) => Err(LauncherError::NotYetRunning),
+            None => Err(LauncherError::InstanceNotFound),
+        }
+    }
+
+    async fn run(&self, instance: &Instance) -> Result<(), LauncherError> {
+        let id = instance.id.as_str();
+        self.emit_state(id, LaunchState::Preparing);
+        let plan = self.prepare_launch(instance).await?;
+
+        self.emit_state(id, LaunchState::Starting);
+        let mut game = ProcessRunner::launch(&plan).await?;
+        self.running_guard().insert(instance.id.clone(), Some(game.killer()));
+
+        let mut log = open_log(&self.instances.logs_dir(id)?).await;
+        while let Some(event) = game.next_event().await {
+            match event {
+                LaunchEvent::Started { pid } => self.emit_state(id, LaunchState::Running { pid }),
+                LaunchEvent::Stdout(line) => {
+                    write_log(&mut log, &line).await;
+                    self.events.game_output(
+                        OutputStream::Stdout,
+                        GameOutputEvent { instance_id: id.to_string(), line },
+                    );
+                }
+                LaunchEvent::Stderr(line) => {
+                    write_log(&mut log, &line).await;
+                    self.events.game_output(
+                        OutputStream::Stderr,
+                        GameOutputEvent { instance_id: id.to_string(), line },
+                    );
+                }
+                LaunchEvent::Exited { code } => self.emit_state(id, LaunchState::Exited { code }),
+            }
+        }
+        Ok(())
+    }
+
+    /// Flujo de la spec 02: instancia -> perfil -> identidad -> version -> Java -> plan.
+    pub async fn prepare_launch(&self, instance: &Instance) -> Result<LaunchPlan, LauncherError> {
+        let id = instance.id.as_str();
+
+        let mut account = self
+            .accounts
+            .get(&instance.profile_id)
+            .await?
+            .ok_or(LauncherError::ProfileMissing)?;
+        // Un fallo de identidad se informa tal cual; nunca se degrada a perfil local.
+        let provider = self
+            .registry
+            .get(account.provider)
+            .ok_or_else(|| LauncherError::Identity("proveedor no disponible.".into()))?;
+        let identity = provider.resolve_identity(&account).await?;
+
+        let descriptor = self.resolve_descriptor(&instance.minecraft_version).await?;
+        let data_dir = self.paths.minecraft_dir();
+
+        let mut install_plan = build_install_plan(&descriptor, &data_dir);
+        if !installation_complete(&install_plan, &data_dir).await {
+            self.emit_state(id, LaunchState::Installing);
+            self.install(id, &mut install_plan, &data_dir).await?;
+        }
+
+        self.emit_state(id, LaunchState::PreparingJava);
+        let java = self.select_java(instance, &descriptor).await?;
+
+        let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
+        if let MemoryPolicy::Fixed { min_mb, max_mb } = &instance.memory {
+            ctx.memory = MemorySettings { min_mb: Some(*min_mb), max_mb: Some(*max_mb) };
+        }
+        let plan = LaunchPlanBuilder::build(&descriptor, &identity, &java, &ctx)?;
+        plan.validate()?;
+
+        account.last_used_at = Some(Utc::now());
+        if let Err(e) = self.accounts.save(&account).await {
+            tracing::warn!(error = %e, "no se pudo actualizar el ultimo uso del perfil");
+        }
+        Ok(plan)
+    }
+
+    async fn install(
+        &self,
+        instance_id: &str,
+        plan: &mut InstallPlan,
+        data_dir: &Path,
+    ) -> Result<(), LauncherError> {
+        let events = Arc::clone(&self.events);
+        let id = instance_id.to_string();
+        let executor = InstallExecutor::new(self.http.clone(), self.download_concurrency);
+        executor
+            .execute(plan, data_dir, move |p| {
+                events.install_progress(InstallProgressEvent {
+                    instance_id: id.clone(),
+                    phase: phase_name(p.phase),
+                    completed: p.completed,
+                    total: p.total,
+                })
+            })
+            .await?;
+        Ok(())
+    }
+
+    async fn select_java(
+        &self,
+        instance: &Instance,
+        descriptor: &VersionDescriptor,
+    ) -> Result<JavaInstallation, LauncherError> {
+        match &instance.java {
+            JavaSelection::Path { path } => Ok(JavaInstallation {
+                path: path.clone(),
+                version: "personalizado".into(),
+                major: 0,
+                managed: false,
+            }),
+            JavaSelection::Auto => {
+                let major = descriptor
+                    .java_version
+                    .as_ref()
+                    .map(|j| j.major_version)
+                    .unwrap_or(DEFAULT_JAVA_MAJOR);
+                Ok(self.java.ensure_java(&JavaRequirement { major_version: major }).await?)
+            }
+        }
+    }
+
+    fn emit_state(&self, instance_id: &str, state: LaunchState) {
+        self.events.launch_state(LaunchStateEvent {
+            instance_id: instance_id.to_string(),
+            state,
+        });
+    }
+
+    fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
+        self.running.lock().unwrap_or_else(|p| p.into_inner())
+    }
+}
+
+fn phase_name(phase: InstallPhase) -> &'static str {
+    match phase {
+        InstallPhase::Metadata => "metadata",
+        InstallPhase::Client => "client",
+        InstallPhase::Libraries => "libraries",
+        InstallPhase::AssetIndex => "assetIndex",
+        InstallPhase::Assets => "assets",
+        InstallPhase::Natives => "natives",
+        InstallPhase::Verify => "verify",
+    }
+}
+
+/// `true` si todos los archivos del plan ya estan en disco, de modo que se pueda
+/// jugar sin red. Solo comprueba existencia; la integridad es trabajo de repair.
+pub async fn installation_complete(plan: &InstallPlan, data_dir: &Path) -> bool {
+    let fixed = std::iter::once(&plan.client)
+        .chain(std::iter::once(&plan.asset_index))
+        .chain(plan.libraries.iter())
+        .chain(plan.natives.iter());
+    for artifact in fixed {
+        if !is_file(&artifact.path).await {
+            return false;
+        }
+    }
+
+    let Ok(data) = tokio::fs::read_to_string(&plan.asset_index.path).await else {
+        return false;
+    };
+    let Ok(index) = serde_json::from_str::<AssetIndex>(&data) else {
+        return false;
+    };
+    for asset in build_asset_artifacts(&index, data_dir) {
+        if !is_file(&asset.path).await {
+            return false;
+        }
+    }
+    true
+}
+
+async fn is_file(path: &Path) -> bool {
+    tokio::fs::metadata(path).await.map(|m| m.is_file()).unwrap_or(false)
+}
+
+async fn open_log(dir: &Path) -> Option<tokio::fs::File> {
+    tokio::fs::create_dir_all(dir).await.ok()?;
+    tokio::fs::File::create(dir.join("latest.log")).await.ok()
+}
+
+async fn write_log(log: &mut Option<tokio::fs::File>, line: &str) {
+    if let Some(file) = log {
+        let _ = file.write_all(line.as_bytes()).await;
+        let _ = file.write_all(b"\n").await;
+    }
+}
