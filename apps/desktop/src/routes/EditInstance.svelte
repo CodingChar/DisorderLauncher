@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Button from '../lib/components/Button.svelte'
-  import Card from '../lib/components/Card.svelte'
-  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
+  import PageHeading from '../lib/components/PageHeading.svelte'
+    import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import Input from '../lib/components/Input.svelte'
   import Select from '../lib/components/Select.svelte'
   import { api } from '../lib/api'
@@ -88,7 +88,7 @@
     if (!instance) return
     try {
       await instances.duplicate(instance.id)
-      nav.go('home')
+      nav.go('instances')
     } catch (e) {
       error = (e as Error).message
     }
@@ -113,7 +113,7 @@
     confirmDelete = false
     try {
       await instances.remove(instance.id)
-      nav.go('home')
+      nav.go('instances')
     } catch (e) {
       error = (e as Error).message
     }
@@ -121,20 +121,18 @@
 </script>
 
 <div class="page">
-  <header>
-    <small>EDITAR INSTANCIA</small>
-    <h1>{instance?.name ?? 'Instancia'}</h1>
-  </header>
+  <PageHeading eyebrow="CONFIGURAR INSTANCIA" title={instance?.name ?? 'Instancia'} description="Nombre, versión, perfil, memoria y Java de esta instancia." />
 
   {#if !instance}
-    <Card><p class="muted">No hay ninguna instancia seleccionada.</p></Card>
+    <p class="library-notice">No hay ninguna instancia seleccionada.</p>
   {:else}
     {#if busy}
-      <p class="banner" role="status">Esta instancia se está usando. Podrás editarla cuando termine.</p>
+      <p class="library-notice" role="status">Esta instancia se está usando. Podrás editarla cuando termine.</p>
     {/if}
 
-    <Card>
+    <section class="settings-panel panel">
       <form
+        class="form-stack"
         onsubmit={(e) => {
           e.preventDefault()
           save()
@@ -144,44 +142,44 @@
         <Select label="Versión de Minecraft" bind:value={version} options={versionOptions} disabled={busy} />
         <Select label="Perfil que juega" bind:value={profileId} options={profileOptions} disabled={busy} />
 
-        <fieldset>
+        <fieldset class="group">
           <legend>Memoria (RAM)</legend>
-          <label class="radio"><input type="radio" bind:group={memoryMode} value="auto" /> Automática (recomendado)</label>
-          <label class="radio"><input type="radio" bind:group={memoryMode} value="fixed" /> Elegir cantidad</label>
+          <label class="check-row"><input type="radio" bind:group={memoryMode} value="auto" /> Automática (recomendado)</label>
+          <label class="check-row"><input type="radio" bind:group={memoryMode} value="fixed" /> Elegir cantidad</label>
           {#if memoryMode === 'fixed'}
             <Input label="Máximo en GB" bind:value={maxGb} maxlength={5} hint="Más memoria no siempre es mejor. 4 GB suele bastar." />
           {/if}
         </fieldset>
 
-        <fieldset>
+        <fieldset class="group">
           <legend>Java</legend>
-          <label class="radio"><input type="radio" bind:group={javaMode} value="auto" /> Automático (recomendado)</label>
-          <label class="radio"><input type="radio" bind:group={javaMode} value="path" /> Usar mi propio Java</label>
+          <label class="check-row"><input type="radio" bind:group={javaMode} value="auto" /> Automático (recomendado)</label>
+          <label class="check-row"><input type="radio" bind:group={javaMode} value="path" /> Usar mi propio Java</label>
           {#if javaMode === 'path'}
             <Input label="Carpeta de Java" bind:value={javaPath} placeholder="C:\Program Files\Java\jdk-21" hint="La carpeta que contiene «bin»." />
           {/if}
         </fieldset>
 
-        {#if error}<p class="error" role="alert">{error}</p>{/if}
-        {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+        {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+        {#if notice}<p class="form-ok" role="status">{notice}</p>{/if}
 
-        <div class="row">
+        <div class="form-actions">
           <Button variant="primary" type="submit" disabled={busy || saving || name.trim().length === 0}>
             {saving ? 'Guardando…' : 'Guardar cambios'}
           </Button>
-          <Button variant="ghost" onclick={() => nav.go('home')}>Volver</Button>
+          <Button variant="ghost" onclick={() => nav.go('instances')}>Volver a Mis instancias</Button>
         </div>
       </form>
-    </Card>
+    </section>
 
-    <Card>
-      <h3>Más acciones</h3>
-      <div class="row">
+    <section class="settings-panel panel">
+      <div class="section-title"><h3>Más acciones</h3></div>
+      <div class="form-actions">
         <Button disabled={busy} onclick={duplicate}>Duplicar</Button>
         <Button disabled={busy} onclick={exportPack}>Exportar como modpack…</Button>
         <Button disabled={busy} onclick={() => (confirmDelete = true)}>Eliminar…</Button>
       </div>
-    </Card>
+    </section>
 
     <ConfirmDialog
       open={confirmDelete}
@@ -198,84 +196,24 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    max-width: 560px;
+    gap: 20px;
+    max-width: 800px;
   }
 
-  header small {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    margin-bottom: 5px;
-  }
-
-  h1 {
-    font-size: 34px;
-    line-height: 0.95;
-    overflow-wrap: anywhere;
-  }
-
-  h3 {
-    font-size: 18px;
-    margin-bottom: 12px;
-  }
-
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-
-  fieldset {
+  .group {
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     padding: 12px 16px 16px;
+    margin: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
-  legend {
+  .group legend {
     padding: 0 6px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: var(--text-secondary);
-  }
-
-  .radio {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 40px;
-  }
-
-  .radio input {
-    width: 20px;
-    height: 20px;
-    accent-color: var(--action);
-  }
-
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .banner,
-  .muted {
-    margin: 0;
-    color: var(--text-secondary);
-  }
-
-  .error {
-    margin: 0;
-    font-weight: 600;
-  }
-
-  .notice {
-    margin: 0;
+    font-size: 11px;
     color: var(--text-secondary);
   }
 </style>

@@ -3,14 +3,16 @@ use std::path::{Path, PathBuf};
 
 const DEFAULT_DARK: &str = include_str!("../../../theme_examples/default-dark.theme.json");
 const DEFAULT_LIGHT: &str = include_str!("../../../theme_examples/default-light.theme.json");
+const DEFAULT_BLUE: &str = include_str!("../../../theme_examples/default-blue.theme.json");
 const SUFFIX: &str = ".theme.json";
 
 pub const DEFAULT_DARK_ID: &str = "disorderlaucher.default.dark";
 pub const DEFAULT_LIGHT_ID: &str = "disorderlaucher.default.light";
+pub const DEFAULT_BLUE_ID: &str = "disorderlaucher.default.blue";
 
 /// Temas incluidos en el binario. Se validan al iniciar: un fallo aqui seria un bug de empaquetado.
 pub fn builtin_themes() -> Vec<Theme> {
-    [DEFAULT_DARK, DEFAULT_LIGHT]
+    [DEFAULT_DARK, DEFAULT_LIGHT, DEFAULT_BLUE]
         .into_iter()
         .map(|json| parse_theme(json.as_bytes()).expect("los temas incluidos deben ser validos"))
         .collect()
@@ -117,7 +119,7 @@ mod tests {
     async fn lists_builtin_themes_first() {
         let dir = tempfile::tempdir().unwrap();
         let list = ThemeStore::new(dir.path()).list().await;
-        assert_eq!(list.len(), 2);
+        assert_eq!(list.len(), 3);
         assert!(list.iter().all(|e| e.builtin));
     }
 
@@ -130,11 +132,11 @@ mod tests {
         assert_eq!(theme.name, "Mi tema");
 
         let list = store.list().await;
-        assert_eq!(list.len(), 3);
-        assert!(!list[2].builtin);
+        assert_eq!(list.len(), 4);
+        assert!(!list[3].builtin);
 
         store.remove("mi.tema").await.unwrap();
-        assert_eq!(store.list().await.len(), 2);
+        assert_eq!(store.list().await.len(), 3);
         assert_eq!(store.remove("mi.tema").await, Err(ThemeError::NotFound));
     }
 
@@ -173,7 +175,7 @@ mod tests {
         std::fs::write(custom.join("otro.theme.json"), custom_json("distinto", "X")).unwrap();
 
         let ids: Vec<_> = store.list().await.into_iter().map(|e| e.theme.id).collect();
-        assert_eq!(ids, [DEFAULT_DARK_ID, DEFAULT_LIGHT_ID, "bueno"]);
+        assert_eq!(ids, [DEFAULT_DARK_ID, DEFAULT_LIGHT_ID, DEFAULT_BLUE_ID, "bueno"]);
 
         assert_eq!(store.resolve(Some("bueno"), ThemeMode::Light).await.name, "Bueno");
         assert_eq!(store.resolve(Some("no-existe"), ThemeMode::Light).await.id, DEFAULT_LIGHT_ID);

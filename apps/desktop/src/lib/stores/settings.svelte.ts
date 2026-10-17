@@ -2,6 +2,9 @@ import { api } from '../api'
 import { applyThemeObject, clearThemeVars } from '../theme'
 import type { Settings, ThemeEntry } from '../types'
 
+/** Tema incluido «Azul oscuro»: lo activa el boton de la luna de la cabecera. */
+export const BLUE_THEME_ID = 'disorderlaucher.default.blue'
+
 const media = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: light)') : null
 
 class SettingsStore {
@@ -26,6 +29,15 @@ class SettingsStore {
     clearThemeVars()
     const mode = this.value.theme === 'system' ? (media?.matches ? 'light' : 'dark') : this.value.theme
     document.documentElement.dataset.theme = mode
+  }
+
+  get isBlue() {
+    return this.value.themeId === BLUE_THEME_ID
+  }
+
+  /** Alterna entre el tema azul y el tema elegido en Ajustes (claro, oscuro o del sistema). */
+  async toggleBlue() {
+    await this.save({ ...this.value, themeId: this.isBlue ? null : BLUE_THEME_ID })
   }
 
   async loadThemes() {

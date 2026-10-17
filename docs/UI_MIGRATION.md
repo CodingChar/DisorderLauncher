@@ -1,7 +1,7 @@
 # Reforma visual: maqueta `DisorderLauncherUI` → `apps/desktop`
 
-> **Si eres otro chat/agente: lee este archivo antes de tocar `apps/desktop/src`.** Mientras el estado de abajo no
-> diga «completada», la interfaz esta en transicion y estas reglas evitan que se pisen cambios.
+> **Si eres otro chat/agente: lee este archivo antes de tocar `apps/desktop/src`.**
+> Estado: **reforma completada** (2026-10-17). Estas reglas siguen vigentes para cualquier cambio de interfaz posterior.
 
 ## Que es esto
 
@@ -49,12 +49,12 @@ Estos reciben el nuevo aspecto por los componentes compartidos y la cabecera `Pa
 | Fase | Contenido | Estado |
 |---|---|---|
 | 0 | Analisis, este documento, reglas en `CLAUDE.md`/spec 08 | ✅ |
-| 1 | Sistema visual global (`app.css`), tema azul incluido, temas con radios de la maqueta | ⬜ |
-| 2 | Componentes compartidos (Button, Card, Input, Select, ConfirmDialog, InstanceCard, ProfileBadge, PageHeading, Icon, ItemLogo) | ⬜ |
-| 3 | Shell: barra lateral, cabecera, pie, ayuda, navegacion con vistas nuevas | ⬜ |
-| 4 | Pantallas: Inicio, Mis instancias, Explorar, Herramientas | ⬜ |
-| 5 | Pantallas: Perfiles, Skins, Ajustes, Crear/Editar, Mods, Editor de skins, Bienvenida | ⬜ |
-| 6 | Verificacion (check, test, build, clippy, navegador, ventana nativa) y documentacion final | ⬜ |
+| 1 | Sistema visual global (`app.css`), tema azul incluido, temas con radios de la maqueta | ✅ |
+| 2 | Componentes compartidos (Button, Card, Input, Select, ConfirmDialog, InstanceCard, ProfileBadge, PageHeading, Icon, ItemLogo) | ✅ |
+| 3 | Shell: barra lateral, cabecera, pie, ayuda, navegacion con vistas nuevas | ✅ |
+| 4 | Pantallas: Inicio, Mis instancias, Explorar, Herramientas | ✅ |
+| 5 | Pantallas: Perfiles, Skins, Ajustes, Crear/Editar, Mods, Editor de skins, Bienvenida | ✅ |
+| 6 | Verificacion y documentacion final | ✅ (ventana nativa: ver pendientes) |
 
 Leyenda: ✅ hecho · 🟡 en curso · ⬜ pendiente. El que avance una fase actualiza esta tabla **en el mismo commit**.
 
@@ -64,3 +64,23 @@ Leyenda: ✅ hecho · 🟡 en curso · ⬜ pendiente. El que avance una fase act
 - El selector de icono de instancia de la maqueta (bloques/objetos) **no se porto**: el modelo real de `Instance` no guarda icono. Los iconos se derivan del cargador (`lib/components/ItemLogo.svelte`). Guardarlo seria un cambio de contrato (`docs/IPC.md`, `instance.json`) fuera de esta reforma.
 - Las skins de la maqueta (colores por parte del cuerpo) se sustituyen por las reales (PNG + vista 3D).
 - La RAM/Java por instancia de la maqueta se mapean a `memory`/`java` reales (`auto` | fijo/ruta).
+
+## Lo que cambio (referencia rapida)
+
+- `apps/desktop/src/app.css`: sistema visual completo (sin fuentes remotas), tokens + estados `--ok/--warn/--danger`.
+- Componentes nuevos: `Icon`, `Avatar`, `ItemLogo` (icono por cargador), `PageHeading`, `HelpDialog`. Reescritos sobre clases globales: `Button`, `Card`, `Input`, `Select`, `ProgressBar`, `ConfirmDialog`, `InstanceCard`, `ProfileBadge`.
+- Vistas nuevas: `Instances` (biblioteca), `Explore`, `Tools`; `Home` es ahora el «Centro de sesion» con consola real.
+- `nav.svelte.ts`: vistas `instances|explore|tools`, `viewLabel` (migas), `navParent` (entrada resaltada), `nav.create(loader)`.
+- `sessions.svelte.ts`: consola por instancia (`logOf`, `clearLog`, maximo 1000 lineas) alimentada por `launch://stdout|stderr`; hora de inicio de la sesion.
+- `api`: `events.onGameOutput`. Sin cambios de comandos IPC.
+- Rust `themes`: tema incluido `disorderlaucher.default.blue`; radios de los temas incluidos 7/8/13/18 (antes 8/10/18/24).
+- `.claude/launch.json`: servidor de desarrollo `desktop-ui` (navegador con backend simulado).
+
+## Pendiente conocido de la reforma
+
+- **Ventana nativa**: verificado `svelte-check`, 18 tests, `vite build`, `clippy -D warnings`, `cargo test --workspace` (todo verde) y recorrido completo en el navegador con el backend simulado (820x560 y 1100x720, tema negro y azul). NO se reejecuto `tauri dev` con el backend real tras la reforma (el puerto 5173 estaba ocupado por otro proceso): conviene lanzar un juego real y confirmar que la consola muestra su salida.
+
+- Icono de instancia elegible (maqueta): requiere cambio de contrato; ver «Decisiones».
+- `Mods` y `SkinEditor` solo recibieron el aspecto por los componentes compartidos y la cabecera; no se rediseño su disposicion interna.
+- Las fuentes Space Grotesk / IBM Plex Sans no se incluyen en el binario (se usa la alternativa del sistema); empaquetarlas en `apps/desktop/public/fonts` seria una mejora aparte.
+- `typography.scale` y `density` de los temas siguen sin aplicarse (ya constaba en `PROGRESS.md`).

@@ -10,24 +10,13 @@
   let { variant = 'plain', children }: Props = $props()
 </script>
 
-<section class="card {variant}">
+<section class="panel pad {variant}">
   {@render children()}
 </section>
 
 <style>
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-soft);
-    padding: 20px;
-  }
-
-  .plain {
-    border-radius: var(--r-lg);
-  }
-
   .hero {
-    border-radius: var(--r-xl) 0 var(--r-xl) 0;
+    border-radius: var(--r-xl);
     padding: 28px;
   }
 </style>

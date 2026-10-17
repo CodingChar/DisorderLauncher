@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Button from '../lib/components/Button.svelte'
+  import PageHeading from '../lib/components/PageHeading.svelte'
   import Card from '../lib/components/Card.svelte'
   import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import Input from '../lib/components/Input.svelte'
@@ -95,10 +96,7 @@
 </script>
 
 <div class="page">
-  <header>
-    <small>SKINS</small>
-    <h1>Tu biblioteca</h1>
-  </header>
+  <PageHeading eyebrow="DISORDERLAUNCHER" title="Skins" description="Tu biblioteca de skins: impórtalas, edítalas y asígnalas a un perfil sin conexión." />
 
   <Card>
     <div class="toolbar">
@@ -124,8 +122,8 @@
     </p>
   </Card>
 
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
-  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+  {#if notice}<p class="form-ok" role="status">{notice}</p>{/if}
 
   {#if skins.loaded && skins.list.length === 0}
     <Card>
@@ -200,21 +198,10 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-width: 880px;
+    max-width: 1100px;
   }
 
-  header small {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    margin-bottom: 5px;
-  }
 
-  h1 {
-    font-size: 34px;
-    line-height: 0.95;
-  }
 
   h3 {
     font-size: 18px;
@@ -286,13 +273,5 @@
     gap: 14px;
   }
 
-  .error {
-    margin: 0;
-    font-weight: 600;
-  }
 
-  .notice {
-    margin: 0;
-    color: var(--text-secondary);
-  }
 </style>

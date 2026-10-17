@@ -79,6 +79,12 @@ export type LaunchStateEvent = { instanceId: string } & (
   | { state: 'failed'; message: string; kind: ErrorKind }
 )
 
+export interface GameOutputEvent {
+  instanceId: string
+  line: string
+  stream: 'stdout' | 'stderr'
+}
+
 export interface RepairSummary {
   found: number
   fixed: number

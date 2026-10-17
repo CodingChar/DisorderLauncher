@@ -5,7 +5,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqu
 
 ## Reforma visual (maqueta `DisorderLauncherUI`)
 
-En curso desde 2026-10-17. Estado, reglas y mapa en [`UI_MIGRATION.md`](UI_MIGRATION.md): **leelo antes de tocar `apps/desktop/src`**. No cambia contratos IPC ni logica.
+✅ Completada el 2026-10-17. La interfaz de `apps/desktop` sustituye al diseno anterior por el de la maqueta `DisorderLauncherUI/` (barra lateral, centro de sesion con consola real, Mis instancias, Explorar, Herramientas, Perfiles, Skins, Ajustes, tema azul oscuro incluido). Reglas, mapa y pendientes en [`UI_MIGRATION.md`](UI_MIGRATION.md): **leelo antes de tocar `apps/desktop/src`**. No cambia contratos IPC ni logica de negocio.
 
 ## Resumen
 

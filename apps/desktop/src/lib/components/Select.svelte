@@ -23,31 +23,3 @@
     {/each}
   </select>
 </div>
-
-<style>
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  label {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: var(--text-secondary);
-  }
-
-  select {
-    min-height: 44px;
-    padding: 0 14px;
-    border-radius: var(--r-sm);
-    border: 1px solid var(--border-strong);
-    background: var(--surface-alt);
-    color: var(--text-primary);
-  }
-
-  select:disabled {
-    opacity: 0.5;
-  }
-</style>

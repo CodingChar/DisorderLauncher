@@ -24,46 +24,24 @@
   })
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="{uid}-title" aria-describedby="{uid}-msg" oncancel={(e) => { e.preventDefault(); oncancel() }}>
-  <h3 id="{uid}-title">{title}</h3>
-  <p id="{uid}-msg">{message}</p>
-  <div class="actions">
+<dialog
+  bind:this={dialog}
+  class="modal panel"
+  aria-labelledby="{uid}-title"
+  aria-describedby="{uid}-msg"
+  oncancel={(e) => {
+    e.preventDefault()
+    oncancel()
+  }}
+>
+  <div class="section-top">
+    <h2 id="{uid}-title">{title}</h2>
+  </div>
+  <p class="modal-text" id="{uid}-msg">{message}</p>
+  <div class="modal-actions">
     {#if cancelLabel}
       <Button variant="ghost" onclick={oncancel}>{cancelLabel}</Button>
     {/if}
     <Button variant="primary" onclick={onconfirm}>{confirmLabel}</Button>
   </div>
 </dialog>
-
-<style>
-  dialog {
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-lg) 0 var(--r-lg) 0;
-    background: var(--surface);
-    color: var(--text-primary);
-    padding: 24px;
-    width: min(420px, calc(100vw - 32px));
-    box-shadow: var(--shadow);
-  }
-
-  dialog::backdrop {
-    background: rgba(0, 0, 0, 0.55);
-  }
-
-  h3 {
-    font-size: 20px;
-    margin-bottom: 8px;
-  }
-
-  p {
-    margin: 0 0 20px;
-    color: var(--text-secondary);
-    line-height: 1.55;
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-</style>

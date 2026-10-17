@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "disorderlaucher.default.blue",
+  "name": "Azul oscuro",
+  "mode": "dark",
+  "colors": {
+    "background": "#0B1220",
+    "surface": "#111D30",
+    "surfaceAlt": "#192940",
+    "surfaceRaised": "#243954",
+    "textPrimary": "#E4EDF9",
+    "textSecondary": "#9CADC6",
+    "border": "#283C57",
+    "borderStrong": "#526E92",
+    "action": "#B8D4FA",
+    "actionText": "#0B1729"
+  },
+  "typography": {
+    "displayFamily": "Space Grotesk",
+    "bodyFamily": "IBM Plex Sans",
+    "scale": 1.0
+  },
+  "shape": {
+    "inputRadius": 7,
+    "buttonRadius": 8,
+    "cardRadius": 13,
+    "heroRadius": 18
+  },
+  "density": {
+    "uiScale": 1.0,
+    "compact": false
+  },
+  "effects": {
+    "shadowStrength": 0.2,
+    "animations": true
+  }
+}

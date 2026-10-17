@@ -17,19 +17,39 @@ export interface Session {
   kind?: ErrorKind
   exitCode?: number | null
   progress?: { phase: InstallPhase; completed: number; total: number }
+  /** Hora local en que se pidio jugar (para mostrarla en el centro de sesion). */
+  startedAt?: string
 }
+
+export interface LogLine {
+  stream: 'stdout' | 'stderr'
+  text: string
+}
+
+/** Lineas de consola que se conservan por instancia: el juego puede escribir miles. */
+const MAX_LOG_LINES = 1000
 
 const BUSY: SessionPhase[] = ['preparing', 'installing', 'preparingJava', 'starting', 'running', 'repairing']
 
 /** Estado de ejecucion por instancia, alimentado por los eventos del backend. */
 class SessionsStore {
   byInstance = $state<Record<string, Session>>({})
+  /** Salida reciente del juego por instancia (ya sin secretos). */
+  logs = $state<Record<string, LogLine[]>>({})
   private started = false
   /** Instancias que el usuario pidio cerrar: su salida no es un fallo. */
   private stopping = new Set<string>()
 
   get(id: string): Session | undefined {
     return this.byInstance[id]
+  }
+
+  logOf(id: string): LogLine[] {
+    return this.logs[id] ?? []
+  }
+
+  clearLog(id: string) {
+    this.logs = { ...this.logs, [id]: [] }
   }
 
   isBusy(id: string): boolean {
@@ -56,13 +76,15 @@ class SessionsStore {
             this.set(e.instanceId, { phase: e.state, progress: e.state === 'installing' ? prev?.progress : undefined })
         }
       }),
+      events.onGameOutput((e) => this.appendLog(e.instanceId, { stream: e.stream, text: e.line })),
       events.onInstallProgress((e) => this.progress(e.instanceId, 'installing', e)),
       events.onRepairProgress((e) => this.progress(e.instanceId, 'repairing', e)),
     ])
   }
 
   async launch(id: string) {
-    this.set(id, { phase: 'preparing' })
+    this.clearLog(id)
+    this.set(id, { phase: 'preparing', startedAt: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) })
     try {
       await api.instancesLaunch(id)
     } catch (e) {
@@ -110,8 +132,16 @@ class SessionsStore {
     this.set(id, { ...prev, phase, progress: { phase: e.phase, completed: e.completed, total: e.total } })
   }
 
+  private appendLog(id: string, line: LogLine) {
+    const current = this.logs[id] ?? []
+    const next = current.length >= MAX_LOG_LINES ? [...current.slice(current.length - MAX_LOG_LINES + 1), line] : [...current, line]
+    this.logs = { ...this.logs, [id]: next }
+  }
+
   private set(id: string, session: Session) {
-    this.byInstance = { ...this.byInstance, [id]: session }
+    // Los cambios de fase conservan la hora de inicio de la sesion en curso.
+    const startedAt = session.startedAt ?? this.byInstance[id]?.startedAt
+    this.byInstance = { ...this.byInstance, [id]: { ...session, startedAt } }
   }
 }
 

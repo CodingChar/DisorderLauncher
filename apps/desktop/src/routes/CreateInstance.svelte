@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Button from '../lib/components/Button.svelte'
+  import PageHeading from '../lib/components/PageHeading.svelte'
   import Card from '../lib/components/Card.svelte'
   import Input from '../lib/components/Input.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
@@ -12,7 +13,7 @@
 
   let name = $state('Mi mundo')
   let version = $state('')
-  let loader = $state<LoaderKind>('vanilla')
+  let loader = $state<LoaderKind>(nav.createLoader)
   let error = $state<string | null>(null)
   let busy = $state(false)
   let importing = $state(false)
@@ -65,13 +66,11 @@
 </script>
 
 <div class="page">
-  <header>
-    <small>NUEVA INSTANCIA</small>
-    <h1>Crea tu mundo</h1>
-  </header>
+  <PageHeading eyebrow="NUEVA INSTANCIA" title="Crea tu mundo" description="Elige un nombre, el tipo de instancia y la versión de Minecraft." />
 
-  <Card>
+  <section class="settings-panel panel">
     <form
+      class="form-stack"
       onsubmit={(e) => {
         e.preventDefault()
         create()
@@ -81,15 +80,15 @@
       <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
 
       {#if versions.loading}
-        <p class="note">Buscando versiones de Minecraft…</p>
+        <p class="subtle">Buscando versiones de Minecraft…</p>
       {:else if versions.error}
         <div class="note-block" role="alert">
-          <p>{versions.error}</p>
+          <p class="form-error">{versions.error}</p>
           <Button onclick={() => versions.load()}>Reintentar</Button>
         </div>
       {:else if options.length === 0}
         <div class="note-block">
-          <p>No hay versiones disponibles por ahora. Comprueba tu conexión a internet.</p>
+          <p class="subtle">No hay versiones disponibles por ahora. Comprueba tu conexión a internet.</p>
           <Button onclick={() => versions.load()}>Buscar de nuevo</Button>
         </div>
       {:else}
@@ -100,25 +99,27 @@
         <p class="form-error" role="alert">{error}</p>
       {/if}
 
-      <div class="row">
+      <div class="form-actions">
         <Button variant="primary" type="submit" disabled={busy || !version || name.trim().length === 0}>
           {busy ? 'Creando…' : 'Crear instancia'}
         </Button>
-        <Button variant="ghost" onclick={() => nav.go('home')}>Cancelar</Button>
+        <Button variant="ghost" onclick={() => nav.go('instances')}>Cancelar</Button>
       </div>
     </form>
-  </Card>
+  </section>
 
-  <Card>
-    <h3>¿Tienes un modpack?</h3>
-    <p class="note">Importa un archivo <strong>.mrpack</strong> (Modrinth) y se crea la instancia con todo lo necesario.</p>
+  <section class="settings-panel panel">
+    <div class="section-title">
+      <h3>¿Tienes un modpack?</h3>
+    </div>
+    <p class="subtle">Importa un archivo <strong>.mrpack</strong> (Modrinth) y se crea la instancia con todo lo necesario.</p>
     {#if importing && instances.importPercent !== null}
       <ProgressBar percent={instances.importPercent} label="Importando modpack" />
     {/if}
-    <div class="row">
+    <div class="form-actions pack-actions">
       <Button disabled={importing || busy} onclick={importPack}>{importing ? 'Importando…' : 'Importar modpack…'}</Button>
     </div>
-  </Card>
+  </section>
 </div>
 
 <style>
@@ -126,42 +127,7 @@
     display: flex;
     flex-direction: column;
     gap: 24px;
-    max-width: 520px;
-  }
-
-  header small {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    margin-bottom: 5px;
-  }
-
-  h1 {
-    font-size: 34px;
-    line-height: 0.95;
-  }
-
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-
-  .row {
-    display: flex;
-    gap: 12px;
-  }
-
-  h3 {
-    font-size: 18px;
-    margin-bottom: 6px;
-  }
-
-  .note,
-  .note-block p {
-    margin: 0;
-    color: var(--text-secondary);
+    max-width: 800px;
   }
 
   .note-block {
@@ -171,8 +137,7 @@
     gap: 10px;
   }
 
-  .form-error {
-    margin: 0;
-    font-weight: 600;
+  .pack-actions {
+    margin-top: 16px;
   }
 </style>

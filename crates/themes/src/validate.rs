@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn rejects_out_of_range_values() {
-        let radius = with(&[("\"cardRadius\": 18", "\"cardRadius\": 500")]);
+        let radius = with(&[("\"cardRadius\": 13", "\"cardRadius\": 500")]);
         assert_eq!(parse_theme(radius.as_bytes()), Err(ThemeError::OutOfRange("shape.cardRadius")));
         let scale = with(&[("\"scale\": 1.0", "\"scale\": 9.0")]);
         assert_eq!(parse_theme(scale.as_bytes()), Err(ThemeError::OutOfRange("typography.scale")));

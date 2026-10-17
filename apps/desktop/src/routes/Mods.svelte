@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
   import Button from '../lib/components/Button.svelte'
+  import PageHeading from '../lib/components/PageHeading.svelte'
   import Card from '../lib/components/Card.svelte'
   import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import Input from '../lib/components/Input.svelte'
@@ -50,10 +51,7 @@
 </script>
 
 <div class="page">
-  <header>
-    <small>MODS</small>
-    <h1>{instance?.name ?? 'Mods'}</h1>
-  </header>
+  <PageHeading eyebrow="MODS DE LA INSTANCIA" title={instance?.name ?? 'Mods'} />
 
   {#if !instance}
     <Card><p class="muted">No hay ninguna instancia seleccionada.</p></Card>
@@ -223,19 +221,7 @@
     max-width: 760px;
   }
 
-  header small {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    margin-bottom: 5px;
-  }
 
-  h1 {
-    font-size: 34px;
-    line-height: 0.95;
-    overflow-wrap: anywhere;
-  }
 
   h3 {
     font-size: 18px;

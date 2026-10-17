@@ -648,7 +648,7 @@ async fn custom_themes_can_be_selected_and_falling_back_when_removed() {
         .replace("Default Dark", "Mi tema");
     let _ = dir;
 
-    assert_eq!(launcher.themes_list().await.len(), 2);
+    assert_eq!(launcher.themes_list().await.len(), 3);
     let imported = launcher.themes_import(theme.as_bytes()).await.unwrap();
     assert_eq!(imported.id, "mi.tema");
     assert!(matches!(launcher.themes_import(theme.as_bytes()).await, Err(LauncherError::InvalidInput(_))));

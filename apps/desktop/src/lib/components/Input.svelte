@@ -35,51 +35,8 @@
     onkeydown={(e) => e.key === 'Enter' && onenter?.()}
   />
   {#if error}
-    <p class="error" id="{uid}-error" role="alert">{error}</p>
+    <p class="field-error" id="{uid}-error" role="alert">{error}</p>
   {:else if hint}
-    <p class="hint" id="{uid}-hint">{hint}</p>
+    <p class="field-help" id="{uid}-hint">{hint}</p>
   {/if}
 </div>
-
-<style>
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  label {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: var(--text-secondary);
-  }
-
-  input {
-    min-height: 44px;
-    padding: 0 14px;
-    border-radius: var(--r-sm);
-    border: 1px solid var(--border-strong);
-    background: var(--surface-alt);
-    color: var(--text-primary);
-  }
-
-  input[aria-invalid='true'] {
-    border-color: var(--text-primary);
-    border-style: dashed;
-  }
-
-  p {
-    margin: 0;
-    font-size: 12px;
-  }
-
-  .hint {
-    color: var(--text-secondary);
-  }
-
-  .error {
-    color: var(--text-primary);
-    font-weight: 600;
-  }
-</style>

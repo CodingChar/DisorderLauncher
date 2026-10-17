@@ -22,8 +22,9 @@
 </script>
 
 <div class="welcome">
-  <div class="panel">
-    <span class="kicker">PRIMER INICIO</span>
+  <div class="card panel">
+    <div class="brand-line" aria-hidden="true">disorder<span>LAUNCHER</span></div>
+    <span class="eyebrow">PRIMER INICIO</span>
     <h1>Bienvenido</h1>
     <p>¿Cómo quieres llamarte en el juego?</p>
 
@@ -57,29 +58,36 @@
     padding: 24px;
   }
 
-  .panel {
+  .card {
     width: min(460px, 100%);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl) 0 var(--r-xl) 0;
     padding: 36px;
+    border-radius: var(--r-xl);
     box-shadow: var(--shadow);
   }
 
-  .kicker {
-    display: inline-block;
-    padding: 6px 9px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    color: var(--text-secondary);
+  .brand-line {
+    font-family: var(--font-display);
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: -1.3px;
+    line-height: 1;
+    margin-bottom: 30px;
+  }
+
+  .brand-line span {
+    display: block;
+    font-family: var(--font-body);
+    font-weight: 400;
+    letter-spacing: 4.8px;
+    font-size: 9px;
+    margin-top: 6px;
   }
 
   h1 {
-    font-size: 40px;
-    margin: 18px 0 8px;
-    letter-spacing: -0.06em;
+    font-size: 34px;
+    margin: 10px 0 8px;
+    letter-spacing: -1.25px;
+    font-weight: 500;
   }
 
   p {

@@ -10,42 +10,12 @@
 </script>
 
 <div
-  class="bar"
+  class="progress"
   role="progressbar"
   aria-label={label}
   aria-valuemin="0"
   aria-valuemax="100"
   aria-valuenow={clamped ?? undefined}
 >
-  <div class="fill" class:indeterminate={clamped === null} style:width={clamped === null ? undefined : `${clamped}%`}></div>
+  <div class="progress-fill" class:indeterminate={clamped === null} style:width={clamped === null ? undefined : `${clamped}%`}></div>
 </div>
-
-<style>
-  .bar {
-    height: 8px;
-    border-radius: 999px;
-    background: var(--surface-raised);
-    overflow: hidden;
-  }
-
-  .fill {
-    height: 100%;
-    background: var(--action);
-    border-radius: 999px;
-    transition: width 0.2s;
-  }
-
-  .indeterminate {
-    width: 35%;
-    animation: slide 1.2s ease-in-out infinite alternate;
-  }
-
-  @keyframes slide {
-    from {
-      margin-left: 0;
-    }
-    to {
-      margin-left: 65%;
-    }
-  }
-</style>

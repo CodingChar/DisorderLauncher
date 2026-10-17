@@ -15,6 +15,7 @@ import type {
   ProjectHit,
   UpdateInfo,
   LaunchStateEvent,
+  GameOutputEvent,
   ProgressEvent,
   RepairSummary,
   SkinAsset,
@@ -115,5 +116,13 @@ export const events = {
   onLaunchState: (h: (e: LaunchStateEvent) => void) => subscribe('launch://state', h),
   onAuthState: (h: (e: AuthEvent) => void) => subscribe('auth://state', h),
   onInstallProgress: (h: (e: ProgressEvent) => void) => subscribe('install://progress', h),
+  /** Salida del juego (stdout y stderr, ya con secretos redactados por el backend). */
+  onGameOutput: async (h: (e: GameOutputEvent) => void) => {
+    const stops = await Promise.all([
+      subscribe<{ instanceId: string; line: string }>('launch://stdout', (e) => h({ ...e, stream: 'stdout' })),
+      subscribe<{ instanceId: string; line: string }>('launch://stderr', (e) => h({ ...e, stream: 'stderr' })),
+    ])
+    return () => stops.forEach((stop) => stop())
+  },
   onRepairProgress: (h: (e: ProgressEvent) => void) => subscribe('repair://progress', h),
 }

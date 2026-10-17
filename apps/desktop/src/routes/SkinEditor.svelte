@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { api } from '../lib/api'
   import Button from '../lib/components/Button.svelte'
+  import PageHeading from '../lib/components/PageHeading.svelte'
   import Card from '../lib/components/Card.svelte'
   import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import Input from '../lib/components/Input.svelte'
@@ -347,10 +348,7 @@
 <svelte:window onkeydown={onKey} onpointerup={endStroke} />
 
 <div class="page">
-  <header>
-    <small>EDITOR DE SKINS</small>
-    <h1>{skinId ? 'Editar skin' : 'Nueva skin'}</h1>
-  </header>
+  <PageHeading eyebrow="EDITOR DE SKINS" title={skinId ? 'Editar skin' : 'Nueva skin'} />
 
   <div class="layout">
     <Card>
@@ -459,18 +457,7 @@
     gap: 16px;
   }
 
-  header small {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    margin-bottom: 5px;
-  }
 
-  h1 {
-    font-size: 34px;
-    line-height: 0.95;
-  }
 
   h3 {
     font-size: 18px;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { providerLabel } from '../text'
   import type { AccountRecord } from '../types'
+  import Avatar from './Avatar.svelte'
 
   interface Props {
     account: AccountRecord
@@ -10,7 +11,7 @@
 </script>
 
 <div class="badge">
-  <span class="avatar" aria-hidden="true">{account.label.charAt(0).toUpperCase()}</span>
+  <Avatar />
   <span class="text">
     <strong>{account.label}</strong>
     <small>{providerLabel[account.provider]}</small>
@@ -25,19 +26,6 @@
     min-width: 0;
   }
 
-  .avatar {
-    width: 40px;
-    height: 40px;
-    flex: none;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: var(--action);
-    color: var(--action-text);
-    font-family: var(--font-display);
-    font-weight: 700;
-  }
-
   .text {
     display: flex;
     flex-direction: column;
@@ -45,7 +33,8 @@
   }
 
   strong {
-    font-size: 15px;
+    font-size: 13px;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -53,6 +42,6 @@
 
   small {
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: 11px;
   }
 </style>

@@ -1,54 +1,54 @@
 <script lang="ts">
-  import { loaderLabel } from '../text'
+  import { loaderName } from '../text'
   import type { Instance } from '../types'
+  import ItemLogo from './ItemLogo.svelte'
 
   interface Props {
     instance: Instance
     selected: boolean
+    running: boolean
+    busy: boolean
+    onplay: () => void
+    onconfigure: () => void
     onselect: () => void
   }
 
-  let { instance, selected, onselect }: Props = $props()
+  let { instance, selected, running, busy, onplay, onconfigure, onselect }: Props = $props()
+
+  const memory = $derived(
+    instance.memory.mode === 'fixed'
+      ? `${Math.round((instance.memory.maxMb / 1024) * 10) / 10} GB de memoria`
+      : 'Memoria automática',
+  )
 </script>
 
-<button class="card" class:selected aria-pressed={selected} onclick={onselect}>
-  <strong>{instance.name}</strong>
-  <small>{loaderLabel(instance.loader)} {instance.minecraftVersion}</small>
-</button>
+<section class="instance-card" class:selected aria-label={instance.name}>
+  <div class="instance-top">
+    <ItemLogo loader={instance.loader} />
+    <span class="loader-badge">{loaderName(instance.loader)}</span>
+    {#if running}
+      <span class="active-instance"><span class="status-dot"></span>En ejecución</span>
+    {/if}
+  </div>
 
-<style>
-  .card {
-    text-align: left;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-height: 64px;
-    padding: 12px 16px;
-    border-radius: var(--r-lg);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-primary);
-    transition: border-color 0.18s, background 0.18s;
-  }
+  <h4 title={instance.name}>{instance.name}</h4>
+  <p>Minecraft {instance.minecraftVersion}</p>
 
-  .card:hover {
-    background: var(--surface-alt);
-  }
+  <div class="library-specs">
+    <span>{memory}</span>
+    <span>{instance.java.mode === 'path' ? 'Java propio' : 'Java automático'}</span>
+  </div>
 
-  .selected {
-    border-color: var(--action);
-    box-shadow: inset 3px 0 0 var(--action);
-  }
+  <div class="library-actions">
+    <button class="secondary" onclick={onconfigure} disabled={busy}>Configurar</button>
+    <button class="primary" onclick={onplay} disabled={busy && !running}>
+      {running ? 'Ver sesión' : 'Jugar'}
+    </button>
+  </div>
 
-  strong {
-    font-family: var(--font-display);
-    letter-spacing: -0.02em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  small {
-    color: var(--text-secondary);
-  }
-</style>
+  <div class="instance-bottom">
+    <button class="text-link" onclick={onselect} aria-pressed={selected}>
+      {selected ? 'Instancia activa' : 'Usar como activa'}
+    </button>
+  </div>
+</section>
