@@ -10,6 +10,9 @@
 
 ## Construir
 
+> Verificado en Windows 10: `npx tauri build --bundles msi` genera `DisorderLauncher_0.1.0_x64_en-US.msi` (6 MiB; ~15 min la primera vez por la compilacion release).
+> El empaquetado NSIS fallo en este equipo con `os error 32` al recrear la carpeta de herramientas de Tauri (`%LOCALAPPDATA%\tauri\NSIS`, archivo bloqueado): es del entorno, no del proyecto; borrar esa carpeta o reintentar tras reiniciar suele bastar.
+
 ```bash
 cd apps/desktop
 npm ci

@@ -9,7 +9,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 | Windows 10 (x64) | ✅ | ✅ Vanilla 1.0 (Java 8 gestionado), Fabric 1.14.4 | 🖐 Chromium (con backend simulado) |
 | Linux | ⚠️ (CI configurado, sin ejecutar) | ⚠️ | ⚠️ |
 | macOS | ⚠️ (sin CI) | ⚠️ | ⚠️ |
-| Ventana nativa de Tauri | ⚠️ compila; no se ha abierto la ventana con `tauri dev` en esta sesion | ⚠️ | — |
+| Ventana nativa de Tauri (Windows) | ✅ build release + MSI | 🖐 arranque del `.exe` verificado via CDP: pantalla de bienvenida bajo la CSP de produccion, IPC real (`accounts_list`, `settings_get`, `themes_list`, `loaders_supported`, `microsoft_status`) y 0 errores de consola | 🖐 |
 
 ## Funciones
 
@@ -47,7 +47,7 @@ Auditada en navegador: objetivos ≥ 40 px (radios con etiqueta de 40 px), campo
 
 ## Pendiente de verificar antes de publicar
 
-1. Abrir la app con `npm run tauri dev` y recorrer los flujos en la ventana nativa.
+1. Recorrer en la ventana nativa los flujos con datos (crear perfil, instalar, jugar): solo se verifico el arranque y el IPC de lectura para no escribir en los datos del usuario.
 2. Repetir el E2E en Linux y macOS (instalacion de Java con `tar.gz`, natives, rutas).
 3. Microsoft contra servidores reales con una app registrada.
 4. Instaladores firmados y actualizador (ver `docs/RELEASE.md`).
