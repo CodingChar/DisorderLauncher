@@ -29,7 +29,7 @@ Alcance: todo el workspace Rust, el frontend y la configuracion de Tauri, contra
 
 ## Pendientes y riesgos aceptados
 
-1. **`cargo audit`/`cargo deny` en CI**: no se pudo ejecutar localmente. Anadir a CI (`rustsec/audit-check`).
+1. **`cargo audit` en CI**: anadido como job `audit` (`rustsec/audit-check`); no se pudo ejecutar localmente (sin `cargo-audit` instalado). Revisar su primer resultado.
 2. **Allowlist de redirecciones**: un host permitido podria redirigir a otro; el hash/checksum protege la integridad, pero no se restringe el destino final.
 3. **Microsoft sin verificar contra los servidores reales** (no hay app registrada). Probado con un servidor falso que imita el contrato.
 4. **Firma de codigo y actualizador**: requieren certificado y clave de firma del proyecto (ver `docs/RELEASE.md`).
