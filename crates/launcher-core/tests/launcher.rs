@@ -515,5 +515,5 @@ async fn unsupported_loaders_are_rejected_at_creation() {
         launcher.instances_create("Forge", "1.20.1", LoaderKind::Forge, None).await,
         Err(LauncherError::LoaderNotSupported)
     ));
-    assert_eq!(launcher.supported_loaders(), vec![LoaderKind::Fabric, LoaderKind::Vanilla]);
+    assert_eq!(launcher.supported_loaders(), vec![LoaderKind::Fabric, LoaderKind::Quilt, LoaderKind::Vanilla]);
 }

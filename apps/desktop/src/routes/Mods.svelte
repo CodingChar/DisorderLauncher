@@ -60,9 +60,9 @@
   {:else if overview && !overview.supported}
     <Card>
       <h3>Esta instancia no admite mods</h3>
-      <p class="muted">Para usar mods crea una instancia de tipo <strong>Fabric</strong>.</p>
+      <p class="muted">Para usar mods crea una instancia de tipo <strong>Fabric</strong> o <strong>Quilt</strong>.</p>
       <div class="row">
-        <Button variant="primary" onclick={() => nav.go('create')}>Crear instancia con Fabric</Button>
+        <Button variant="primary" onclick={() => nav.go('create')}>Crear instancia con mods</Button>
         <Button variant="ghost" onclick={() => nav.go('home')}>Volver</Button>
       </div>
     </Card>

@@ -18,6 +18,7 @@
   const loaderOptions = [
     { value: 'vanilla', label: 'Minecraft original (sin mods)' },
     { value: 'fabric', label: 'Fabric (permite instalar mods)' },
+    { value: 'quilt', label: 'Quilt (compatible con mods de Fabric)' },
   ]
   const options = $derived(versions.list.map((v) => ({ value: v.id, label: v.id })))
 

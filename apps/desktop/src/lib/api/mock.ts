@@ -95,7 +95,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         name: args.name,
         minecraftVersion: args.version,
         loader: args.loader ?? 'vanilla',
-        loaderVersion: args.loader === 'fabric' ? '0.16.9' : null,
+        loaderVersion: args.loader && args.loader !== 'vanilla' ? '0.16.9' : null,
         profileId: defaultId,
         java: { mode: 'auto' },
         memory: { mode: 'auto' },
@@ -139,13 +139,13 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return { found: 2, fixed: 2, remaining: 0 } satisfies RepairSummary
     }
     case 'loaders_supported':
-      return ['fabric', 'vanilla']
+      return ['fabric', 'quilt', 'vanilla']
     case 'mods_list': {
       const inst = instances.find((i) => i.id === args.id)
       const mods = installedMods.get(args.id) ?? []
       const needsApi = mods.some((m) => m.enabled && m.needsApi) && !mods.some((m) => m.enabled && m.name === 'Fabric API')
       return {
-        supported: inst?.loader === 'fabric',
+        supported: inst?.loader === 'fabric' || inst?.loader === 'quilt',
         mods: mods.map(({ needsApi: _n, ...m }) => m),
         missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, requires: 'Fabric API' }] : [],
       }

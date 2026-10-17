@@ -14,7 +14,7 @@ use instance_manager::{
     MemoryPolicy, NewInstance,
 };
 use java_runtime::{JavaInstallation, JavaManager, JavaRequirement};
-use loaders::{FabricProvider, LoaderInstallContext, LoaderProvider, LoaderVersion};
+use loaders::{FabricProvider, LoaderInstallContext, LoaderProvider, LoaderVersion, QuiltProvider};
 use minecraft_install::{
     build_asset_artifacts, build_install_plan, legacy_assets_present, materialize_legacy_assets,
     InstallExecutor, InstallPhase, InstallPlan,
@@ -65,7 +65,8 @@ impl Launcher {
         registry.register(Arc::new(MicrosoftIdentityProvider));
 
         let mut loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>> = HashMap::new();
-        loader_providers.insert(LoaderKind::Fabric, Arc::new(FabricProvider::new(http.clone())));
+        loader_providers.insert(LoaderKind::Fabric, Arc::new(FabricProvider::create(http.clone())));
+        loader_providers.insert(LoaderKind::Quilt, Arc::new(QuiltProvider::create(http.clone())));
 
         Self {
             loader_providers,
@@ -208,7 +209,7 @@ impl Launcher {
             .find(|v| v.stable)
             .or_else(|| versions.first())
             .cloned()
-            .ok_or_else(|| LauncherError::LoaderUnavailable("Fabric".into()))
+            .ok_or_else(|| LauncherError::LoaderUnavailable(format!("{kind:?}")))
     }
 
     /// Versiones del loader para una version de Minecraft (la mas reciente primero).

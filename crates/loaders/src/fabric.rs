@@ -10,10 +10,42 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 pub const FABRIC_META_URL: &str = "https://meta.fabricmc.net/v2";
+pub const QUILT_META_URL: &str = "https://meta.quiltmc.org/v3";
 
-pub struct FabricProvider {
+/// Proveedor para loaders que publican perfiles de version sobre vanilla (`inheritsFrom`)
+/// mediante una API "meta" con el mismo formato: Fabric y Quilt.
+pub struct ProfileProvider {
+    kind: LoaderKind,
+    /// Prefijo del id del perfil: `fabric-loader` o `quilt-loader`.
+    id_prefix: &'static str,
     http: reqwest::Client,
     meta_url: String,
+}
+
+/// Espacio de nombres de las constructoras de Fabric.
+pub struct FabricProvider;
+
+impl FabricProvider {
+    pub fn create(http: reqwest::Client) -> ProfileProvider {
+        ProfileProvider::new(LoaderKind::Fabric, "fabric-loader", FABRIC_META_URL, http)
+    }
+
+    pub fn profile_id(minecraft_version: &str, loader_version: &str) -> String {
+        format!("fabric-loader-{loader_version}-{minecraft_version}")
+    }
+}
+
+/// Espacio de nombres de las constructoras de Quilt.
+pub struct QuiltProvider;
+
+impl QuiltProvider {
+    pub fn create(http: reqwest::Client) -> ProfileProvider {
+        ProfileProvider::new(LoaderKind::Quilt, "quilt-loader", QUILT_META_URL, http)
+    }
+
+    pub fn profile_id(minecraft_version: &str, loader_version: &str) -> String {
+        format!("quilt-loader-{loader_version}-{minecraft_version}")
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -24,13 +56,19 @@ struct LoaderEntry {
 #[derive(Debug, Deserialize)]
 struct LoaderInfo {
     version: String,
+    /// Fabric lo informa; Quilt no (se deduce del nombre de la version).
     #[serde(default)]
-    stable: bool,
+    stable: Option<bool>,
 }
 
-impl FabricProvider {
-    pub fn new(http: reqwest::Client) -> Self {
-        Self { http, meta_url: FABRIC_META_URL.to_string() }
+fn looks_stable(version: &str) -> bool {
+    let lower = version.to_lowercase();
+    !["beta", "alpha", "rc", "pre", "snapshot"].iter().any(|tag| lower.contains(tag))
+}
+
+impl ProfileProvider {
+    pub fn new(kind: LoaderKind, id_prefix: &'static str, meta_url: &str, http: reqwest::Client) -> Self {
+        Self { kind, id_prefix, http, meta_url: meta_url.to_string() }
     }
 
     pub fn with_meta_url(mut self, url: impl Into<String>) -> Self {
@@ -38,9 +76,9 @@ impl FabricProvider {
         self
     }
 
-    /// Identificador que usa Fabric para el perfil (y que usamos como carpeta de version).
-    pub fn profile_id(minecraft_version: &str, loader_version: &str) -> String {
-        format!("fabric-loader-{loader_version}-{minecraft_version}")
+    /// Identificador del perfil (y carpeta de version).
+    pub fn profile_id(&self, minecraft_version: &str, loader_version: &str) -> String {
+        format!("{}-{loader_version}-{minecraft_version}", self.id_prefix)
     }
 
     fn profile_path(data_dir: &Path, profile_id: &str) -> PathBuf {
@@ -65,14 +103,14 @@ pub fn parse_loader_versions(json: &[u8]) -> Result<Vec<LoaderVersion>, LoaderEr
     let entries: Vec<LoaderEntry> = serde_json::from_slice(json)?;
     Ok(entries
         .into_iter()
-        .map(|e| LoaderVersion { version: e.loader.version, stable: e.loader.stable })
+        .map(|e| LoaderVersion { stable: e.loader.stable.unwrap_or_else(|| looks_stable(&e.loader.version)), version: e.loader.version })
         .collect())
 }
 
 #[async_trait::async_trait]
-impl LoaderProvider for FabricProvider {
+impl LoaderProvider for ProfileProvider {
     fn kind(&self) -> LoaderKind {
-        LoaderKind::Fabric
+        self.kind
     }
 
     async fn versions(&self, minecraft_version: &str) -> Result<Vec<LoaderVersion>, LoaderError> {
@@ -96,7 +134,7 @@ impl LoaderProvider for FabricProvider {
         let bytes = self.get_bytes(&url).await?;
         let profile: LoaderProfile = serde_json::from_slice(&bytes)?;
 
-        let expected_id = Self::profile_id(ctx.minecraft_version, ctx.loader_version);
+        let expected_id = self.profile_id(ctx.minecraft_version, ctx.loader_version);
         if profile.id != expected_id || profile.inherits_from.as_deref() != Some(ctx.minecraft_version) {
             return Err(LoaderError::ProfileMismatch);
         }
@@ -143,7 +181,7 @@ impl LoaderProvider for FabricProvider {
         validate_component(minecraft_version)?;
         validate_component(loader_version)?;
 
-        let profile_id = Self::profile_id(minecraft_version, loader_version);
+        let profile_id = self.profile_id(minecraft_version, loader_version);
         let Ok(data) = tokio::fs::read(Self::profile_path(data_dir, &profile_id)).await else {
             return Ok(None);
         };

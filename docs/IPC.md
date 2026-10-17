@@ -13,7 +13,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `accounts_create_local` | `name` | `AccountRecord` (el primero queda como predeterminado) |
 | `accounts_set_default` | `id` | `void` |
 | `instances_list` | — | `Instance[]` |
-| `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto) o `fabric`; sin `loaderVersion` se usa la ultima estable |
+| `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto), `fabric` o `quilt`; sin `loaderVersion` se usa la ultima estable |
 | `loaders_supported` | — | `LoaderKind[]` (siempre incluye `vanilla`) |
 | `loaders_list_versions` | `loader`, `minecraftVersion` | `{ version, stable }[]` |
 | `instances_update` | `id`, `changes` | `Instance` — `changes` (todos opcionales): `name`, `minecraftVersion`, `profileId`, `java` (`{mode:'auto'}` o `{mode:'path', path}`), `memory` (`{mode:'auto'}` o `{mode:'fixed', minMb, maxMb}`) |

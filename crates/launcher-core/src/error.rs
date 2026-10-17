@@ -182,7 +182,7 @@ impl From<loaders::LoaderError> for LauncherError {
             E::Http(h) if is_network(&h) => Self::Offline,
             E::Download(download_manager::DownloadError::Http(h)) if is_network(&h) => Self::Offline,
             E::DownloadFailures(_) => Self::Offline,
-            E::NoVersionFor(_) => Self::LoaderUnavailable("Fabric".into()),
+            E::NoVersionFor(_) => Self::LoaderUnavailable("Ese cargador de mods".into()),
             _ => Self::InstallFailed,
         }
     }

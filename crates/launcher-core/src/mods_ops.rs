@@ -20,8 +20,16 @@ pub struct ModsOverview {
     pub supported: bool,
 }
 
+/// Categoria de Modrinth con la que se filtran mods. Quilt carga los mods de Fabric.
 fn loader_name(kind: LoaderKind) -> String {
-    format!("{kind:?}").to_lowercase()
+    match kind {
+        LoaderKind::Quilt => "fabric".to_string(),
+        other => format!("{other:?}").to_lowercase(),
+    }
+}
+
+fn supports_mods(kind: LoaderKind) -> bool {
+    matches!(kind, LoaderKind::Fabric | LoaderKind::Quilt)
 }
 
 impl From<ModError> for LauncherError {
@@ -63,10 +71,10 @@ impl Launcher {
 
     /// Los mods solo se gestionan en instancias con loader compatible.
     fn require_mod_support(instance: &Instance) -> Result<(), LauncherError> {
-        if instance.loader == LoaderKind::Fabric {
+        if supports_mods(instance.loader) {
             Ok(())
         } else {
-            Err(LauncherError::InvalidInput("Esta instancia no admite mods. Crea una con Fabric.".into()))
+            Err(LauncherError::InvalidInput("Esta instancia no admite mods. Crea una con Fabric o Quilt.".into()))
         }
     }
 
@@ -76,7 +84,7 @@ impl Launcher {
         Ok(ModsOverview {
             missing_dependencies: ModManager::missing_dependencies(&mods),
             mods,
-            supported: instance.loader == LoaderKind::Fabric,
+            supported: supports_mods(instance.loader),
         })
     }
 
@@ -152,6 +160,7 @@ mod tests {
     fn loader_names_match_modrinth_categories() {
         assert_eq!(loader_name(LoaderKind::Fabric), "fabric");
         assert_eq!(loader_name(LoaderKind::NeoForge), "neoforge");
+        assert_eq!(loader_name(LoaderKind::Quilt), "fabric");
     }
 
     #[test]
