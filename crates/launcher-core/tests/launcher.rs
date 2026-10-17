@@ -14,6 +14,7 @@ const NO_NETWORK: &str = "http://127.0.0.1:1/version_manifest_v2.json";
 #[derive(Default)]
 struct Collector {
     states: Mutex<Vec<LaunchStateEvent>>,
+    output: Mutex<Vec<String>>,
 }
 
 impl LauncherEvents for Collector {
@@ -21,7 +22,9 @@ impl LauncherEvents for Collector {
     fn launch_state(&self, event: LaunchStateEvent) {
         self.states.lock().unwrap().push(event);
     }
-    fn game_output(&self, _: OutputStream, _: GameOutputEvent) {}
+    fn game_output(&self, _: OutputStream, event: GameOutputEvent) {
+        self.output.lock().unwrap().push(event.line);
+    }
 }
 
 fn launcher() -> (tempfile::TempDir, Arc<Launcher>, Arc<Collector>) {
@@ -243,4 +246,65 @@ async fn real_manifest_lists_releases_and_resolves_a_descriptor() {
 async fn repair_of_unknown_instance_fails_cleanly() {
     let (_d, launcher, _) = launcher();
     assert!(matches!(launcher.repair_instance("inst_nope").await, Err(LauncherError::InstanceNotFound)));
+}
+
+/// Flujo real completo con una version pequena (1.0): descarga, natives, Java gestionado,
+/// lanzamiento y cierre. Ejecutar con `cargo test -p launcher-core --test launcher -- --ignored --nocapture real_vanilla`.
+#[tokio::test]
+#[ignore = "requiere internet, descarga ~100 MB y abre una ventana de Minecraft unos segundos"]
+async fn real_vanilla_install_launch_and_stop() {
+    let dir = tempfile::tempdir().unwrap();
+    let events = Arc::new(Collector::default());
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(dir.path()), events.clone()));
+
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher.instances_create("E2E", "1.0").await.unwrap();
+    launcher.launch(&instance.id).await.unwrap();
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(900);
+    let running = loop {
+        {
+            let states = events.states.lock().unwrap();
+            if let Some(e) = states.iter().find(|e| matches!(e.state, LaunchState::Running { .. } | LaunchState::Failed { .. } | LaunchState::Exited { .. })) {
+                break e.state.clone();
+            }
+        }
+        assert!(std::time::Instant::now() < deadline, "timeout esperando Running");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    println!("estados: {:?}", events.states.lock().unwrap().iter().map(|e| e.state.clone()).collect::<Vec<_>>());
+    assert!(matches!(running, LaunchState::Running { .. }), "{running:?}");
+
+    // Dejar que arranque unos segundos y cerrar.
+    tokio::time::sleep(Duration::from_secs(8)).await;
+    println!("salida del juego:
+{}", events.output.lock().unwrap().join("
+"));
+    println!("estados finales: {:?}", events.states.lock().unwrap().iter().map(|e| e.state.clone()).collect::<Vec<_>>());
+    launcher.stop(&instance.id).unwrap();
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+
+    // Segundo arranque: todo esta instalado y el Java gestionado se reutiliza, sin descargas.
+    let before = events.states.lock().unwrap().len();
+    let started = std::time::Instant::now();
+    launcher.launch(&instance.id).await.unwrap();
+    for _ in 0..200 {
+        let seen_running = events.states.lock().unwrap()[before..]
+            .iter()
+            .any(|e| matches!(e.state, LaunchState::Running { .. }));
+        if seen_running {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let second = events.states.lock().unwrap()[before..].iter().map(|e| e.state.clone()).collect::<Vec<_>>();
+    println!("segundo arranque en {:?}: {second:?}", started.elapsed());
+    assert!(!second.contains(&LaunchState::Installing), "no debia reinstalar");
+    assert!(second.iter().any(|s| matches!(s, LaunchState::Running { .. })));
+    let _ = launcher.stop(&instance.id);
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+
+    let log = launcher.paths().instances_dir().join(&instance.id).join("logs").join("latest.log");
+    println!("log existe: {}", log.is_file());
+    assert!(log.is_file());
 }

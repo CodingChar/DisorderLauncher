@@ -184,7 +184,7 @@ fn verify_sha256(data: &[u8], expected: Option<&str>) -> Result<(), JavaError> {
     }
 }
 
-async fn find_java_home_in_extracted(dir: &Path) -> Result<std::path::PathBuf, JavaError> {
+pub(crate) async fn find_java_home_in_extracted(dir: &Path) -> Result<std::path::PathBuf, JavaError> {
     let mut entries = fs::read_dir(dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();

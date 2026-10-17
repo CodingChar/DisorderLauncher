@@ -82,7 +82,7 @@ fn build_asset_artifacts_from_index() {
         },
     );
 
-    let index = AssetIndex { objects };
+    let index = AssetIndex { objects, is_virtual: false, map_to_resources: false };
     let game_dir = std::path::PathBuf::from("/tmp/minecraft");
     let artifacts = build_asset_artifacts(&index, &game_dir);
 

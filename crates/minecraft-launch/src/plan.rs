@@ -94,6 +94,9 @@ pub struct LaunchContext {
     pub game_dir: PathBuf,
     pub memory: MemorySettings,
     pub window_size: Option<(u32, u32)>,
+    /// Valor de `${game_assets}` cuando el indice de assets es legacy
+    /// (`map_to_resources` -> `<gameDir>/resources`). Por defecto `assets/virtual/<indice>`.
+    pub game_assets_dir: Option<PathBuf>,
     pub launcher_name: String,
     pub launcher_version: String,
 }
@@ -105,6 +108,7 @@ impl LaunchContext {
             game_dir: game_dir.into(),
             memory: MemorySettings::default(),
             window_size: None,
+            game_assets_dir: None,
             launcher_name: "DisorderLauncher".to_string(),
             launcher_version: env!("CARGO_PKG_VERSION").to_string(),
         }
@@ -148,10 +152,11 @@ impl LaunchPlanBuilder {
         placeholders.set("game_directory", path_str(&ctx.game_dir));
         placeholders.set("assets_root", path_str(&assets_root));
         placeholders.set("assets_index_name", &version.asset_index.id);
-        placeholders.set(
-            "game_assets",
-            path_str(&assets_root.join("virtual").join("legacy")),
-        );
+        let game_assets = ctx
+            .game_assets_dir
+            .clone()
+            .unwrap_or_else(|| assets_root.join("virtual").join(&version.asset_index.id));
+        placeholders.set("game_assets", path_str(&game_assets));
         placeholders.set("natives_directory", path_str(&natives_dir));
         placeholders.set("launcher_name", &ctx.launcher_name);
         placeholders.set("launcher_version", &ctx.launcher_version);

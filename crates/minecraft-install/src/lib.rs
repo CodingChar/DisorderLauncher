@@ -1,11 +1,13 @@
 mod error;
 mod plan_builder;
 mod executor;
+mod legacy_assets;
 mod rules;
 
 pub use error::*;
 pub use plan_builder::*;
 pub use executor::*;
+pub use legacy_assets::*;
 
 use std::path::PathBuf;
 

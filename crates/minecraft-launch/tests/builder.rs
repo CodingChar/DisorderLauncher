@@ -205,3 +205,21 @@ fn validate_lists_missing_classpath_entries_when_java_exists() {
         other => panic!("esperaba MissingFiles, obtuve {other:?}"),
     }
 }
+
+#[test]
+fn game_assets_dir_override_is_used_for_legacy_indexes() {
+    let version: VersionDescriptor = serde_json::from_str(LEGACY).unwrap();
+    let legacy_with_assets = serde_json::from_str::<VersionDescriptor>(
+        &LEGACY.replace("--userProperties ${user_properties}", "--assetsDir ${game_assets}"),
+    )
+    .unwrap();
+
+    let default = LaunchPlanBuilder::build(&legacy_with_assets, &identity("0"), &java(), &ctx()).unwrap();
+    assert!(Path::new(arg_after(&default.game_args, "--assetsDir")).ends_with("virtual/1.7.10"));
+
+    let mut c = ctx();
+    c.game_assets_dir = Some("/data/instances/i1/game/resources".into());
+    let overridden = LaunchPlanBuilder::build(&legacy_with_assets, &identity("0"), &java(), &c).unwrap();
+    assert!(Path::new(arg_after(&overridden.game_args, "--assetsDir")).ends_with("game/resources"));
+    let _ = version;
+}

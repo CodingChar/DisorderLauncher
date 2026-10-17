@@ -1,4 +1,5 @@
 use crate::error::InstallError;
+use crate::legacy_assets::materialize_legacy_assets;
 use crate::plan_builder::build_asset_artifacts;
 use crate::{Artifact, InstallPhase, InstallPlan, InstallProgress};
 use download_manager::archive::{extract_zip, ExtractOptions};
@@ -72,6 +73,14 @@ impl InstallExecutor {
             });
             self.download_artifacts(&plan.assets, &progress, InstallPhase::Assets)
                 .await?;
+
+            let index_id = plan
+                .asset_index
+                .path
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            materialize_legacy_assets(index, index_id, game_dir.to_path_buf(), None).await?;
         }
 
         if !plan.natives.is_empty() {

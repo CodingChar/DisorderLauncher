@@ -159,6 +159,12 @@ pub struct LoggingFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetIndex {
     pub objects: HashMap<String, AssetObject>,
+    /// Indices antiguos: los assets se exponen por nombre en `assets/virtual/<id>/`.
+    #[serde(default, rename = "virtual")]
+    pub is_virtual: bool,
+    /// Versiones muy antiguas: los assets se esperan en `<gameDir>/resources/`.
+    #[serde(default)]
+    pub map_to_resources: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

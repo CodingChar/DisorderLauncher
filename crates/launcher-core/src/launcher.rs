@@ -12,7 +12,10 @@ use instance_manager::{
     NewInstance,
 };
 use java_runtime::{JavaInstallation, JavaManager, JavaRequirement};
-use minecraft_install::{build_asset_artifacts, build_install_plan, InstallExecutor, InstallPhase, InstallPlan};
+use minecraft_install::{
+    build_asset_artifacts, build_install_plan, legacy_assets_present, materialize_legacy_assets,
+    InstallExecutor, InstallPhase, InstallPlan,
+};
 use minecraft_launch::{
     GameKiller, LaunchContext, LaunchEvent, LaunchPlan, LaunchPlanBuilder, MemorySettings,
     ProcessRunner,
@@ -20,7 +23,7 @@ use minecraft_launch::{
 use minecraft_meta::{AssetIndex, MetaError, VersionDescriptor, VersionEntry, VersionManifest, VersionType};
 use sha1::{Digest, Sha1};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
@@ -374,10 +377,13 @@ impl Launcher {
             self.install(id, &mut install_plan, &data_dir).await?;
         }
 
+        let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
+
         self.emit_state(id, LaunchState::PreparingJava);
         let java = self.select_java(instance, &descriptor).await?;
 
         let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
+        ctx.game_assets_dir = game_assets_dir;
         if let MemoryPolicy::Fixed { min_mb, max_mb } = &instance.memory {
             ctx.memory = MemorySettings { min_mb: Some(*min_mb), max_mb: Some(*max_mb) };
         }
@@ -411,6 +417,33 @@ impl Launcher {
             })
             .await?;
         Ok(())
+    }
+
+    /// Versiones muy antiguas esperan sus assets en `<gameDir>/resources`: es por instancia.
+    async fn sync_instance_resources(
+        &self,
+        instance: &Instance,
+        plan: &InstallPlan,
+        data_dir: &Path,
+    ) -> Result<Option<PathBuf>, LauncherError> {
+        let Ok(data) = tokio::fs::read_to_string(&plan.asset_index.path).await else {
+            return Ok(None);
+        };
+        let Ok(index) = serde_json::from_str::<AssetIndex>(&data) else {
+            return Ok(None);
+        };
+        if !index.map_to_resources {
+            return Ok(None);
+        }
+        let index_id = plan
+            .asset_index
+            .path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let resources = instance.game_dir.join("resources");
+        materialize_legacy_assets(index, index_id, data_dir.to_path_buf(), Some(instance.game_dir.clone())).await?;
+        Ok(Some(resources))
     }
 
     async fn select_java(
@@ -488,7 +521,14 @@ pub async fn installation_complete(plan: &InstallPlan, data_dir: &Path) -> bool 
             return false;
         }
     }
-    true
+
+    let index_id = plan
+        .asset_index
+        .path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    legacy_assets_present(&index, &index_id, data_dir, None)
 }
 
 async fn dir_has_entries(dir: &Path) -> bool {
