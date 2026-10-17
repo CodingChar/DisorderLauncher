@@ -1,3 +1,9 @@
+mod error;
+mod manager;
+
+pub use error::*;
+pub use manager::*;
+
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -15,4 +21,19 @@ pub struct DownloadProgress {
     pub bytes_downloaded: u64,
     pub bytes_total: u64,
     pub current_file: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DownloadReport {
+    pub total: usize,
+    pub succeeded: usize,
+    pub skipped: usize,
+    pub failed: Vec<DownloadFailure>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DownloadFailure {
+    pub url: String,
+    pub dest: PathBuf,
+    pub error: String,
 }
