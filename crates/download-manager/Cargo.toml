@@ -1,0 +1,12 @@
+[package]
+name = "download-manager"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+reqwest = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sha1 = { workspace = true }
+url = { workspace = true }

@@ -1,0 +1,11 @@
+[package]
+name = "minecraft-launch"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+identity-api = { path = "../identity-api" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

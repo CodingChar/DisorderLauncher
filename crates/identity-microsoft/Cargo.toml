@@ -1,0 +1,12 @@
+[package]
+name = "identity-microsoft"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+microsoft-auth = []
+
+[dependencies]
+identity-api = { path = "../identity-api" }
+async-trait = { workspace = true }
