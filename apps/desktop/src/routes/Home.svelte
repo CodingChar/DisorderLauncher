@@ -91,6 +91,9 @@
               {busy ? 'Un momento…' : 'JUGAR'}
             </Button>
           {/if}
+          {#if instance.loader !== 'vanilla'}
+            <Button variant="ghost" disabled={busy} onclick={() => nav.go('mods')}>Mods</Button>
+          {/if}
           <Button variant="ghost" disabled={busy} onclick={() => nav.go('edit')}>Editar</Button>
           <Button variant="ghost" disabled={busy} onclick={() => sessions.repair(instance.id)}>Reparar</Button>
         </div>

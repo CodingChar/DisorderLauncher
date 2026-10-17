@@ -7,12 +7,18 @@
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
   import { versions } from '../lib/stores/versions.svelte'
+  import type { LoaderKind } from '../lib/types'
 
   let name = $state('Mi mundo')
   let version = $state('')
+  let loader = $state<LoaderKind>('vanilla')
   let error = $state<string | null>(null)
   let busy = $state(false)
 
+  const loaderOptions = [
+    { value: 'vanilla', label: 'Minecraft original (sin mods)' },
+    { value: 'fabric', label: 'Fabric (permite instalar mods)' },
+  ]
   const options = $derived(versions.list.map((v) => ({ value: v.id, label: v.id })))
 
   onMount(() => {
@@ -29,7 +35,7 @@
     busy = true
     error = null
     try {
-      await instances.create(name, version)
+      await instances.create(name, version, loader)
       nav.go('home')
     } catch (e) {
       error = (e as Error).message
@@ -53,6 +59,7 @@
       }}
     >
       <Input label="Nombre" bind:value={name} maxlength={64} />
+      <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
 
       {#if versions.loading}
         <p class="note">Buscando versiones de Minecraft…</p>

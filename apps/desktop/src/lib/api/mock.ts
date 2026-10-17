@@ -22,6 +22,8 @@ let accounts: AccountRecord[] = []
 let defaultId: string | null = null
 let instances: Instance[] = []
 let counter = 0
+const installedMods = new Map<string, any[]>()
+const pendingUpdates = new Set<string>()
 let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', javaPath: null as string | null }
 
 const versions: VersionEntry[] = ['1.21.4', '1.21.1', '1.20.4', '1.19.4', '1.16.5', '1.12.2'].map((id) => ({
@@ -92,8 +94,8 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         id: `inst_${++counter}`,
         name: args.name,
         minecraftVersion: args.version,
-        loader: 'vanilla',
-        loaderVersion: null,
+        loader: args.loader ?? 'vanilla',
+        loaderVersion: args.loader === 'fabric' ? '0.16.9' : null,
         profileId: defaultId,
         java: { mode: 'auto' },
         memory: { mode: 'auto' },
@@ -135,6 +137,79 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         await sleep(100)
       }
       return { found: 2, fixed: 2, remaining: 0 } satisfies RepairSummary
+    }
+    case 'loaders_supported':
+      return ['fabric', 'vanilla']
+    case 'mods_list': {
+      const inst = instances.find((i) => i.id === args.id)
+      const mods = installedMods.get(args.id) ?? []
+      const needsApi = mods.some((m) => m.enabled && m.needsApi) && !mods.some((m) => m.enabled && m.name === 'Fabric API')
+      return {
+        supported: inst?.loader === 'fabric',
+        mods: mods.map(({ needsApi: _n, ...m }) => m),
+        missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, requires: 'Fabric API' }] : [],
+      }
+    }
+    case 'mods_set_enabled': {
+      const list = installedMods.get(args.id) ?? []
+      const base = (f: string) => f.replace('.disabled', '')
+      const m = list.find((x) => base(x.fileName) === base(args.file))
+      if (m) {
+        m.enabled = args.enabled
+        m.fileName = args.enabled ? base(m.fileName) : `${base(m.fileName)}.disabled`
+      }
+      return null
+    }
+    case 'mods_remove':
+      installedMods.set(args.id, (installedMods.get(args.id) ?? []).filter((m) => m.fileName !== args.file))
+      return null
+    case 'mods_add_local':
+      return null
+    case 'mods_search': {
+      const all = [
+        { project_id: 'AANobbMI', slug: 'sodium', title: 'Sodium', description: 'Motor de renderizado moderno que mejora los FPS.', author: 'jellysquid3', downloads: 50000000, icon_url: null, categories: ['fabric'] },
+        { project_id: 'gvQqBUqZ', slug: 'lithium', title: 'Lithium', description: 'Optimiza la logica del juego sin cambiar su comportamiento.', author: 'jellysquid3', downloads: 30000000, icon_url: null, categories: ['fabric'] },
+        { project_id: 'P7dR8mSH', slug: 'fabric-api', title: 'Fabric API', description: 'Base que necesitan muchos mods de Fabric.', author: 'modmuss50', downloads: 90000000, icon_url: null, categories: ['fabric'] },
+      ]
+      const q = String(args.query ?? '').toLowerCase()
+      return all.filter((h) => !q || h.title.toLowerCase().includes(q))
+    }
+    case 'mods_install': {
+      const list = installedMods.get(args.id) ?? []
+      const result: any[] = []
+      const add = (title: string, file: string, dep: boolean, needsApi = false) => {
+        list.push({ fileName: file, enabled: true, name: title, version: '1.0.0', description: null, size: 1200000, source: { projectId: file, versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi })
+        result.push({ projectId: file, title, versionNumber: '1.0.0', file, isDependency: dep })
+      }
+      if (args.projectId === 'P7dR8mSH') {
+        add('Fabric API', 'fabric-api.jar', false)
+      } else {
+        if (!list.some((m) => m.name === 'Fabric API') && args.projectId === 'gvQqBUqZ') add('Fabric API', 'fabric-api.jar', true)
+        add(args.projectId === 'AANobbMI' ? 'Sodium' : 'Lithium', `${args.projectId}.jar`, false)
+        pendingUpdates.add(`${args.projectId}.jar`)
+      }
+      installedMods.set(args.id, list)
+      return result
+    }
+    case 'mods_check_updates':
+      return [...pendingUpdates].map((file) => ({ file, projectId: file, title: file.replace('.jar', ''), currentVersion: '1.0.0', latestVersion: '1.1.0' }))
+    case 'mods_update': {
+      const m = (installedMods.get(args.id) ?? []).find((x) => x.fileName === args.file)
+      if (m) {
+        m.version = '1.1.0'
+        m.source = { ...m.source, versionNumber: '1.1.0', hasPreviousVersion: true }
+      }
+      pendingUpdates.delete(args.file)
+      return { projectId: args.file, title: m?.name ?? '', versionNumber: '1.1.0', file: args.file, isDependency: false }
+    }
+    case 'mods_rollback': {
+      const m = (installedMods.get(args.id) ?? []).find((x) => x.fileName === args.file)
+      if (m) {
+        m.version = '1.0.0'
+        m.source = { ...m.source, versionNumber: '1.0.0', hasPreviousVersion: false }
+      }
+      pendingUpdates.add(args.file)
+      return null
     }
     case 'settings_get':
       return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }

@@ -11,6 +11,7 @@
   import CreateInstance from './routes/CreateInstance.svelte'
   import EditInstance from './routes/EditInstance.svelte'
   import Home from './routes/Home.svelte'
+  import Mods from './routes/Mods.svelte'
   import Settings from './routes/Settings.svelte'
   import { settings } from './lib/stores/settings.svelte'
   import Welcome from './routes/Welcome.svelte'
@@ -90,6 +91,8 @@
         <CreateInstance />
       {:else if nav.view === 'edit'}
         <EditInstance />
+      {:else if nav.view === 'mods'}
+        <Mods />
       {:else if nav.view === 'settings'}
         <Settings />
       {:else}

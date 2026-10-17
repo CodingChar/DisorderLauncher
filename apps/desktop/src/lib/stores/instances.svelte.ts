@@ -1,5 +1,5 @@
 import { api } from '../api'
-import type { Instance, InstanceChanges } from '../types'
+import type { Instance, InstanceChanges, LoaderKind } from '../types'
 
 class InstancesStore {
   list = $state<Instance[]>([])
@@ -20,8 +20,8 @@ class InstancesStore {
     }
   }
 
-  async create(name: string, version: string) {
-    const instance = await api.instancesCreate(name, version)
+  async create(name: string, version: string, loader: LoaderKind = 'vanilla') {
+    const instance = await api.instancesCreate(name, version, loader)
     await this.load()
     this.selectedId = instance.id
     return instance
