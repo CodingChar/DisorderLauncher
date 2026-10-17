@@ -729,3 +729,22 @@ async fn microsoft_profiles_do_not_take_local_skins() {
     assert!(matches!(launcher.accounts_set_skin("acc_ms_x", Some(&skin.id)).await, Err(LauncherError::InvalidInput(_))));
     assert!(matches!(launcher.accounts_set_skin("acc_nope", None).await, Err(LauncherError::AccountNotFound)));
 }
+
+#[tokio::test]
+async fn editor_save_creates_and_updates_skins_with_validation() {
+    let (_d, launcher, _) = launcher();
+    let png = skins::encode_rgba(&vec![90u8; 64 * 64 * 4], 64, 64).unwrap();
+
+    let created = launcher.skins_save(None, "Dibujo", &png, skins::SkinModel::Slim).await.unwrap();
+    assert_eq!(created.model, skins::SkinModel::Slim);
+
+    let mut other = vec![10u8; 64 * 64 * 4];
+    other[3] = 0;
+    let edited_png = skins::encode_rgba(&other, 64, 64).unwrap();
+    let updated = launcher.skins_save(Some(&created.id), "Dibujo v2", &edited_png, skins::SkinModel::Classic).await.unwrap();
+    assert_eq!((updated.id.as_str(), updated.name.as_str(), updated.model), (created.id.as_str(), "Dibujo v2", skins::SkinModel::Classic));
+    assert_eq!(launcher.skins_list().await.len(), 1);
+
+    assert!(matches!(launcher.skins_save(None, "x", b"no es png", skins::SkinModel::Classic).await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.skins_save(Some("skin_00000000000000000000000000000000"), "x", &png, skins::SkinModel::Classic).await, Err(LauncherError::InvalidInput(_))));
+}

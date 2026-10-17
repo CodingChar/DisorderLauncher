@@ -8,6 +8,8 @@ class SkinsStore {
   previews = $state<Record<string, string>>({})
   loaded = $state(false)
   error = $state<string | null>(null)
+  /** Skin que abre el editor (`null` = una nueva). */
+  editingId = $state<string | null>(null)
 
   async load() {
     try {

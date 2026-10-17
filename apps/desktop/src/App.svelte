@@ -13,6 +13,7 @@
   import Home from './routes/Home.svelte'
   import Mods from './routes/Mods.svelte'
   import Settings from './routes/Settings.svelte'
+  import SkinEditor from './routes/SkinEditor.svelte'
   import Skins from './routes/Skins.svelte'
   import { settings } from './lib/stores/settings.svelte'
   import Welcome from './routes/Welcome.svelte'
@@ -98,6 +99,8 @@
         <Mods />
       {:else if nav.view === 'skins'}
         <Skins />
+      {:else if nav.view === 'skinEditor'}
+        <SkinEditor />
       {:else if nav.view === 'settings'}
         <Settings />
       {:else}

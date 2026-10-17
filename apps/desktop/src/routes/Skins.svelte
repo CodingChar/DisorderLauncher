@@ -7,6 +7,7 @@
   import Select from '../lib/components/Select.svelte'
   import SkinPreview from '../lib/components/SkinPreview.svelte'
   import { accounts } from '../lib/stores/accounts.svelte'
+  import { nav } from '../lib/stores/nav.svelte'
   import { skins } from '../lib/stores/skins.svelte'
   import type { SkinAsset } from '../lib/types'
 
@@ -47,6 +48,11 @@
     } finally {
       busy = false
     }
+  }
+
+  const openEditor = (id: string | null) => {
+    skins.editingId = id
+    nav.go('skinEditor')
   }
 
   const importSkin = () =>
@@ -109,6 +115,7 @@
       </div>
       <div class="buttons">
         <Button variant="primary" disabled={busy} onclick={importSkin}>Importar skin…</Button>
+        <Button disabled={busy} onclick={() => openEditor(null)}>Crear skin nueva</Button>
         <Button variant="ghost" disabled={busy || !profileSkinId} onclick={unassign}>Quitar skin del perfil</Button>
       </div>
     </div>
@@ -123,7 +130,7 @@
   {#if skins.loaded && skins.list.length === 0}
     <Card>
       <h3>Aún no tienes skins</h3>
-      <p class="muted">Importa un archivo PNG de 64×64 (o 64×32) para empezar.</p>
+      <p class="muted">Importa un archivo PNG de 64×64 (o 64×32) o crea una desde cero con el editor.</p>
     </Card>
   {:else}
     <ul class="grid">
@@ -142,6 +149,7 @@
                 {:else}
                   <Button disabled={busy || !profile} onclick={() => use(skin)}>Usar</Button>
                 {/if}
+                <Button disabled={busy} onclick={() => openEditor(skin.id)}>Editar</Button>
                 <Button variant="ghost" disabled={busy} onclick={() => startRename(skin)}>Renombrar</Button>
                 <Button
                   variant="ghost"

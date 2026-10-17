@@ -98,6 +98,8 @@ export const api = {
   skinsRename: (id: string, name: string) => call<SkinAsset>('skins_rename', { id, name }),
   skinsSetModel: (id: string, model: SkinModel) => call<SkinAsset>('skins_set_model', { id, model }),
   skinsRemove: (id: string) => call<void>('skins_remove', { id }),
+  skinsSave: (id: string | null, name: string, pngBase64: string, model: SkinModel) =>
+    call<SkinAsset>('skins_save', { id, name, pngBase64, model }),
   skinsExport: (id: string) => call<boolean>('skins_export', { id }),
   accountsSetSkin: (accountId: string, skinId: string | null) => call<void>('accounts_set_skin', { accountId, skinId }),
   themesList: () => call<ThemeEntry[]>('themes_list'),

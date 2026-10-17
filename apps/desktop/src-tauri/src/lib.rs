@@ -66,6 +66,7 @@ pub fn run() {
       commands::skins_set_model,
       commands::skins_remove,
       commands::skins_export,
+      commands::skins_save,
       commands::accounts_set_skin,
       commands::themes_list,
       commands::themes_import,

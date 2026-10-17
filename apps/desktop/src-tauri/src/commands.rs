@@ -380,3 +380,24 @@ pub async fn skins_export(app: tauri::AppHandle, state: State<'_, AppState>, id:
 pub async fn accounts_set_skin(state: State<'_, AppState>, account_id: String, skin_id: Option<String>) -> Result<(), String> {
   state.launcher.accounts_set_skin(&account_id, skin_id.as_deref()).await.map_err(user_message)
 }
+
+/// Guarda lo que dibujo el editor. El PNG llega como base64 (con o sin prefijo `data:`), se limita
+/// su tamano antes de decodificar y el backend lo vuelve a validar y normalizar.
+#[tauri::command]
+pub async fn skins_save(
+  state: State<'_, AppState>,
+  id: Option<String>,
+  name: String,
+  png_base64: String,
+  model: skins::SkinModel,
+) -> Result<skins::SkinAsset, String> {
+  use base64::Engine;
+  let payload = png_base64.split_once(',').map(|(_, rest)| rest).unwrap_or(&png_base64);
+  if payload.len() > skins::MAX_SKIN_BYTES * 4 / 3 + 16 {
+    return Err("La imagen es demasiado grande para ser una skin.".to_string());
+  }
+  let bytes = base64::engine::general_purpose::STANDARD
+    .decode(payload.trim())
+    .map_err(|_| "La imagen no es valida.".to_string())?;
+  state.launcher.skins_save(id.as_deref(), &name, &bytes, model).await.map_err(user_message)
+}

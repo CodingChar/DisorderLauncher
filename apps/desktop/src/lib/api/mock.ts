@@ -336,6 +336,20 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       mockSkins = mockSkins.filter((s) => s.asset.id !== args.id)
       accounts = accounts.map((a) => (a.providerData.type === 'local' && a.providerData.skinId === args.id ? { ...a, providerData: { ...a.providerData, skinId: null } } : a))
       return null
+    case 'skins_save': {
+      const url = String(args.pngBase64)
+      if (args.id) {
+        const s = mockSkins.find((x) => x.asset.id === args.id)
+        if (!s) throw 'No se encontro esa skin.'
+        s.url = url
+        s.asset = { ...s.asset, name: args.name, model: args.model, updatedAt: new Date().toISOString() }
+        return s.asset
+      }
+      const n = mockSkins.length + 1
+      const asset = { id: `skin_${String(n).padStart(32, '0')}`, name: args.name, model: args.model, source: 'local' as const, width: 64, height: 64, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      mockSkins.push({ asset, url })
+      return asset
+    }
     case 'skins_export':
       return true
     case 'accounts_set_skin': {

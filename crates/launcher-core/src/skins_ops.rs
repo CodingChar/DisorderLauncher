@@ -52,6 +52,25 @@ impl Launcher {
         Ok(self.skin_library.replace_pixels(id, png).await?)
     }
 
+    /// Guarda el resultado del editor: crea una skin nueva (`id = None`) o actualiza una existente.
+    /// El PNG pasa por la misma validacion y normalizacion que una importacion.
+    pub async fn skins_save(
+        &self,
+        id: Option<&str>,
+        name: &str,
+        png: &[u8],
+        model: SkinModel,
+    ) -> Result<SkinAsset, LauncherError> {
+        match id {
+            None => Ok(self.skin_library.import(png, name, Some(model)).await?),
+            Some(id) => {
+                self.skin_library.replace_pixels(id, png).await?;
+                self.skin_library.rename(id, name).await?;
+                Ok(self.skin_library.set_model(id, model).await?)
+            }
+        }
+    }
+
     /// Borra la skin y la desvincula de los perfiles que la usaban.
     pub async fn skins_remove(&self, id: &str) -> Result<(), LauncherError> {
         self.skin_library.remove(id).await?;

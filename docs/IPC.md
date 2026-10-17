@@ -42,6 +42,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `skins_import` | — | `SkinAsset \| null` — selector de PNG; se valida la firma real, 64x64 / 64x32 y ≤ 256 KB; se recodifica a RGBA sin metadatos |
 | `skins_read` | `id` | `string` (data URL PNG) |
 | `skins_rename` / `skins_set_model` / `skins_remove` | `id`, … | `SkinAsset` / `SkinAsset` / `void` (quitar desvincula la skin de los perfiles) |
+| `skins_save` | `id?`, `name`, `pngBase64`, `model` | `SkinAsset` — guarda lo dibujado en el editor (crea o actualiza); se revalida y normaliza en Rust |
 | `skins_export` | `id` | `boolean` — pide donde guardar |
 | `accounts_set_skin` | `accountId`, `skinId \| null` | `void` — solo perfiles Offline Gaming; no registra nada en Microsoft ni se aplica dentro del juego sin un mod compatible |
 | `themes_list` | — | `{ builtin, id, name, mode, colors, typography, shape, density, effects }[]` — incluidos primero |
