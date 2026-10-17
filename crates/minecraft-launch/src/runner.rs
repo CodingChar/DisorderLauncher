@@ -17,6 +17,10 @@ const INHERITED_ENV: &[&str] = &[
     "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE", "XDG_DATA_DIRS",
 ];
 
+/// Familias de variables graficas/de sesion que el juego necesita en Linux (GPU hibrida, Mesa,
+/// audio, locale, D-Bus). Se heredan por prefijo; nada mas.
+const INHERITED_ENV_PREFIXES: &[&str] = &["LC_", "XDG_", "MESA_", "LIBGL_", "__GLX", "__NV", "__VK", "VK_", "PULSE_", "SDL_", "DBUS_SESSION"];
+
 const CHANNEL_CAPACITY: usize = 512;
 const MIN_REDACTABLE_SECRET_LEN: usize = 8;
 
@@ -177,10 +181,17 @@ impl GameKiller {
 }
 
 fn inherited_env() -> Vec<(OsString, OsString)> {
-    INHERITED_ENV
-        .iter()
-        .filter_map(|key| std::env::var_os(key).map(|v| (OsString::from(key), v)))
-        .collect()
+    filter_env(std::env::vars_os())
+}
+
+/// Aplica la allowlist (nombres exactos + prefijos) a un conjunto de variables.
+fn filter_env(vars: impl Iterator<Item = (OsString, OsString)>) -> Vec<(OsString, OsString)> {
+    vars.filter(|(key, _)| {
+        let name = key.to_string_lossy();
+        INHERITED_ENV.iter().any(|k| k.eq_ignore_ascii_case(&name))
+            || INHERITED_ENV_PREFIXES.iter().any(|p| name.starts_with(p))
+    })
+    .collect()
 }
 
 fn redact(line: &str, secrets: &[String]) -> String {
@@ -244,6 +255,24 @@ mod tests {
             events.push(e);
         }
         events
+    }
+
+    #[test]
+    fn env_allowlist_matches_names_and_prefixes_only() {
+        let vars = [
+            ("PATH", "p"), ("Path", "p2"), ("MESA_GLTHREAD", "1"), ("__NV_PRIME_RENDER_OFFLOAD", "1"),
+            ("XDG_SESSION_TYPE", "x11"), ("LC_ALL", "C"), ("AWS_SECRET_ACCESS_KEY", "s"), ("GITHUB_TOKEN", "t"),
+            ("SDL_VIDEODRIVER", "x11"), ("DBUS_SESSION_BUS_ADDRESS", "u"), ("DBUS_SYSTEM_BUS_ADDRESS", "no"),
+        ]
+        .map(|(k, v)| (OsString::from(k), OsString::from(v)));
+        let kept: Vec<String> = filter_env(vars.into_iter()).into_iter().map(|(k, _)| k.to_string_lossy().into_owned()).collect();
+
+        for yes in ["PATH", "Path", "MESA_GLTHREAD", "__NV_PRIME_RENDER_OFFLOAD", "XDG_SESSION_TYPE", "LC_ALL", "SDL_VIDEODRIVER", "DBUS_SESSION_BUS_ADDRESS"] {
+            assert!(kept.contains(&yes.to_string()), "{yes}");
+        }
+        for no in ["AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "DBUS_SYSTEM_BUS_ADDRESS"] {
+            assert!(!kept.contains(&no.to_string()), "{no}");
+        }
     }
 
     #[tokio::test]
