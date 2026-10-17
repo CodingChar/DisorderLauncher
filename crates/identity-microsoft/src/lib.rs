@@ -1,25 +1,21 @@
-use identity_api::*;
+//! Proveedor de identidad Microsoft: Authorization Code + PKCE con navegador del sistema,
+//! cadena Xbox -> XSTS -> Minecraft Services y verificacion de propiedad (spec 04).
+//!
+//! Cliente publico: no hay secreto en el binario. Sin `client_id` configurado el proveedor
+//! queda deshabilitado y responde `MicrosoftNotConfigured`; nunca se simula una sesion.
 
-pub struct MicrosoftIdentityProvider;
+mod auth;
+mod config;
+mod fake;
+mod loopback;
+mod pkce;
+mod provider;
+mod secret;
 
-#[async_trait::async_trait]
-impl IdentityProvider for MicrosoftIdentityProvider {
-    fn kind(&self) -> IdentityProviderKind {
-        IdentityProviderKind::Microsoft
-    }
-
-    async fn resolve_identity(
-        &self,
-        _account: &AccountRecord,
-    ) -> Result<ResolvedIdentity, IdentityError> {
-        Err(IdentityError::MicrosoftNotConfigured)
-    }
-
-    async fn refresh(&self, _account: &AccountRecord) -> Result<AuthState, IdentityError> {
-        Err(IdentityError::MicrosoftNotConfigured)
-    }
-
-    async fn logout(&self, _account: &AccountRecord) -> Result<(), IdentityError> {
-        Err(IdentityError::MicrosoftNotConfigured)
-    }
-}
+pub use auth::*;
+pub use config::*;
+pub use fake::*;
+pub use loopback::*;
+pub use pkce::*;
+pub use provider::*;
+pub use secret::*;
