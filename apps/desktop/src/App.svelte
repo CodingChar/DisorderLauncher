@@ -10,19 +10,22 @@
   import CreateInstance from './routes/CreateInstance.svelte'
   import EditInstance from './routes/EditInstance.svelte'
   import Home from './routes/Home.svelte'
+  import Settings from './routes/Settings.svelte'
+  import { settings } from './lib/stores/settings.svelte'
   import Welcome from './routes/Welcome.svelte'
 
   const items: { view: View; label: string }[] = [
     { view: 'home', label: 'Inicio' },
     { view: 'create', label: 'Nueva instancia' },
     { view: 'accounts', label: 'Perfiles' },
+    { view: 'settings', label: 'Ajustes' },
   ]
 
   const needsProfile = $derived(accounts.loaded && accounts.list.length === 0)
 
   onMount(async () => {
     await sessions.init()
-    await Promise.all([accounts.load(), instances.load()])
+    await Promise.all([settings.load(), accounts.load(), instances.load()])
   })
 </script>
 
@@ -64,6 +67,8 @@
         <CreateInstance />
       {:else if nav.view === 'edit'}
         <EditInstance />
+      {:else if nav.view === 'settings'}
+        <Settings />
       {:else}
         <AccountPicker />
       {/if}

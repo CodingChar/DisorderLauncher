@@ -367,3 +367,29 @@ async fn busy_instance_cannot_be_edited_or_deleted() {
         assert!(matches!(blocked, Err(LauncherError::AlreadyRunning)));
     }
 }
+
+#[tokio::test]
+async fn settings_persist_across_launcher_restarts_and_validate_java() {
+    use launcher_core::{DownloadProfile, Settings, Theme};
+    let dir = tempfile::tempdir().unwrap();
+    let make = || Launcher::new(LauncherPaths::new(dir.path()), Arc::new(Collector::default()));
+
+    let first = make();
+    first.load_settings().await;
+    assert_eq!(first.settings(), Settings::default());
+
+    let updated = first
+        .settings_update(Settings { theme: Theme::Light, download_profile: DownloadProfile::Performance, ..Settings::default() })
+        .await
+        .unwrap();
+    assert_eq!(updated.download_profile.concurrency(), 10);
+
+    let second = make();
+    second.load_settings().await;
+    assert_eq!(second.settings().theme, Theme::Light);
+
+    let bad = Settings { java_path: Some(dir.path().join("nada")), ..Settings::default() };
+    assert!(matches!(second.settings_update(bad).await, Err(LauncherError::InvalidInput(_))));
+    assert_eq!(second.settings().theme, Theme::Light, "un fallo no altera los ajustes vigentes");
+    assert_eq!(second.settings_snapshot().data_dir, dir.path().display().to_string());
+}

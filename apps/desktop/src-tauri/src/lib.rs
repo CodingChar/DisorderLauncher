@@ -20,7 +20,9 @@ pub fn run() {
       }
 
       let data_dir = app.path().app_data_dir()?;
-      app.manage(state::AppState::new(data_dir, app.handle().clone()));
+      let state = state::AppState::new(data_dir, app.handle().clone());
+      tauri::async_runtime::block_on(state.launcher.load_settings());
+      app.manage(state);
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
@@ -37,6 +39,8 @@ pub fn run() {
       commands::instances_stop,
       commands::instances_repair,
       commands::minecraft_list_versions,
+      commands::settings_get,
+      commands::settings_update,
     ])
     .run(tauri::generate_context!())
     .expect("error while building tauri application");

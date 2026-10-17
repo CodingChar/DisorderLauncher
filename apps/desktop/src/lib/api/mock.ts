@@ -22,6 +22,7 @@ let accounts: AccountRecord[] = []
 let defaultId: string | null = null
 let instances: Instance[] = []
 let counter = 0
+let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', javaPath: null as string | null }
 
 const versions: VersionEntry[] = ['1.21.4', '1.21.1', '1.20.4', '1.19.4', '1.16.5', '1.12.2'].map((id) => ({
   id,
@@ -131,6 +132,11 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       }
       return { found: 2, fixed: 2, remaining: 0 } satisfies RepairSummary
     }
+    case 'settings_get':
+      return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
+    case 'settings_update':
+      settings = { ...args.settings }
+      return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
     case 'minecraft_list_versions':
       return versions
     default:

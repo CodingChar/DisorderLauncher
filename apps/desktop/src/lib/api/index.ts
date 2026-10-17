@@ -7,6 +7,8 @@ import type {
   LaunchStateEvent,
   ProgressEvent,
   RepairSummary,
+  Settings,
+  SettingsSnapshot,
   VersionEntry,
 } from '../types'
 
@@ -59,6 +61,8 @@ export const api = {
   instancesLaunch: (id: string) => call<void>('instances_launch', { id }),
   instancesStop: (id: string) => call<void>('instances_stop', { id }),
   instancesRepair: (id: string) => call<RepairSummary>('instances_repair', { id }),
+  settingsGet: () => call<SettingsSnapshot>('settings_get'),
+  settingsUpdate: (settings: Settings) => call<SettingsSnapshot>('settings_update', { settings }),
   listVersions: (includeAll = false) => call<VersionEntry[]>('minecraft_list_versions', { includeAll }),
 }
 

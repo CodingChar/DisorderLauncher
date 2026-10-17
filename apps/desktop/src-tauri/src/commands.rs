@@ -99,3 +99,17 @@ pub async fn minecraft_list_versions(
     .await
     .map_err(user_message)
 }
+
+#[tauri::command]
+pub async fn settings_get(state: State<'_, AppState>) -> Result<launcher_core::SettingsSnapshot, String> {
+  Ok(state.launcher.settings_snapshot())
+}
+
+#[tauri::command]
+pub async fn settings_update(
+  state: State<'_, AppState>,
+  settings: launcher_core::Settings,
+) -> Result<launcher_core::SettingsSnapshot, String> {
+  state.launcher.settings_update(settings).await.map_err(user_message)?;
+  Ok(state.launcher.settings_snapshot())
+}

@@ -85,3 +85,18 @@ export interface InstanceChanges {
   java?: JavaSelection
   memory?: MemoryPolicy
 }
+
+export type Theme = 'system' | 'light' | 'dark'
+export type DownloadProfile = 'eco' | 'normal' | 'performance'
+
+export interface Settings {
+  schemaVersion: number
+  theme: Theme
+  downloadProfile: DownloadProfile
+  javaPath: string | null
+}
+
+export interface SettingsSnapshot {
+  settings: Settings
+  dataDir: string
+}

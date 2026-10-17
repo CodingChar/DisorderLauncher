@@ -20,6 +20,8 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `instances_launch` | `id` | `void` — inicia en segundo plano; el avance llega por eventos |
 | `instances_stop` | `id` | `void` |
 | `instances_repair` | `id` | `{ found, fixed, remaining }` — verifica hashes y redescarga lo danado |
+| `settings_get` | — | `{ settings, dataDir }` |
+| `settings_update` | `settings` | `{ settings, dataDir }` — `settings`: `theme` (`system`/`light`/`dark`), `downloadProfile` (`eco`=3, `normal`=6, `performance`=10 descargas), `javaPath` (carpeta de Java global o `null`) |
 | `minecraft_list_versions` | `includeAll?` | `VersionEntry[]` (solo `release` salvo `includeAll`) |
 
 Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin duplicados (sin distinguir mayusculas).

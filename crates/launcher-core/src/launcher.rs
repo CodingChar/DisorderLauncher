@@ -1,3 +1,4 @@
+use crate::settings::{self, Settings};
 use crate::{
     GameOutputEvent, IdentityRegistry, InstallProgressEvent, LaunchState, LaunchStateEvent,
     LauncherError, LauncherEvents, LauncherPaths, OutputStream, RepairSummary,
@@ -31,7 +32,6 @@ use tokio::io::AsyncWriteExt;
 
 const MANIFEST_TIMEOUT: Duration = Duration::from_secs(20);
 const DEFAULT_JAVA_MAJOR: u32 = 8;
-const DEFAULT_CONCURRENCY: usize = 6;
 
 /// Orquestador de la aplicacion (capa Application de la spec 02): une repositorios,
 /// identidad, instalacion, Java y lanzamiento. No conoce Tauri.
@@ -44,7 +44,7 @@ pub struct Launcher {
     java: JavaManager,
     events: Arc<dyn LauncherEvents>,
     manifest_url: String,
-    download_concurrency: usize,
+    settings: Mutex<Settings>,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
     running: Mutex<HashMap<String, Option<GameKiller>>>,
 }
@@ -69,10 +69,38 @@ impl Launcher {
             http,
             events,
             manifest_url: minecraft_meta::VERSION_MANIFEST_URL.to_string(),
-            download_concurrency: DEFAULT_CONCURRENCY,
+            settings: Mutex::new(Settings::default()),
             running: Mutex::new(HashMap::new()),
             paths,
         }
+    }
+
+    /// Carga los ajustes guardados. Llamar una vez al iniciar la app.
+    pub async fn load_settings(&self) {
+        let loaded = settings::load_settings(&self.paths.settings_file()).await;
+        *self.settings_guard() = loaded;
+    }
+
+    pub fn settings_snapshot(&self) -> crate::SettingsSnapshot {
+        crate::SettingsSnapshot {
+            settings: self.settings(),
+            data_dir: self.paths.root().display().to_string(),
+        }
+    }
+
+    pub fn settings(&self) -> Settings {
+        self.settings_guard().clone()
+    }
+
+    pub async fn settings_update(&self, new: Settings) -> Result<Settings, LauncherError> {
+        let validated = new.validated()?;
+        settings::save_settings(&self.paths.settings_file(), &validated).await?;
+        *self.settings_guard() = validated.clone();
+        Ok(validated)
+    }
+
+    fn settings_guard(&self) -> std::sync::MutexGuard<'_, Settings> {
+        self.settings.lock().unwrap_or_else(|p| p.into_inner())
     }
 
     pub fn with_manifest_url(mut self, url: impl Into<String>) -> Self {
@@ -331,7 +359,7 @@ impl Launcher {
 
         let events = Arc::clone(&self.events);
         let id = instance.id.clone();
-        let executor = InstallExecutor::new(self.http.clone(), self.download_concurrency);
+        let executor = InstallExecutor::new(self.http.clone(), self.settings().download_profile.concurrency());
         let report = diagnostics::repair_installation(&executor, &mut plan, &data_dir, move |p| {
             events.repair_progress(InstallProgressEvent {
                 instance_id: id.clone(),
@@ -450,7 +478,7 @@ impl Launcher {
     ) -> Result<(), LauncherError> {
         let events = Arc::clone(&self.events);
         let id = instance_id.to_string();
-        let executor = InstallExecutor::new(self.http.clone(), self.download_concurrency);
+        let executor = InstallExecutor::new(self.http.clone(), self.settings().download_profile.concurrency());
         executor
             .execute(plan, data_dir, move |p| {
                 events.install_progress(InstallProgressEvent {
@@ -509,9 +537,25 @@ impl Launcher {
                     .as_ref()
                     .map(|j| j.major_version)
                     .unwrap_or(DEFAULT_JAVA_MAJOR);
+                if let Some(global) = self.global_java(major).await {
+                    return Ok(global);
+                }
                 Ok(self.java.ensure_java(&JavaRequirement { major_version: major }).await?)
             }
         }
+    }
+
+    /// Java global de los ajustes, solo si es compatible con lo que pide el juego.
+    async fn global_java(&self, required_major: u32) -> Option<JavaInstallation> {
+        let path = self.settings().java_path?;
+        let found = java_runtime::detect_java_at(&path).await.ok()?;
+        let candidate = [found];
+        let compatible = java_runtime::select_best_java(&candidate, required_major).is_some();
+        if !compatible {
+            tracing::warn!(required_major, "el Java global no es compatible; se usa el automatico");
+        }
+        let [found] = candidate;
+        compatible.then_some(found)
     }
 
     fn emit_state(&self, instance_id: &str, state: LaunchState) {
