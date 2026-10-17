@@ -4,7 +4,7 @@ Launcher de Minecraft Java ligero, modular, seguro y usable por personas con poc
 
 **Stack**: Rust (Tauri 2) + Svelte + TypeScript
 
-**Estado**: Sprints 0–10 implementados (Offline Gaming + Vanilla, instancias, Fabric/Quilt/Forge/NeoForge, mods y Modrinth, modpacks `.mrpack`, Microsoft, temas, skins con editor, hardening). Pendiente de infraestructura: actualizador automatico (clave de firma + endpoint) y verificacion de Microsoft contra servidores reales (requiere app registrada). Ver [`docs/QA_MATRIX.md`](docs/QA_MATRIX.md), [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md), [`docs/RELEASE.md`](docs/RELEASE.md), el plan en [`docs/PLAN_TECNICO.md`](docs/PLAN_TECNICO.md) y el contrato IPC en [`docs/IPC.md`](docs/IPC.md).
+**Estado**: Sprints 0–10 implementados (Offline Gaming + Vanilla, instancias, Fabric/Quilt/Forge/NeoForge, mods y Modrinth, modpacks `.mrpack`, Microsoft, temas, skins con editor, hardening). Pendiente de infraestructura: actualizador automatico (clave de firma + endpoint) y verificacion de Microsoft contra servidores reales (requiere app registrada). Avance y pendientes: [`docs/PROGRESS.md`](docs/PROGRESS.md). Ver [`docs/QA_MATRIX.md`](docs/QA_MATRIX.md), [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md), [`docs/RELEASE.md`](docs/RELEASE.md), el plan en [`docs/PLAN_TECNICO.md`](docs/PLAN_TECNICO.md) y el contrato IPC en [`docs/IPC.md`](docs/IPC.md).
 
 ```bash
 cargo test --workspace            # tests del core

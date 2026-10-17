@@ -1,5 +1,7 @@
 # DisorderLauncher — Plan Tecnico de Implementacion
 
+> **Estado**: todas las tareas S0–S10 estan implementadas (salvo las bloqueadas por infraestructura). Ver [`PROGRESS.md`](PROGRESS.md) para el avance real, lo verificado y los pendientes; este documento se conserva como plan original.
+
 Este documento es el plan maestro para construir DisorderLauncher. Esta disenado para que agentes de IA de menor consumo (Sonnet, Haiku) puedan ejecutar cada tarea sin leer los 14 documentos de especificacion completos.
 
 **Regla**: antes de cada tarea, el agente debe leer `.claude/CLAUDE.md` y la seccion relevante de este plan. Solo consultar `docs/spec/` cuando necesite detalle adicional.
