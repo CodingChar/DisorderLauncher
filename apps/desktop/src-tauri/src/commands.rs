@@ -251,3 +251,33 @@ pub async fn modpacks_export(
   let path = file.into_path().map_err(|_| "No se pudo usar esa ubicación.".to_string())?;
   state.launcher.modpack_export(&id, &path).await.map(Some).map_err(user_message)
 }
+
+#[tauri::command]
+pub async fn themes_list(state: State<'_, AppState>) -> Result<Vec<themes::ThemeEntry>, String> {
+  Ok(state.launcher.themes_list().await)
+}
+
+/// Abre el selector de archivos, valida el `.json` del tema y lo guarda. `None` si se cancela.
+#[tauri::command]
+pub async fn themes_import(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Option<themes::Theme>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app
+    .dialog()
+    .file()
+    .add_filter("Tema de DisorderLauncher", &["json"])
+    .blocking_pick_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  // Se limita la lectura: un tema legitimo pesa pocos KB.
+  let meta = std::fs::metadata(&path).map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  if meta.len() as usize > themes::MAX_THEME_BYTES {
+    return Err("Ese archivo es demasiado grande para ser un tema.".to_string());
+  }
+  let data = std::fs::read(&path).map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  state.launcher.themes_import(&data).await.map(Some).map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn themes_remove(state: State<'_, AppState>, id: String) -> Result<(), String> {
+  state.launcher.themes_remove(&id).await.map_err(user_message)
+}

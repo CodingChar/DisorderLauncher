@@ -16,6 +16,7 @@ import type {
   RepairSummary,
   Settings,
   SettingsSnapshot,
+  ThemeEntry,
   VersionEntry,
 } from '../types'
 
@@ -81,6 +82,9 @@ export const api = {
   modsRollback: (id: string, file: string) => call<void>('mods_rollback', { id, file }),
   modpacksImport: () => call<Instance | null>('modpacks_import'),
   modpacksExport: (id: string) => call<ExportSummary | null>('modpacks_export', { id }),
+  themesList: () => call<ThemeEntry[]>('themes_list'),
+  themesImport: () => call<ThemeEntry | null>('themes_import'),
+  themesRemove: (id: string) => call<void>('themes_remove', { id }),
   settingsGet: () => call<SettingsSnapshot>('settings_get'),
   settingsUpdate: (settings: Settings) => call<SettingsSnapshot>('settings_update', { settings }),
   listVersions: (includeAll = false) => call<VersionEntry[]>('minecraft_list_versions', { includeAll }),

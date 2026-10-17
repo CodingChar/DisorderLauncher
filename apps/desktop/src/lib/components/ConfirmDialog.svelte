@@ -38,7 +38,7 @@
 <style>
   dialog {
     border: 1px solid var(--border-strong);
-    border-radius: 20px 0 20px 0;
+    border-radius: var(--r-lg) 0 var(--r-lg) 0;
     background: var(--surface);
     color: var(--text-primary);
     padding: 24px;

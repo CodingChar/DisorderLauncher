@@ -646,3 +646,30 @@ async fn real_modpack_export_and_import_use_modrinth_references() {
     assert_eq!(mods.mods.len(), 1);
     assert_eq!(mods.mods[0].name, "Fabric API");
 }
+
+#[tokio::test]
+async fn custom_themes_can_be_selected_and_falling_back_when_removed() {
+    use launcher_core::Settings;
+    let (dir, launcher, _) = launcher();
+    let theme = include_str!("../../../theme_examples/default-dark.theme.json")
+        .replace("disorderlaucher.default.dark", "mi.tema")
+        .replace("Default Dark", "Mi tema");
+    let _ = dir;
+
+    assert_eq!(launcher.themes_list().await.len(), 2);
+    let imported = launcher.themes_import(theme.as_bytes()).await.unwrap();
+    assert_eq!(imported.id, "mi.tema");
+    assert!(matches!(launcher.themes_import(theme.as_bytes()).await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.themes_import(b"{}").await, Err(LauncherError::InvalidInput(_))));
+
+    // Seleccionar un tema que no existe se rechaza; uno existente se guarda.
+    let missing = Settings { theme_id: Some("fantasma".into()), ..Settings::default() };
+    assert!(matches!(launcher.settings_update(missing).await, Err(LauncherError::InvalidInput(_))));
+    let chosen = Settings { theme_id: Some("mi.tema".into()), ..Settings::default() };
+    assert_eq!(launcher.settings_update(chosen).await.unwrap().theme_id.as_deref(), Some("mi.tema"));
+
+    // Al quitar el tema en uso, los ajustes vuelven al tema incluido.
+    launcher.themes_remove("mi.tema").await.unwrap();
+    assert_eq!(launcher.settings().theme_id, None);
+    assert!(matches!(launcher.themes_remove("disorderlaucher.default.dark").await, Err(LauncherError::InvalidInput(_))));
+}

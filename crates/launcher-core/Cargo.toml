@@ -18,6 +18,7 @@ instance-manager = { path = "../instance-manager" }
 loaders = { path = "../loaders" }
 mods = { path = "../mods" }
 modpacks = { path = "../modpacks" }
+themes = { path = "../themes" }
 diagnostics = { path = "../diagnostics" }
 async-trait = { workspace = true }
 sha1 = { workspace = true }

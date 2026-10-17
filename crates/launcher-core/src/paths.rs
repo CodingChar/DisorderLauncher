@@ -15,6 +15,10 @@ impl LauncherPaths {
         &self.root
     }
 
+    pub fn themes_dir(&self) -> PathBuf {
+        self.root.join("themes")
+    }
+
     pub fn settings_file(&self) -> PathBuf {
         self.root.join("settings.json")
     }

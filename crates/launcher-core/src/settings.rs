@@ -37,6 +37,8 @@ pub struct Settings {
     pub schema_version: u32,
     pub theme: Theme,
     pub download_profile: DownloadProfile,
+    /// Tema personalizado elegido; `None` usa el tema incluido segun `theme`.
+    pub theme_id: Option<String>,
     /// Carpeta de Java usada por las instancias con Java "automatico" cuando es compatible.
     pub java_path: Option<PathBuf>,
 }
@@ -47,6 +49,7 @@ impl Default for Settings {
             schema_version: SCHEMA_VERSION,
             theme: Theme::System,
             download_profile: DownloadProfile::Normal,
+            theme_id: None,
             java_path: None,
         }
     }

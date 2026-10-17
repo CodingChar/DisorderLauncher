@@ -33,8 +33,11 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `mods_check_updates` | `id` | `{ file, projectId, title, currentVersion, latestVersion }[]` |
 | `mods_update` | `id`, `file` | `InstalledMod` (guarda la version anterior) |
 | `mods_rollback` | `id`, `file` | `void` (restaura la version anterior) |
+| `themes_list` | — | `{ builtin, id, name, mode, colors, typography, shape, density, effects }[]` — incluidos primero |
+| `themes_import` | — | `Theme \| null` — selector de `.json`; Rust valida (colores `#RRGGBB`, fuentes seguras, rangos, contraste AA, sin campos desconocidos) |
+| `themes_remove` | `id` | `void` (solo temas del usuario; si estaba en uso vuelve al incluido) |
 | `settings_get` | — | `{ settings, dataDir }` |
-| `settings_update` | `settings` | `{ settings, dataDir }` — `settings`: `theme` (`system`/`light`/`dark`), `downloadProfile` (`eco`=3, `normal`=6, `performance`=10 descargas), `javaPath` (carpeta de Java global o `null`) |
+| `settings_update` | `settings` | `{ settings, dataDir }` — `settings`: `theme` (`system`/`light`/`dark`), `downloadProfile` (`eco`=3, `normal`=6, `performance`=10 descargas), `themeId` (tema personalizado o `null`), `javaPath` (carpeta de Java global o `null`) |
 | `minecraft_list_versions` | `includeAll?` | `VersionEntry[]` (solo `release` salvo `includeAll`) |
 
 Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin duplicados (sin distinguir mayusculas).

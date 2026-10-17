@@ -142,7 +142,7 @@
 
   .brand {
     border: 1px solid var(--border-strong);
-    border-radius: 0 16px 16px 0;
+    border-radius: 0 var(--r-lg) var(--r-lg) 0;
     padding: 14px 12px;
     margin-bottom: 26px;
   }
@@ -186,7 +186,7 @@
   .nav button.active {
     background: var(--action);
     color: var(--action-text);
-    border-radius: 0 10px 10px 0;
+    border-radius: 0 var(--r-md) var(--r-md) 0;
     font-weight: 700;
   }
 

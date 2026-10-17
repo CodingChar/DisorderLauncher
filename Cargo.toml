@@ -17,6 +17,7 @@ members = [
     "crates/loaders",
     "crates/mods",
     "crates/modpacks",
+    "crates/themes",
     "apps/desktop/src-tauri",
 ]
 

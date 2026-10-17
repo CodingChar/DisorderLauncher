@@ -48,6 +48,7 @@ pub struct Launcher {
     pub(crate) events: Arc<dyn LauncherEvents>,
     manifest_url: String,
     settings: Mutex<Settings>,
+    pub(crate) theme_store: themes::ThemeStore,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
     running: Mutex<HashMap<String, Option<GameKiller>>>,
 }
@@ -79,6 +80,7 @@ impl Launcher {
             events,
             manifest_url: minecraft_meta::VERSION_MANIFEST_URL.to_string(),
             settings: Mutex::new(Settings::default()),
+            theme_store: themes::ThemeStore::new(paths.themes_dir()),
             running: Mutex::new(HashMap::new()),
             paths,
         }
@@ -103,6 +105,11 @@ impl Launcher {
 
     pub async fn settings_update(&self, new: Settings) -> Result<Settings, LauncherError> {
         let validated = new.validated()?;
+        if let Some(id) = &validated.theme_id {
+            if !self.theme_store.list().await.iter().any(|e| &e.theme.id == id) {
+                return Err(LauncherError::InvalidInput("Ese tema ya no esta disponible.".into()));
+            }
+        }
         settings::save_settings(&self.paths.settings_file(), &validated).await?;
         *self.settings_guard() = validated.clone();
         Ok(validated)

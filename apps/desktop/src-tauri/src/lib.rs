@@ -53,6 +53,9 @@ pub fn run() {
       commands::mods_check_updates,
       commands::mods_update,
       commands::mods_rollback,
+      commands::themes_list,
+      commands::themes_import,
+      commands::themes_remove,
       commands::settings_get,
       commands::settings_update,
     ])

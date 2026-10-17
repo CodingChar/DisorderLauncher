@@ -2,6 +2,7 @@
   import Button from '../lib/components/Button.svelte'
   import Card from '../lib/components/Card.svelte'
   import Input from '../lib/components/Input.svelte'
+  import Select from '../lib/components/Select.svelte'
   import { settings } from '../lib/stores/settings.svelte'
   import type { DownloadProfile, Theme } from '../lib/types'
 
@@ -19,9 +20,37 @@
   let theme = $state<Theme>(settings.value.theme)
   let speed = $state<DownloadProfile>(settings.value.downloadProfile)
   let javaPath = $state(settings.value.javaPath ?? '')
+  let themeId = $state(settings.value.themeId ?? '')
+  const customThemes = $derived(settings.themes.filter((t) => !t.builtin))
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
   let saving = $state(false)
+
+  async function importTheme() {
+    error = null
+    notice = null
+    try {
+      const theme = await settings.importTheme()
+      if (theme) {
+        themeId = theme.id
+        notice = `Tema «${theme.name}» importado. Pulsa Guardar para usarlo.`
+      }
+    } catch (e) {
+      error = (e as Error).message
+    }
+  }
+
+  async function removeTheme() {
+    if (!themeId) return
+    error = null
+    try {
+      await settings.removeTheme(themeId)
+      themeId = ''
+      notice = 'Tema quitado.'
+    } catch (e) {
+      error = (e as Error).message
+    }
+  }
 
   async function save() {
     if (saving) return
@@ -33,6 +62,7 @@
         ...settings.value,
         theme,
         downloadProfile: speed,
+        themeId: themeId || null,
         javaPath: javaPath.trim() || null,
       })
       notice = 'Preferencias guardadas.'
@@ -62,6 +92,20 @@
         {#each themes as option (option.value)}
           <label class="radio"><input type="radio" bind:group={theme} value={option.value} /> {option.label}</label>
         {/each}
+      </fieldset>
+
+      <fieldset>
+        <legend>Tema personalizado</legend>
+        <Select
+          label="Tema"
+          bind:value={themeId}
+          options={[{ value: '', label: 'Ninguno (usar el de arriba)' }, ...customThemes.map((t) => ({ value: t.id, label: t.name }))]}
+        />
+        <div class="theme-actions">
+          <Button onclick={importTheme}>Importar tema…</Button>
+          <Button variant="ghost" disabled={!themeId} onclick={removeTheme}>Quitar este tema</Button>
+        </div>
+        <small class="hint">Un tema solo cambia colores, formas y tipografía; nunca ejecuta código.</small>
       </fieldset>
 
       <fieldset>
@@ -155,6 +199,18 @@
   .radio small {
     display: block;
     color: var(--text-secondary);
+  }
+
+  .theme-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .hint {
+    color: var(--text-secondary);
+    margin-top: 8px;
   }
 
   .readonly {

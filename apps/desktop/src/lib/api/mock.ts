@@ -22,9 +22,21 @@ let accounts: AccountRecord[] = []
 let defaultId: string | null = null
 let instances: Instance[] = []
 let counter = 0
+let mockThemes: any[] = [
+  { builtin: true, schemaVersion: 1, id: 'disorderlaucher.default.dark', name: 'Default Dark', mode: 'dark',
+    colors: { background: '#0C0C0C', surface: '#141414', surfaceAlt: '#1D1D1D', surfaceRaised: '#252525', textPrimary: '#F0F0EA', textSecondary: '#A0A09A', border: '#2D2D2D', borderStrong: '#4D4D4D', action: '#F3F3ED', actionText: '#0C0C0C' },
+    typography: { displayFamily: 'Space Grotesk', bodyFamily: 'IBM Plex Sans', scale: 1 },
+    shape: { inputRadius: 8, buttonRadius: 10, cardRadius: 18, heroRadius: 24 },
+    density: { uiScale: 1, compact: false }, effects: { shadowStrength: 0.2, animations: true } },
+  { builtin: true, schemaVersion: 1, id: 'disorderlaucher.default.light', name: 'Default Light', mode: 'light',
+    colors: { background: '#ECECE8', surface: '#F8F8F5', surfaceAlt: '#DFDFDB', surfaceRaised: '#CFCFCA', textPrimary: '#0A0A0A', textSecondary: '#62625E', border: '#C8C8C2', borderStrong: '#9E9E98', action: '#101010', actionText: '#F4F4EF' },
+    typography: { displayFamily: 'Space Grotesk', bodyFamily: 'IBM Plex Sans', scale: 1 },
+    shape: { inputRadius: 8, buttonRadius: 10, cardRadius: 18, heroRadius: 24 },
+    density: { uiScale: 1, compact: false }, effects: { shadowStrength: 0.2, animations: true } },
+]
 const installedMods = new Map<string, any[]>()
 const pendingUpdates = new Set<string>()
-let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', javaPath: null as string | null }
+let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null as string | null, javaPath: null as string | null }
 
 const versions: VersionEntry[] = ['1.21.4', '1.21.1', '1.20.4', '1.19.4', '1.16.5', '1.12.2'].map((id) => ({
   id,
@@ -225,6 +237,24 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
     }
     case 'modpacks_export':
       return { remoteFiles: 12, bundledFiles: 5 }
+    case 'themes_list':
+      return mockThemes
+    case 'themes_import': {
+      const theme = {
+        ...mockThemes[0],
+        builtin: false,
+        id: `custom.${++counter}`,
+        name: 'Medianoche azul',
+        colors: { ...mockThemes[0].colors, background: '#0B1020', surface: '#121A30', surfaceAlt: '#1A2442', surfaceRaised: '#243057', border: '#2A3760', borderStrong: '#4A5C94', action: '#8FB4FF', actionText: '#0B1020' },
+        shape: { inputRadius: 14, buttonRadius: 20, cardRadius: 26, heroRadius: 30 },
+      }
+      mockThemes = [...mockThemes, theme]
+      return theme
+    }
+    case 'themes_remove':
+      mockThemes = mockThemes.filter((t) => t.id !== args.id)
+      if (settings.themeId === args.id) settings = { ...settings, themeId: null }
+      return null
     case 'settings_get':
       return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
     case 'settings_update':

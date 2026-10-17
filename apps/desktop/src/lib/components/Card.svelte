@@ -27,7 +27,7 @@
   }
 
   .hero {
-    border-radius: 24px 0 24px 0;
+    border-radius: var(--r-xl) 0 var(--r-xl) 0;
     padding: 28px;
   }
 </style>

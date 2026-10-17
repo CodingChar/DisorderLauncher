@@ -100,6 +100,7 @@ export interface Settings {
   schemaVersion: number
   theme: Theme
   downloadProfile: DownloadProfile
+  themeId: string | null
   javaPath: string | null
 }
 
@@ -171,4 +172,30 @@ export interface LoaderVersion {
 export interface ExportSummary {
   remoteFiles: number
   bundledFiles: number
+}
+
+export interface ThemeColors {
+  background: string
+  surface: string
+  surfaceAlt: string
+  surfaceRaised: string
+  textPrimary: string
+  textSecondary: string
+  border: string
+  borderStrong: string
+  action: string
+  actionText: string
+}
+
+export interface ThemeEntry {
+  builtin: boolean
+  schemaVersion: number
+  id: string
+  name: string
+  mode: 'dark' | 'light'
+  colors: ThemeColors
+  typography: { displayFamily: string; bodyFamily: string; scale: number }
+  shape: { inputRadius: number; buttonRadius: number; cardRadius: number; heroRadius: number }
+  density: { uiScale: number; compact: boolean }
+  effects: { shadowStrength: number; animations: boolean }
 }

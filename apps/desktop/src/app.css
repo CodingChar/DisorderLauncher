@@ -108,3 +108,10 @@ main:focus,
 h1:focus {
   outline: none;
 }
+
+:root[data-animations='off'] *,
+:root[data-animations='off'] *::before,
+:root[data-animations='off'] *::after {
+  animation: none !important;
+  transition: none !important;
+}

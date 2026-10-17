@@ -61,7 +61,7 @@
     width: min(460px, 100%);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 24px 0 24px 0;
+    border-radius: var(--r-xl) 0 var(--r-xl) 0;
     padding: 36px;
     box-shadow: var(--shadow);
   }
