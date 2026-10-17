@@ -33,4 +33,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+test-support = { path = "../test-support" }
 zip = { workspace = true }
+url = { workspace = true }

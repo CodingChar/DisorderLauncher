@@ -1,6 +1,5 @@
-#![allow(dead_code)]
+//! Servidor HTTP falso para pruebas de contrato (Microsoft, Xbox, Minecraft Services).
 
-use identity_microsoft::MicrosoftEndpoints;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -74,18 +73,6 @@ impl FakeServer {
             .collect()
     }
 
-    pub fn endpoints(&self) -> MicrosoftEndpoints {
-        MicrosoftEndpoints {
-            authorize: format!("{}/authorize", self.base),
-            token: format!("{}/token", self.base),
-            xbox_user: format!("{}/xbox", self.base),
-            xsts: format!("{}/xsts", self.base),
-            minecraft_login: format!("{}/mc/login", self.base),
-            minecraft_entitlements: format!("{}/mc/entitlements", self.base),
-            minecraft_profile: format!("{}/mc/profile", self.base),
-        }
-    }
-
     /// Respuestas correctas para toda la cadena (el token de refresco se parametriza).
     pub fn happy_chain(&self, refresh_token: &str) {
         self.respond(
@@ -131,7 +118,7 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<Recorded> {
             length = v.trim().parse().unwrap_or(0);
         }
         if lower.starts_with("authorization:") {
-            authorization = Some(line.splitn(2, ':').nth(1)?.trim().to_string());
+            authorization = Some(line.split_once(':')?.1.trim().to_string());
         }
     }
     while buf.len() < header_end + length {

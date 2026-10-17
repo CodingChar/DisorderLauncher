@@ -1,18 +1,28 @@
-mod support;
-
 use credential_store::{CredentialStore, InMemoryCredentialStore};
 use identity_api::{AuthErrorKind, AuthState, IdentityError, IdentityProvider, ProviderAccountData};
 use identity_microsoft::{challenge_for, MicrosoftConfig, MicrosoftIdentityProvider};
 use std::sync::Arc;
 use std::time::Duration;
-use support::FakeServer;
+use test_support::FakeServer;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 const CLIENT_ID: &str = "00000000-0000-0000-0000-000000000001";
 
+fn endpoints_of(server: &FakeServer) -> identity_microsoft::MicrosoftEndpoints {
+    identity_microsoft::MicrosoftEndpoints {
+        authorize: format!("{}/authorize", server.base),
+        token: format!("{}/token", server.base),
+        xbox_user: format!("{}/xbox", server.base),
+        xsts: format!("{}/xsts", server.base),
+        minecraft_login: format!("{}/mc/login", server.base),
+        minecraft_entitlements: format!("{}/mc/entitlements", server.base),
+        minecraft_profile: format!("{}/mc/profile", server.base),
+    }
+}
+
 fn provider(server: &FakeServer, store: Arc<InMemoryCredentialStore>) -> MicrosoftIdentityProvider {
-    let config = MicrosoftConfig { client_id: Some(CLIENT_ID.into()), endpoints: server.endpoints() };
+    let config = MicrosoftConfig { client_id: Some(CLIENT_ID.into()), endpoints: endpoints_of(server) };
     MicrosoftIdentityProvider::new(reqwest::Client::new(), config, store).unwrap()
 }
 
@@ -165,7 +175,7 @@ async fn transient_failures_keep_the_refresh_token() {
             client_id: Some(CLIENT_ID.into()),
             endpoints: identity_microsoft::MicrosoftEndpoints {
                 token: "http://127.0.0.1:1/token".into(),
-                ..server.endpoints()
+                ..endpoints_of(&server)
             },
         },
         store.clone(),

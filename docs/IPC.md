@@ -12,6 +12,11 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `accounts_default` | — | `string \| null` (id del perfil predeterminado) |
 | `accounts_create_local` | `name` | `AccountRecord` (el primero queda como predeterminado) |
 | `accounts_set_default` | `id` | `void` |
+| `microsoft_status` | — | `{ enabled, loginInProgress }` — `enabled` solo si hay un ID de aplicacion configurado (Ajustes > avanzado o `DISORDER_MS_CLIENT_ID`) |
+| `accounts_microsoft_begin_login` | — | `void` — abre el navegador del sistema (PKCE + callback local de un solo uso); el resultado llega por `auth://state` y la cuenta se guarda sola |
+| `accounts_microsoft_cancel_login` | — | `void` |
+| `accounts_auth_state` | `id` | `AuthState` (`LocalReady`, `MicrosoftAuthenticated`, `MicrosoftExpired`, `MicrosoftOfflineCachedIdentity`, `{Error: ...}`) |
+| `accounts_remove` | `id` | `void` — falla si alguna instancia usa el perfil; olvida los tokens de Microsoft |
 | `instances_list` | — | `Instance[]` |
 | `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto), `fabric` o `quilt`; sin `loaderVersion` se usa la ultima estable |
 | `loaders_supported` | — | `LoaderKind[]` (siempre incluye `vanilla`) |
@@ -47,8 +52,9 @@ Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin dupl
 | Evento | Payload |
 |---|---|
 | `install://progress` | `{ instanceId, phase, completed, total }` — `phase`: `client`, `libraries`, `assetIndex`, `assets`, `natives`, `verify` |
+| `auth://state` | `{ state: 'authorizing' \| 'connected' (+accountId, name) \| 'cancelled' \| 'failed' (+message) }` |
 | `repair://progress` | igual que `install://progress` |
-| `launch://state` | `{ instanceId, state }` — `state`: `preparing`, `installing`, `preparingJava`, `starting`, `running` (+`pid`), `exited` (+`code`), `failed` (+`message`) |
+| `launch://state` | `{ instanceId, state }` — `state`: `preparing`, `installing`, `preparingJava`, `starting`, `running` (+`pid`), `exited` (+`code`), `failed` (+`message`, `kind`: `offline` \| `repairable` \| `signIn` \| `other`) |
 | `launch://stdout` / `launch://stderr` | `{ instanceId, line }` (secretos redactados; tambien se guarda en `instances/<id>/logs/latest.log`) |
 
 ## Notas de comportamiento
@@ -60,3 +66,12 @@ Nombre de perfil local: 3–16 caracteres, letras ASCII, numeros y `_`; sin dupl
 ## Pendiente conocido
 
 - El progreso del instalador es por fase (conteo de archivos), no por bytes.
+
+## Microsoft: estado y limites
+
+- Sin ID de aplicacion la funcion esta deshabilitada y la interfaz lo explica; no se simula ninguna sesion.
+- Nunca se convierte una cuenta Microsoft con problemas en un perfil local: el lanzamiento falla con el motivo
+  (`signIn` si la sesion vencio) y la instancia conserva su perfil.
+- No verificado contra Microsoft real (requiere registrar una app de Azure como cliente publico con redirect
+  `http://localhost`, scope `XboxLive.signin offline_access`). Minecraft Services puede rechazar apps no aprobadas:
+  en ese caso se informa y Offline Gaming sigue funcionando.

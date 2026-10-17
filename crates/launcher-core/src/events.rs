@@ -42,12 +42,26 @@ pub struct GameOutputEvent {
     pub line: String,
 }
 
+/// Progreso del inicio de sesion con Microsoft (`auth://state`).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum AuthStateEvent {
+    /// El navegador del sistema esta abierto esperando al usuario.
+    Authorizing,
+    #[serde(rename_all = "camelCase")]
+    Connected { account_id: String, name: String },
+    Cancelled,
+    Failed { message: String },
+}
+
 /// Destino de los eventos del launcher. La app de escritorio lo implementa emitiendo
 /// eventos Tauri; los tests usan un recolector.
 pub trait LauncherEvents: Send + Sync {
     fn install_progress(&self, event: InstallProgressEvent);
     fn launch_state(&self, event: LaunchStateEvent);
     fn game_output(&self, stream: OutputStream, event: GameOutputEvent);
+    /// Estado del inicio de sesion con Microsoft.
+    fn auth_state(&self, _event: AuthStateEvent) {}
     /// Avance de una reparacion (mismo formato que el de instalacion).
     fn repair_progress(&self, _event: InstallProgressEvent) {}
 }

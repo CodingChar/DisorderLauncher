@@ -281,3 +281,43 @@ pub async fn themes_import(app: tauri::AppHandle, state: State<'_, AppState>) ->
 pub async fn themes_remove(state: State<'_, AppState>, id: String) -> Result<(), String> {
   state.launcher.themes_remove(&id).await.map_err(user_message)
 }
+
+#[tauri::command]
+pub async fn microsoft_status(state: State<'_, AppState>) -> Result<launcher_core::MicrosoftStatus, String> {
+  Ok(state.launcher.microsoft_status())
+}
+
+/// Abre el navegador del sistema en la pagina de inicio de sesion de Microsoft. El resultado
+/// llega por `auth://state`; los tokens nunca pasan por el frontend.
+#[tauri::command]
+pub async fn accounts_microsoft_begin_login(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+  use tauri_plugin_opener::OpenerExt;
+  let start = state.launcher.microsoft_begin_login().await.map_err(user_message)?;
+  // Solo se abre una URL HTTPS construida por el backend.
+  if !start.auth_url.starts_with("https://") {
+    state.launcher.microsoft_cancel_login();
+    return Err("No se pudo abrir el inicio de sesion de forma segura.".to_string());
+  }
+  if app.opener().open_url(&start.auth_url, None::<&str>).is_err() {
+    state.launcher.microsoft_cancel_login();
+    return Err("No se pudo abrir tu navegador.".to_string());
+  }
+  Ok(())
+}
+
+#[tauri::command]
+pub async fn accounts_microsoft_cancel_login(state: State<'_, AppState>) -> Result<(), String> {
+  state.launcher.microsoft_cancel_login();
+  Ok(())
+}
+
+/// Estado de una cuenta (para Microsoft puede consultar la red).
+#[tauri::command]
+pub async fn accounts_auth_state(state: State<'_, AppState>, id: String) -> Result<identity_api::AuthState, String> {
+  state.launcher.accounts_auth_state(&id).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn accounts_remove(state: State<'_, AppState>, id: String) -> Result<(), String> {
+  state.launcher.accounts_remove(&id).await.map_err(user_message)
+}

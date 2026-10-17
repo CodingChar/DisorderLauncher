@@ -8,7 +8,8 @@ use account_storage::{AccountRepository, FileAccountRepository};
 use chrono::Utc;
 use identity_api::{AccountRecord, IdentityProviderKind};
 use identity_local::{new_local_account, LocalIdentityProvider};
-use identity_microsoft::MicrosoftIdentityProvider;
+use credential_store::{CredentialStore, KeyringCredentialStore};
+use identity_microsoft::{MicrosoftConfig, MicrosoftEndpoints, MicrosoftIdentityProvider};
 use instance_manager::{
     FileInstanceRepository, Instance, InstanceRepository, InstanceUpdate, JavaSelection, LoaderKind,
     MemoryPolicy, NewInstance,
@@ -39,10 +40,14 @@ const DEFAULT_JAVA_MAJOR: u32 = 8;
 pub struct Launcher {
     paths: LauncherPaths,
     pub(crate) http: reqwest::Client,
-    accounts: Arc<dyn AccountRepository>,
+    pub(crate) accounts: Arc<dyn AccountRepository>,
     pub(crate) instances: Arc<FileInstanceRepository>,
     pub(crate) mods_service: mods::ModsService,
-    registry: IdentityRegistry,
+    pub(crate) registry: IdentityRegistry,
+    pub(crate) ms_slot: Arc<crate::microsoft_ops::MicrosoftSlot>,
+    credential_store: Arc<dyn CredentialStore>,
+    ms_endpoints: Option<MicrosoftEndpoints>,
+    pub(crate) login: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>>,
     java: JavaManager,
     pub(crate) events: Arc<dyn LauncherEvents>,
@@ -61,9 +66,13 @@ impl Launcher {
             .build()
             .unwrap_or_default();
 
+        let credential_store: Arc<dyn CredentialStore> = Arc::new(KeyringCredentialStore::new("DisorderLauncher"));
+        let ms_slot = Arc::new(crate::microsoft_ops::MicrosoftSlot::new(Arc::new(MicrosoftIdentityProvider::disabled(
+            credential_store.clone(),
+        ))));
         let mut registry = IdentityRegistry::new();
         registry.register(Arc::new(LocalIdentityProvider));
-        registry.register(Arc::new(MicrosoftIdentityProvider));
+        registry.register(ms_slot.clone());
 
         let mut loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>> = HashMap::new();
         loader_providers.insert(LoaderKind::Fabric, Arc::new(FabricProvider::create(http.clone())));
@@ -76,6 +85,10 @@ impl Launcher {
             instances: Arc::new(FileInstanceRepository::new(paths.instances_dir())),
             java: JavaManager::new(http.clone(), paths.runtimes_dir()),
             registry,
+            ms_slot,
+            credential_store,
+            ms_endpoints: None,
+            login: Mutex::new(None),
             http,
             events,
             manifest_url: minecraft_meta::VERSION_MANIFEST_URL.to_string(),
@@ -90,6 +103,51 @@ impl Launcher {
     pub async fn load_settings(&self) {
         let loaded = settings::load_settings(&self.paths.settings_file()).await;
         *self.settings_guard() = loaded;
+        self.rebuild_microsoft();
+    }
+
+    /// Sustituye el proveedor de un tipo de identidad (pruebas de contrato con proveedores simulados).
+    pub fn with_identity_provider(mut self, provider: Arc<dyn identity_api::IdentityProvider>) -> Self {
+        self.registry.register(provider);
+        self
+    }
+
+    /// Cambia el almacen de secretos (pruebas). Reconstruye el proveedor Microsoft.
+    pub fn with_credential_store(mut self, store: Arc<dyn CredentialStore>) -> Self {
+        self.credential_store = store;
+        self.rebuild_microsoft();
+        self
+    }
+
+    /// Apunta los endpoints de Microsoft a otro servidor (pruebas de contrato).
+    pub fn with_microsoft_endpoints(mut self, endpoints: MicrosoftEndpoints) -> Self {
+        self.ms_endpoints = Some(endpoints);
+        self.rebuild_microsoft();
+        self
+    }
+
+    /// Reconstruye el proveedor segun el client id de los ajustes (o `DISORDER_MS_CLIENT_ID`).
+    /// Sin client id valido queda deshabilitado; nunca se sustituye por una sesion simulada.
+    pub(crate) fn rebuild_microsoft(&self) {
+        let from_env = std::env::var("DISORDER_MS_CLIENT_ID").ok();
+        let client_id = self.settings().microsoft_client_id.or(from_env);
+        let provider = match MicrosoftConfig::with_client_id(client_id.as_deref()) {
+            Ok(mut config) => {
+                if let Some(endpoints) = &self.ms_endpoints {
+                    config.endpoints = endpoints.clone();
+                }
+                MicrosoftIdentityProvider::new(self.http.clone(), config, self.credential_store.clone())
+                    .unwrap_or_else(|e| {
+                        tracing::warn!(error = %e, "configuracion de Microsoft invalida; funcion deshabilitada");
+                        MicrosoftIdentityProvider::disabled(self.credential_store.clone())
+                    })
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "client id de Microsoft invalido; funcion deshabilitada");
+                MicrosoftIdentityProvider::disabled(self.credential_store.clone())
+            }
+        };
+        self.ms_slot.replace(Arc::new(provider));
     }
 
     pub fn settings_snapshot(&self) -> crate::SettingsSnapshot {
@@ -111,7 +169,11 @@ impl Launcher {
             }
         }
         settings::save_settings(&self.paths.settings_file(), &validated).await?;
+        let client_id_changed = self.settings().microsoft_client_id != validated.microsoft_client_id;
         *self.settings_guard() = validated.clone();
+        if client_id_changed {
+            self.rebuild_microsoft();
+        }
         Ok(validated)
     }
 

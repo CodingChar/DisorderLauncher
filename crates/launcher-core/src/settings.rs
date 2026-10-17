@@ -39,6 +39,8 @@ pub struct Settings {
     pub download_profile: DownloadProfile,
     /// Tema personalizado elegido; `None` usa el tema incluido segun `theme`.
     pub theme_id: Option<String>,
+    /// Id de la app registrada en Azure (opcional, avanzado). Sin el, Microsoft queda deshabilitado.
+    pub microsoft_client_id: Option<String>,
     /// Carpeta de Java usada por las instancias con Java "automatico" cuando es compatible.
     pub java_path: Option<PathBuf>,
 }
@@ -50,6 +52,7 @@ impl Default for Settings {
             theme: Theme::System,
             download_profile: DownloadProfile::Normal,
             theme_id: None,
+            microsoft_client_id: None,
             java_path: None,
         }
     }
@@ -60,6 +63,12 @@ impl Settings {
     pub fn validated(mut self) -> Result<Self, LauncherError> {
         self.schema_version = SCHEMA_VERSION;
         self.java_path = self.java_path.filter(|p| !p.as_os_str().is_empty());
+        self.microsoft_client_id = match self.microsoft_client_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(id) => Some(identity_microsoft::validate_client_id(id).map_err(|_| {
+                LauncherError::InvalidInput("El identificador de la aplicacion de Microsoft no es valido.".into())
+            })?),
+            None => None,
+        };
         if let Some(path) = &self.java_path {
             if !java_runtime::java_executable(path).is_file() {
                 return Err(LauncherError::InvalidInput("No se encontro Java en esa carpeta.".into()));

@@ -53,6 +53,18 @@ pub enum LauncherError {
     #[error("La cuenta no esta disponible: {0}")]
     Identity(String),
 
+    #[error("Tu sesion de Microsoft vencio. Vuelve a iniciar sesion en Perfiles.")]
+    SignInRequired,
+
+    #[error("Ya hay un inicio de sesion en curso.")]
+    LoginInProgress,
+
+    #[error("Este perfil lo usan {0} instancia(s). Cambia el perfil de esas instancias antes de quitarlo.")]
+    ProfileInUse(usize),
+
+    #[error("No se encontro el perfil.")]
+    AccountNotFound,
+
     #[error("No se pudo leer o guardar la informacion del launcher.")]
     Storage,
 }
@@ -65,6 +77,8 @@ pub enum ErrorKind {
     Offline,
     /// Archivos del juego danados o incompletos: reparar.
     Repairable,
+    /// La sesion de la cuenta vencio: volver a iniciar sesion.
+    SignIn,
     Other,
 }
 
@@ -72,6 +86,7 @@ impl LauncherError {
     pub fn kind(&self) -> ErrorKind {
         match self {
             Self::Offline => ErrorKind::Offline,
+            Self::SignInRequired => ErrorKind::SignIn,
             Self::CorruptDownload | Self::InstallFailed | Self::MissingGameFiles => ErrorKind::Repairable,
             _ => ErrorKind::Other,
         }
@@ -106,7 +121,25 @@ impl From<identity_api::IdentityError> for LauncherError {
             E::LocalProfileInvalid(msg) => Self::InvalidInput(msg),
             E::NetworkUnavailable => Self::Offline,
             E::MicrosoftNotConfigured => {
-                Self::Identity("el inicio de sesion con Microsoft aun no esta disponible.".into())
+                Self::Identity("el inicio de sesion con Microsoft no esta configurado en esta version.".into())
+            }
+            E::MicrosoftReauthRequired => Self::SignInRequired,
+            E::MicrosoftAuthorizationCancelled => Self::Identity("se cancelo el inicio de sesion.".into()),
+            E::MicrosoftLoginTimedOut => Self::Identity("el inicio de sesion tardo demasiado. Vuelve a intentarlo.".into()),
+            E::MicrosoftStateMismatch => {
+                Self::Identity("no se pudo verificar el inicio de sesion. Vuelve a intentarlo.".into())
+            }
+            E::MicrosoftXstsFailed(message) => Self::Identity(message),
+            E::MicrosoftXboxAuthFailed(_) => Self::Identity("Xbox no acepto el inicio de sesion. Vuelve a intentarlo.".into()),
+            E::MinecraftServicesRejectedApp => Self::Identity(
+                "Minecraft no acepto esta aplicacion para iniciar sesion. Puedes seguir jugando con un perfil sin conexion; no se usara automaticamente.".into(),
+            ),
+            E::MinecraftOwnershipUnavailable => {
+                Self::Identity("esta cuenta no tiene Minecraft Java Edition.".into())
+            }
+            E::SecureStoreUnavailable(detail) => {
+                tracing::error!(%detail, "almacen seguro no disponible");
+                Self::Identity("no se pudo acceder al almacen seguro del sistema.".into())
             }
             other => {
                 tracing::error!(error = %other, "error de identidad");

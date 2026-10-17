@@ -11,6 +11,7 @@ pub fn run() {
 
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_opener::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -31,6 +32,11 @@ pub fn run() {
       commands::accounts_default,
       commands::accounts_create_local,
       commands::accounts_set_default,
+      commands::accounts_remove,
+      commands::accounts_auth_state,
+      commands::accounts_microsoft_begin_login,
+      commands::accounts_microsoft_cancel_login,
+      commands::microsoft_status,
       commands::instances_list,
       commands::instances_create,
       commands::loaders_supported,

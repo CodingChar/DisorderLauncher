@@ -1,10 +1,11 @@
 use launcher_core::{
-  GameOutputEvent, InstallProgressEvent, LaunchStateEvent, LauncherEvents, OutputStream,
+  AuthStateEvent, GameOutputEvent, InstallProgressEvent, LaunchStateEvent, LauncherEvents, OutputStream,
 };
 use tauri::{AppHandle, Emitter};
 
 pub const INSTALL_PROGRESS: &str = "install://progress";
 pub const REPAIR_PROGRESS: &str = "repair://progress";
+pub const AUTH_STATE: &str = "auth://state";
 pub const LAUNCH_STATE: &str = "launch://state";
 pub const LAUNCH_STDOUT: &str = "launch://stdout";
 pub const LAUNCH_STDERR: &str = "launch://stderr";
@@ -23,6 +24,10 @@ impl TauriEvents {
 impl LauncherEvents for TauriEvents {
   fn install_progress(&self, event: InstallProgressEvent) {
     let _ = self.app.emit(INSTALL_PROGRESS, event);
+  }
+
+  fn auth_state(&self, event: AuthStateEvent) {
+    let _ = self.app.emit(AUTH_STATE, event);
   }
 
   fn repair_progress(&self, event: InstallProgressEvent) {
