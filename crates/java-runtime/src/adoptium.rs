@@ -213,6 +213,29 @@ pub(crate) async fn find_java_home_in_extracted(dir: &Path) -> Result<std::path:
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn finds_java_home_in_linux_windows_and_macos_layouts() {
+        let exe = if cfg!(windows) { "java.exe" } else { "java" };
+
+        // Linux/Windows: <dir>/jdk-21.../bin/java
+        let linux = tempfile::tempdir().unwrap();
+        let home = linux.path().join("jdk-21.0.4+7-jre");
+        std::fs::create_dir_all(home.join("bin")).unwrap();
+        std::fs::write(home.join("bin").join(exe), b"").unwrap();
+        assert_eq!(find_java_home_in_extracted(linux.path()).await.unwrap(), home);
+
+        // macOS: <dir>/jdk-21.../Contents/Home/bin/java
+        let mac = tempfile::tempdir().unwrap();
+        let mac_home = mac.path().join("jdk-21.0.4+7-jre").join("Contents").join("Home");
+        std::fs::create_dir_all(mac_home.join("bin")).unwrap();
+        std::fs::write(mac_home.join("bin").join("java"), b"").unwrap();
+        assert_eq!(find_java_home_in_extracted(mac.path()).await.unwrap(), mac_home);
+
+        // Sin ningun Java: error claro en vez de una ruta inventada.
+        let empty = tempfile::tempdir().unwrap();
+        assert!(find_java_home_in_extracted(empty.path()).await.is_err());
+    }
+
     #[test]
     fn sha256_is_verified() {
         let good = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";

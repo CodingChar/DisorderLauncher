@@ -11,3 +11,6 @@ reqwest = { workspace = true }
 tracing = { workspace = true }
 sha2 = { workspace = true }
 download-manager = { path = "../download-manager" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
