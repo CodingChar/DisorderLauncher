@@ -29,6 +29,9 @@ fn safe_relative(name: &str) -> Option<PathBuf> {
 }
 
 fn object_path(data_dir: &Path, hash: &str) -> Option<PathBuf> {
+    if !minecraft_meta::is_valid_asset_hash(hash) {
+        return None;
+    }
     let prefix = hash.get(..2)?;
     Some(data_dir.join("assets").join("objects").join(prefix).join(hash))
 }
@@ -111,8 +114,8 @@ mod tests {
     #[tokio::test]
     async fn virtual_index_is_mapped_by_name() {
         let dir = tempfile::tempdir().unwrap();
-        store(dir.path(), "abcdef", b"icon");
-        let idx = index(true, false, &[("icons/icon_16x16.png", "abcdef", 4)]);
+        store(dir.path(), "abcdef0123456789abcdef0123456789abcdef01", b"icon");
+        let idx = index(true, false, &[("icons/icon_16x16.png", "abcdef0123456789abcdef0123456789abcdef01", 4)]);
 
         assert!(!legacy_assets_present(&idx, "legacy", dir.path(), None));
         materialize_legacy_assets(idx.clone(), "legacy".into(), dir.path().into(), None).await.unwrap();
@@ -126,8 +129,8 @@ mod tests {
     async fn map_to_resources_uses_the_game_dir() {
         let dir = tempfile::tempdir().unwrap();
         let game = dir.path().join("game");
-        store(dir.path(), "abcdef", b"snd");
-        let idx = index(false, true, &[("sound/a.ogg", "abcdef", 3)]);
+        store(dir.path(), "abcdef0123456789abcdef0123456789abcdef01", b"snd");
+        let idx = index(false, true, &[("sound/a.ogg", "abcdef0123456789abcdef0123456789abcdef01", 3)]);
 
         materialize_legacy_assets(idx, "pre-1.6".into(), dir.path().into(), Some(game.clone())).await.unwrap();
         assert!(game.join("resources/sound/a.ogg").is_file());
@@ -136,7 +139,7 @@ mod tests {
     #[tokio::test]
     async fn modern_index_does_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        let idx = index(false, false, &[("minecraft/lang/es.json", "abcdef", 3)]);
+        let idx = index(false, false, &[("minecraft/lang/es.json", "abcdef0123456789abcdef0123456789abcdef01", 3)]);
         materialize_legacy_assets(idx.clone(), "17".into(), dir.path().into(), None).await.unwrap();
         assert!(!dir.path().join("assets/virtual").exists());
         assert!(legacy_assets_present(&idx, "17", dir.path(), None));
@@ -145,8 +148,8 @@ mod tests {
     #[tokio::test]
     async fn unsafe_names_are_ignored_and_never_escape() {
         let dir = tempfile::tempdir().unwrap();
-        store(dir.path(), "abcdef", b"x");
-        let idx = index(true, false, &[("../../escape.txt", "abcdef", 1), ("/abs.txt", "abcdef", 1)]);
+        store(dir.path(), "abcdef0123456789abcdef0123456789abcdef01", b"x");
+        let idx = index(true, false, &[("../../escape.txt", "abcdef0123456789abcdef0123456789abcdef01", 1), ("/abs.txt", "abcdef0123456789abcdef0123456789abcdef01", 1)]);
 
         materialize_legacy_assets(idx, "legacy".into(), dir.path().into(), None).await.unwrap();
         assert!(!dir.path().join("escape.txt").exists());

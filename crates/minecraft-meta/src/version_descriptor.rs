@@ -174,6 +174,12 @@ pub struct AssetIndex {
     pub map_to_resources: bool,
 }
 
+/// Un hash de asset es un SHA-1 de 40 hexadecimales; se usa para construir rutas y URLs, asi que
+/// cualquier otra cosa (separadores, `..`, longitud distinta) se rechaza.
+pub fn is_valid_asset_hash(hash: &str) -> bool {
+    hash.len() == 40 && hash.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetObject {
     pub hash: String,

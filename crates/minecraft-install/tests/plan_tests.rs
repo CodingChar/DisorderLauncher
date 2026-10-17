@@ -105,3 +105,19 @@ fn empty_assets_before_index_download() {
 
     assert!(plan.assets.is_empty());
 }
+
+#[test]
+fn malformed_or_hostile_asset_hashes_never_become_artifacts() {
+    let good = "a".repeat(40);
+    let mut objects = HashMap::new();
+    objects.insert("ok".to_string(), AssetObject { hash: good.clone(), size: 1 });
+    for (i, bad) in ["", "a", "../../../../evil", "ab/cd", &"g".repeat(40), &"a".repeat(41), "\u{e9}\u{e9}"].iter().enumerate() {
+        objects.insert(format!("bad{i}"), AssetObject { hash: (*bad).to_string(), size: 1 });
+    }
+    let index = AssetIndex { objects, is_virtual: false, map_to_resources: false };
+
+    let artifacts = build_asset_artifacts(&index, std::path::Path::new("/data"));
+    assert_eq!(artifacts.len(), 1, "solo el hash valido produce un artefacto");
+    assert!(artifacts[0].path.ends_with(format!("aa/{good}")));
+    assert!(artifacts[0].url.ends_with(&format!("/aa/{good}")));
+}

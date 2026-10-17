@@ -115,6 +115,7 @@ pub fn build_asset_artifacts(
     asset_index
         .objects
         .values()
+        .filter(|obj| minecraft_meta::is_valid_asset_hash(&obj.hash))
         .map(|obj| {
             let prefix = &obj.hash[..2];
             Artifact {
