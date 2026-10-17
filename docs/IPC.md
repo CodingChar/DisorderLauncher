@@ -13,13 +13,24 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `accounts_create_local` | `name` | `AccountRecord` (el primero queda como predeterminado) |
 | `accounts_set_default` | `id` | `void` |
 | `instances_list` | — | `Instance[]` |
-| `instances_create` | `name`, `version` | `Instance` (Vanilla, perfil predeterminado) |
+| `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto) o `fabric`; sin `loaderVersion` se usa la ultima estable |
+| `loaders_supported` | — | `LoaderKind[]` (siempre incluye `vanilla`) |
+| `loaders_list_versions` | `loader`, `minecraftVersion` | `{ version, stable }[]` |
 | `instances_update` | `id`, `changes` | `Instance` — `changes` (todos opcionales): `name`, `minecraftVersion`, `profileId`, `java` (`{mode:'auto'}` o `{mode:'path', path}`), `memory` (`{mode:'auto'}` o `{mode:'fixed', minMb, maxMb}`) |
 | `instances_delete` | `id` | `void` (borra la instancia y su carpeta) |
 | `instances_duplicate` | `id` | `Instance` (copia los archivos del juego) |
 | `instances_launch` | `id` | `void` — inicia en segundo plano; el avance llega por eventos |
 | `instances_stop` | `id` | `void` |
 | `instances_repair` | `id` | `{ found, fixed, remaining }` — verifica hashes y redescarga lo danado |
+| `mods_list` | `id` | `{ mods, missingDependencies, supported }` — cada mod: `fileName`, `enabled`, `name`, `version`, `description`, `size`, `source?` |
+| `mods_set_enabled` | `id`, `file`, `enabled` | `void` (renombra a `.jar.disabled`) |
+| `mods_remove` | `id`, `file` | `void` |
+| `mods_add_local` | `id` | `ModEntry \| null` — abre el selector de archivos del sistema; `null` si se cancela |
+| `mods_search` | `id`, `query`, `page?` | `ProjectHit[]` filtrados por version y loader de la instancia (Modrinth) |
+| `mods_install` | `id`, `projectId` | `InstalledMod[]` (el mod y sus dependencias obligatorias) |
+| `mods_check_updates` | `id` | `{ file, projectId, title, currentVersion, latestVersion }[]` |
+| `mods_update` | `id`, `file` | `InstalledMod` (guarda la version anterior) |
+| `mods_rollback` | `id`, `file` | `void` (restaura la version anterior) |
 | `settings_get` | — | `{ settings, dataDir }` |
 | `settings_update` | `settings` | `{ settings, dataDir }` — `settings`: `theme` (`system`/`light`/`dark`), `downloadProfile` (`eco`=3, `normal`=6, `performance`=10 descargas), `javaPath` (carpeta de Java global o `null`) |
 | `minecraft_list_versions` | `includeAll?` | `VersionEntry[]` (solo `release` salvo `includeAll`) |

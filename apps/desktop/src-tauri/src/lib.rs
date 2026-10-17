@@ -10,6 +10,7 @@ pub fn run() {
   let _ = tracing_subscriber::fmt().with_target(false).try_init();
 
   tauri::Builder::default()
+    .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -41,6 +42,15 @@ pub fn run() {
       commands::instances_stop,
       commands::instances_repair,
       commands::minecraft_list_versions,
+      commands::mods_list,
+      commands::mods_set_enabled,
+      commands::mods_remove,
+      commands::mods_add_local,
+      commands::mods_search,
+      commands::mods_install,
+      commands::mods_check_updates,
+      commands::mods_update,
+      commands::mods_rollback,
       commands::settings_get,
       commands::settings_update,
     ])

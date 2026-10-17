@@ -444,3 +444,76 @@ async fn real_fabric_install_launch_and_stop() {
     assert!(output.to_lowercase().contains("fabric"), "el juego debio cargar Fabric");
     assert!(alive, "el juego se cerro solo antes de tiempo");
 }
+
+fn write_mod(dir: &std::path::Path, file: &str, meta_json: &str) -> std::path::PathBuf {
+    use std::io::Write;
+    std::fs::create_dir_all(dir).unwrap();
+    let path = dir.join(file);
+    let mut writer = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    writer.start_file("fabric.mod.json", zip::write::SimpleFileOptions::default()).unwrap();
+    writer.write_all(meta_json.as_bytes()).unwrap();
+    writer.finish().unwrap();
+    path
+}
+
+#[tokio::test]
+async fn local_mod_management_on_a_fabric_instance() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    // Con version de loader explicita no se consulta la red.
+    let instance = launcher
+        .instances_create("Con mods", "1.20.1", LoaderKind::Fabric, Some("0.16.9".into()))
+        .await
+        .unwrap();
+
+    let jar = write_mod(
+        &dir.path().join("descargas"),
+        "alpha.jar",
+        r#"{"id":"alpha","name":"Alpha","version":"1.0","depends":{"fabric-api":"*"}}"#,
+    );
+    // El archivo se elige en el selector del sistema; aqui se llama directamente al backend.
+    let added = launcher.mods_add_local(&instance.id, &jar).await.unwrap();
+    assert_eq!(added.name, "Alpha");
+
+    let overview = launcher.mods_list(&instance.id).await.unwrap();
+    assert!(overview.supported);
+    assert_eq!(overview.mods.len(), 1);
+    assert_eq!(overview.missing_dependencies[0].requires, "Fabric API");
+
+    launcher.mods_set_enabled(&instance.id, "alpha.jar", false).await.unwrap();
+    let overview = launcher.mods_list(&instance.id).await.unwrap();
+    assert!(!overview.mods[0].enabled);
+    assert!(overview.missing_dependencies.is_empty(), "un mod desactivado no pide dependencias");
+
+    launcher.mods_remove(&instance.id, "alpha.jar.disabled").await.unwrap();
+    assert!(launcher.mods_list(&instance.id).await.unwrap().mods.is_empty());
+
+    assert!(matches!(
+        launcher.mods_set_enabled(&instance.id, "../evil.jar", true).await,
+        Err(LauncherError::InvalidInput(_))
+    ));
+}
+
+#[tokio::test]
+async fn vanilla_instances_do_not_support_mods() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher.instances_create("Vanilla", "1.21", LoaderKind::Vanilla, None).await.unwrap();
+
+    assert!(!launcher.mods_list(&instance.id).await.unwrap().supported);
+    let jar = write_mod(&dir.path().join("d"), "a.jar", r#"{"id":"a"}"#);
+    assert!(matches!(launcher.mods_add_local(&instance.id, &jar).await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.mods_search(&instance.id, "sodium", 0).await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.mods_install(&instance.id, "AANobbMI").await, Err(LauncherError::InvalidInput(_))));
+}
+
+#[tokio::test]
+async fn unsupported_loaders_are_rejected_at_creation() {
+    let (_d, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    assert!(matches!(
+        launcher.instances_create("Forge", "1.20.1", LoaderKind::Forge, None).await,
+        Err(LauncherError::LoaderNotSupported)
+    ));
+    assert_eq!(launcher.supported_loaders(), vec![LoaderKind::Fabric, LoaderKind::Vanilla]);
+}

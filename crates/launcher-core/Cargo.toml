@@ -16,6 +16,7 @@ java-runtime = { path = "../java-runtime" }
 download-manager = { path = "../download-manager" }
 instance-manager = { path = "../instance-manager" }
 loaders = { path = "../loaders" }
+mods = { path = "../mods" }
 diagnostics = { path = "../diagnostics" }
 async-trait = { workspace = true }
 sha1 = { workspace = true }
@@ -30,3 +31,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+zip = { workspace = true }

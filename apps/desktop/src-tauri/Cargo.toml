@@ -16,10 +16,12 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
 log = "0.4"
 tracing-subscriber = { workspace = true }
 launcher-core = { path = "../../../crates/launcher-core" }
 identity-api = { path = "../../../crates/identity-api" }
+mods = { path = "../../../crates/mods" }
 instance-manager = { path = "../../../crates/instance-manager" }
 loaders = { path = "../../../crates/loaders" }
 account-storage = { path = "../../../crates/account-storage" }

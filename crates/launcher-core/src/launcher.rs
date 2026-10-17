@@ -40,7 +40,8 @@ pub struct Launcher {
     paths: LauncherPaths,
     http: reqwest::Client,
     accounts: Arc<dyn AccountRepository>,
-    instances: Arc<FileInstanceRepository>,
+    pub(crate) instances: Arc<FileInstanceRepository>,
+    pub(crate) mods_service: mods::ModsService,
     registry: IdentityRegistry,
     loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>>,
     java: JavaManager,
@@ -68,6 +69,7 @@ impl Launcher {
 
         Self {
             loader_providers,
+            mods_service: mods::ModsService::new(http.clone()),
             accounts: Arc::new(FileAccountRepository::new(paths.accounts_dir())),
             instances: Arc::new(FileInstanceRepository::new(paths.instances_dir())),
             java: JavaManager::new(http.clone(), paths.runtimes_dir()),
@@ -256,7 +258,7 @@ impl Launcher {
         Ok(self.instances.duplicate(id).await?)
     }
 
-    fn ensure_idle(&self, id: &str) -> Result<(), LauncherError> {
+    pub(crate) fn ensure_idle(&self, id: &str) -> Result<(), LauncherError> {
         if self.running_guard().contains_key(id) {
             Err(LauncherError::AlreadyRunning)
         } else {

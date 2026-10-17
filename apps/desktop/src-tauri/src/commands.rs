@@ -135,3 +135,76 @@ pub async fn settings_update(
   state.launcher.settings_update(settings).await.map_err(user_message)?;
   Ok(state.launcher.settings_snapshot())
 }
+
+#[tauri::command]
+pub async fn mods_list(state: State<'_, AppState>, id: String) -> Result<launcher_core::ModsOverview, String> {
+  state.launcher.mods_list(&id).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_set_enabled(
+  state: State<'_, AppState>,
+  id: String,
+  file: String,
+  enabled: bool,
+) -> Result<(), String> {
+  state.launcher.mods_set_enabled(&id, &file, enabled).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_remove(state: State<'_, AppState>, id: String, file: String) -> Result<(), String> {
+  state.launcher.mods_remove(&id, &file).await.map_err(user_message)
+}
+
+/// Abre el selector de archivos del sistema; el frontend nunca elige rutas por su cuenta.
+/// Devuelve `None` si el usuario cancela.
+#[tauri::command]
+pub async fn mods_add_local(
+  app: tauri::AppHandle,
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<Option<mods::ModEntry>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app
+    .dialog()
+    .file()
+    .add_filter("Mods de Minecraft", &["jar"])
+    .blocking_pick_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  state.launcher.mods_add_local(&id, &path).await.map(Some).map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_search(
+  state: State<'_, AppState>,
+  id: String,
+  query: String,
+  page: Option<u32>,
+) -> Result<Vec<mods::ProjectHit>, String> {
+  state.launcher.mods_search(&id, &query, page.unwrap_or(0)).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_install(
+  state: State<'_, AppState>,
+  id: String,
+  project_id: String,
+) -> Result<Vec<mods::InstalledMod>, String> {
+  state.launcher.mods_install(&id, &project_id).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_check_updates(state: State<'_, AppState>, id: String) -> Result<Vec<mods::UpdateInfo>, String> {
+  state.launcher.mods_check_updates(&id).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_update(state: State<'_, AppState>, id: String, file: String) -> Result<mods::InstalledMod, String> {
+  state.launcher.mods_update(&id, &file).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub async fn mods_rollback(state: State<'_, AppState>, id: String, file: String) -> Result<(), String> {
+  state.launcher.mods_rollback(&id, &file).await.map_err(user_message)
+}
