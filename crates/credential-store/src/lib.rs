@@ -15,6 +15,51 @@ pub trait CredentialStore: Send + Sync {
     async fn delete_secret(&self, key: &str) -> Result<(), CredentialError>;
 }
 
+pub struct KeyringCredentialStore {
+    service: String,
+}
+
+impl KeyringCredentialStore {
+    pub fn new(service: impl Into<String>) -> Self {
+        Self {
+            service: service.into(),
+        }
+    }
+
+    fn entry(&self, key: &str) -> Result<keyring::Entry, CredentialError> {
+        keyring::Entry::new(&self.service, key)
+            .map_err(|e| CredentialError::StoreUnavailable(e.to_string()))
+    }
+}
+
+#[async_trait::async_trait]
+impl CredentialStore for KeyringCredentialStore {
+    async fn put_secret(&self, key: &str, secret: &str) -> Result<(), CredentialError> {
+        let entry = self.entry(key)?;
+        entry
+            .set_password(secret)
+            .map_err(|e| CredentialError::StoreUnavailable(e.to_string()))
+    }
+
+    async fn get_secret(&self, key: &str) -> Result<Option<String>, CredentialError> {
+        let entry = self.entry(key)?;
+        match entry.get_password() {
+            Ok(secret) => Ok(Some(secret)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(CredentialError::StoreUnavailable(e.to_string())),
+        }
+    }
+
+    async fn delete_secret(&self, key: &str) -> Result<(), CredentialError> {
+        let entry = self.entry(key)?;
+        match entry.delete_credential() {
+            Ok(()) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(CredentialError::StoreUnavailable(e.to_string())),
+        }
+    }
+}
+
 pub struct InMemoryCredentialStore {
     secrets: std::sync::Mutex<std::collections::HashMap<String, String>>,
 }
