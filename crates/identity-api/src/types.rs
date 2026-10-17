@@ -27,10 +27,19 @@ pub struct ResolvedIdentity {
     pub skin: Option<SkinReference>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GameSessionMaterial {
     pub access_token: String,
     pub token_type: String,
+}
+
+impl fmt::Debug for GameSessionMaterial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GameSessionMaterial")
+            .field("access_token", &"<redacted>")
+            .field("token_type", &self.token_type)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

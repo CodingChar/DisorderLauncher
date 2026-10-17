@@ -5,7 +5,12 @@ edition.workspace = true
 
 [dependencies]
 identity-api = { path = "../identity-api" }
-serde = { workspace = true }
+minecraft-meta = { path = "../minecraft-meta" }
+java-runtime = { path = "../java-runtime" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = { workspace = true }

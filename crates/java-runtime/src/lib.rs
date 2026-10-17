@@ -18,6 +18,13 @@ pub struct JavaInstallation {
     pub managed: bool,
 }
 
+impl JavaInstallation {
+    /// Ruta al ejecutable `java` dentro del home de esta instalacion.
+    pub fn executable(&self) -> PathBuf {
+        java_executable(&self.path)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct JavaRequirement {
     pub major_version: u32,

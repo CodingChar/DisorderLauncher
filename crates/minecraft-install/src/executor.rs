@@ -35,7 +35,7 @@ impl InstallExecutor {
             completed: 0,
             total: 1,
         });
-        self.download_artifacts(&[plan.client.clone()], &progress, InstallPhase::Client)
+        self.download_artifacts(std::slice::from_ref(&plan.client), &progress, InstallPhase::Client)
             .await?;
 
         progress(InstallProgress {
@@ -52,7 +52,7 @@ impl InstallExecutor {
             total: 1,
         });
         self.download_artifacts(
-            &[plan.asset_index.clone()],
+            std::slice::from_ref(&plan.asset_index),
             &progress,
             InstallPhase::AssetIndex,
         )

@@ -51,7 +51,7 @@ pub async fn detect_system_java() -> Vec<JavaInstallation> {
     found
 }
 
-fn java_executable(java_home: &Path) -> PathBuf {
+pub fn java_executable(java_home: &Path) -> PathBuf {
     if cfg!(target_os = "windows") {
         java_home.join("bin").join("java.exe")
     } else {
