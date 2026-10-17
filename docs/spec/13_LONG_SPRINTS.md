@@ -184,3 +184,63 @@ Si Minecraft Services rechaza la app registration:
 - QA matrix;
 - security audit;
 - release docs.
+
+---
+
+## Dependencias entre sprints
+
+| Sprint | Depende de | Bloqueo externo |
+|--------|-----------|-----------------|
+| 0 | — | — |
+| 1 | 0 | — |
+| 2 | 1 | — |
+| 3 | 1 | — |
+| 4 | 3 | — |
+| 5 | 3, 4 | — |
+| 6 | 0 | App registration de Microsoft habilitada |
+| 7 | 2 | — |
+| 8 | 1 | — |
+| 9 | 8 | — |
+| 10 | todos | — |
+
+Sprint 3 y Sprint 2 pueden ejecutarse en paralelo tras completar Sprint 1.
+Sprint 6 (Microsoft) puede ejecutarse en cualquier momento tras Sprint 0 si la app registration lo permite, pero no bloquea ningún otro sprint.
+
+---
+
+## Roadmap de versiones
+
+### MVP
+- Offline Gaming.
+- Vanilla.
+- Fabric.
+- instances.
+- repair.
+- Java auto.
+- design system.
+- Microsoft architecture prepared.
+
+### 1.0
+- remaining loaders.
+- mods/modpacks.
+- Microsoft if external registration permits.
+- diagnostics.
+- updater.
+
+### 1.5
+- custom themes JSON.
+- theme import/export.
+
+### 2.0
+- skins library mature.
+- integrated skin editor.
+
+### 2.x
+- optional theme catalog.
+- backups.
+- portable profiles.
+- modpack authoring.
+
+### Regla
+
+Microsoft no debe convertirse en deuda arquitectónica aunque su habilitación externa se retrase.

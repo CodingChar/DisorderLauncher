@@ -24,7 +24,7 @@ System browser
 
 ## 3. Cliente desktop público
 
-DisorderLaucher es una aplicación desktop y debe tratarse como public client.
+DisorderLauncher es una aplicación desktop y debe tratarse como public client.
 
 Implicación:
 - no se puede proteger un client secret dentro del binario;

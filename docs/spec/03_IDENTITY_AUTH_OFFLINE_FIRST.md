@@ -8,7 +8,7 @@ Debe ser estable por sí sola y no depender de Microsoft.
 
 ## 2. Qué es un perfil local
 
-Es una identidad administrada por DisorderLaucher:
+Es una identidad administrada por DisorderLauncher:
 
 ```rust
 pub struct LocalAccountData {

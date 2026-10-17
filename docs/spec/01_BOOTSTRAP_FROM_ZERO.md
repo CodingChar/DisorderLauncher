@@ -3,12 +3,12 @@
 ## 1. Repositorio
 
 Nombre:
-`DisorderLaucher`
+`DisorderLauncher`
 
 Estructura inicial:
 
 ```text
-DisorderLaucher/
+DisorderLauncher/
 ├── Cargo.toml
 ├── rust-toolchain.toml
 ├── apps/
