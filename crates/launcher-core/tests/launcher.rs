@@ -756,6 +756,11 @@ async fn startup_notices_report_quarantined_profiles_once_and_keep_working() {
 
 /// Lanza una instancia con un loader real y comprueba que el juego lo carga. Reutiliza `DISORDER_E2E_DIR`.
 async fn run_loader_e2e(kind: LoaderKind, mc: &str, expected_in_output: &[&str]) {
+    run_loader_e2e_with_mods(kind, mc, expected_in_output, &[]).await
+}
+
+/// Igual que `run_loader_e2e`, instalando antes los mods de Modrinth indicados (ids de proyecto).
+async fn run_loader_e2e_with_mods(kind: LoaderKind, mc: &str, expected_in_output: &[&str], mod_projects: &[&str]) {
     let temp;
     let root = match std::env::var("DISORDER_E2E_DIR") {
         Ok(dir) => std::path::PathBuf::from(dir),
@@ -774,6 +779,10 @@ async fn run_loader_e2e(kind: LoaderKind, mc: &str, expected_in_output: &[&str])
     println!("{kind:?} {mc}: {} versiones, la mas reciente {}", versions.len(), versions[0].version);
     let instance = launcher.instances_create(&format!("E2E {kind:?}"), mc, kind, None).await.unwrap();
     println!("version elegida: {:?}", instance.loader_version);
+    for project in mod_projects {
+        let installed = launcher.mods_install(&instance.id, project).await.unwrap();
+        println!("mods instalados: {:?}", installed.iter().map(|m| (&m.title, &m.version_number)).collect::<Vec<_>>());
+    }
 
     launcher.launch(&instance.id).await.unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(2400);
@@ -813,4 +822,17 @@ async fn real_forge_install_launch_and_stop() {
 #[ignore = "requiere internet (~600 MB la primera vez), ejecuta el instalador de NeoForge y abre Minecraft unos segundos"]
 async fn real_neoforge_install_launch_and_stop() {
     run_loader_e2e(LoaderKind::NeoForge, "1.21.1", &["neoforge"]).await;
+}
+
+#[tokio::test]
+#[ignore = "requiere internet y abre Minecraft unos segundos"]
+async fn real_quilt_install_launch_and_stop() {
+    run_loader_e2e(LoaderKind::Quilt, "1.14.4", &["quilt"]).await;
+}
+
+/// Fabric + Fabric API instalada desde Modrinth: el juego debe cargar el mod.
+#[tokio::test]
+#[ignore = "requiere internet y abre Minecraft unos segundos"]
+async fn real_fabric_with_modrinth_mod_loads_the_mod() {
+    run_loader_e2e_with_mods(LoaderKind::Fabric, "1.14.4", &["fabric", "fabric-api"], &["P7dR8mSH"]).await;
 }
