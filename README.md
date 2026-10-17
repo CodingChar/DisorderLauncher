@@ -4,7 +4,12 @@ Launcher de Minecraft Java ligero, modular, seguro y usable por personas con poc
 
 **Stack**: Rust (Tauri 2) + Svelte + TypeScript
 
-**Estado**: Fase de especificacion — no hay codigo fuente todavia.
+**Estado**: Sprint 1 implementado (Offline Gaming + Vanilla end-to-end). Plan en [`docs/PLAN_TECNICO.md`](docs/PLAN_TECNICO.md); contrato IPC en [`docs/IPC.md`](docs/IPC.md).
+
+```bash
+cargo test --workspace            # tests del core
+cd apps/desktop && npm install && npm run tauri dev   # app de escritorio
+```
 
 ---
 
