@@ -7,7 +7,9 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Los servicios del core usan `tracing`; nunca registran tokens (ver redaccion en launch).
-  let _ = tracing_subscriber::fmt().with_target(false).try_init();
+  // `set_global_default` (y no `try_init`) para no registrar el puente tracing->log, que chocaria con
+  // `tauri_plugin_log` en modo desarrollo (dos loggers globales = panico al iniciar).
+  let _ = tracing::subscriber::set_global_default(tracing_subscriber::fmt().with_target(false).finish());
 
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
