@@ -53,10 +53,12 @@ base64 = "0.22"
 getrandom = "0.3"
 zeroize = "1"
 
-# Binario de produccion mas pequeño y rapido. Se mantiene `panic = "unwind"` (por defecto): un panico en
-# una tarea no debe cerrar el launcher ni dejar el juego sin su proceso padre.
+# Perfil de produccion pensado para compilar rapido (instalaciones frecuentes): sin LTO completo el
+# ejecutable pesa unos MB mas pero la compilacion pasa de ~10 min a pocos. Se mantiene `panic = "unwind"`
+# (por defecto): un panico en una tarea no debe cerrar el launcher ni dejar el juego sin su proceso padre.
 [profile.release]
-lto = true
-codegen-units = 1
+lto = false
+codegen-units = 16
+incremental = true
 strip = "symbols"
 opt-level = 3
