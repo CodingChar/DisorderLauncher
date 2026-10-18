@@ -1,0 +1,58 @@
+BENCHMARK DE DISORDERLAUNCHER (ejecutable release, Windows)
+======================================================================
+Fecha de medicion: 2026-10-18T22:31:40.137Z
+Ejecutable: target/release/disorderlauncher-desktop.exe (compilado: 2026-10-18T22:27:56.721Z)
+Equipo: Intel Core i3-8130U @ 2.20 GHz, 4 hilos logicos, 10.2 GB RAM
+GPU: Intel UHD Graphics 620 (sin GPU NVIDIA: la medida es el contador de motores GPU de Windows)
+Sistema: Windows 10.0.19045
+Arranque: ventana con depuracion lista en 2334 ms; interfaz lista en 3120 ms
+
+METODO
+- Se midio el arbol de procesos del launcher (exe + procesos WebView2 hijos), muestreado cada ~0.5 s.
+- CPU: % del total de la maquina (suma de la CPU de los procesos / hilos logicos).
+- RAM: memoria privada (WorkingSetPrivate) sumada; no incluye las DLL compartidas.
+- GPU: suma de «GPU Engine» de los procesos del arbol (todos los motores), en % de un motor.
+- Escenarios controlados por CDP: clics y teclas reales dentro de la ventana.
+
+RESULTADOS POR ESCENARIO (media / p95 / maximo)
+----------------------------------------------------------------------
+Reposo en menu principal (30 s)
+  duracion: 30 s, muestras: 14, procesos del arbol (media): 6
+  CPU launcher (%):      media 2.3 / p95 11.8 / max 11.8
+  CPU sistema total (%): media 59.0 / p95 100.0 / max 100.0
+  RAM privada (MB):      media 92 / p95 105 / max 105
+  GPU (% de motor):      media 0.0 / p95 0.0 / max 0.0
+
+Navegacion entre pantallas (60 s)
+  duracion: 65 s, muestras: 36, procesos del arbol (media): 6
+  CPU launcher (%):      media 5.6 / p95 20.0 / max 20.5
+  CPU sistema total (%): media 43.0 / p95 92.0 / max 100.0
+  RAM privada (MB):      media 114 / p95 128 / max 131
+  GPU (% de motor):      media 0.0 / p95 0.0 / max 0.0
+
+Escritura rapida en campo de texto (1123 teclas)
+  duracion: 45 s, muestras: 26, procesos del arbol (media): 6
+  CPU launcher (%):      media 8.2 / p95 26.3 / max 38.3
+  CPU sistema total (%): media 57.7 / p95 80.0 / max 81.0
+  RAM privada (MB):      media 114 / p95 119 / max 119
+  GPU (% de motor):      media 0.6 / p95 4.0 / max 4.0
+
+Carga externa de CPU (4 hilos al 100 %, launcher en reposo)
+  duracion: 40 s, muestras: 13, procesos del arbol (media): 6
+  CPU launcher (%):      media 0.8 / p95 5.3 / max 5.3
+  CPU sistema total (%): media 99.4 / p95 100.0 / max 100.0
+  RAM privada (MB):      media 121 / p95 130 / max 130
+  GPU (% de motor):      media 0.1 / p95 1.0 / max 1.0
+
+Reposo final (20 s)
+  duracion: 20 s, muestras: 11, procesos del arbol (media): 6
+  CPU launcher (%):      media 1.9 / p95 10.5 / max 10.5
+  CPU sistema total (%): media 54.3 / p95 84.0 / max 84.0
+  RAM privada (MB):      media 123 / p95 130 / max 130
+  GPU (% de motor):      media 0.0 / p95 0.0 / max 0.0
+
+NOTAS
+- Las cifras de CPU del escenario de carga externa incluyen la carga artificial del sistema; la de la app es la que interesa.
+- El ejecutable medido incluye los cambios de este turno (splash nativo y BitmapText en un solo paso de dibujo).
+- La GPU de este equipo es integrada (Intel UHD 620): los valores bajos son esperables; no hay medida de GPU dedicada.
+- Muestras crudas: samples.csv en la carpeta de trabajo de la sesion.
