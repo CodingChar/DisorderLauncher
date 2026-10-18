@@ -33,6 +33,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
 const MANIFEST_TIMEOUT: Duration = Duration::from_secs(20);
+const MANIFEST_MEMO_TTL: Duration = Duration::from_secs(60);
 const DEFAULT_JAVA_MAJOR: u32 = 8;
 
 /// Orquestador de la aplicacion (capa Application de la spec 02): une repositorios,
@@ -52,6 +53,8 @@ pub struct Launcher {
     java: JavaManager,
     pub(crate) events: Arc<dyn LauncherEvents>,
     manifest_url: String,
+    /// Ultimo manifiesto descargado: cambiar de tipo de instancia no vuelve a pedirlo durante un minuto.
+    manifest_memo: Mutex<Option<(std::time::Instant, VersionManifest)>>,
     settings: Mutex<Settings>,
     pub(crate) theme_store: themes::ThemeStore,
     pub(crate) skin_library: skins::SkinLibrary,
@@ -105,6 +108,7 @@ impl Launcher {
             http,
             events,
             manifest_url: minecraft_meta::VERSION_MANIFEST_URL.to_string(),
+            manifest_memo: Mutex::new(None),
             settings: Mutex::new(Settings::default()),
             theme_store: themes::ThemeStore::new(paths.themes_dir()),
             skin_library: skins::SkinLibrary::new(paths.skins_dir()),
@@ -397,6 +401,11 @@ impl Launcher {
 
     /// Manifiesto y si salio del cache local (`true`) en vez de la red.
     pub(crate) async fn load_manifest_with_source(&self) -> Result<(VersionManifest, bool), LauncherError> {
+        if let Some((at, manifest)) = self.manifest_memo.lock().unwrap().as_ref() {
+            if at.elapsed() < MANIFEST_MEMO_TTL {
+                return Ok((manifest.clone(), false));
+            }
+        }
         let cache = self.paths.manifest_cache();
         let fetched = tokio::time::timeout(
             MANIFEST_TIMEOUT,
@@ -409,6 +418,7 @@ impl Launcher {
                 if let Err(e) = minecraft_meta::save_manifest_cache(&manifest, &cache).await {
                     tracing::warn!(error = %e, "no se pudo guardar el cache del manifiesto");
                 }
+                *self.manifest_memo.lock().unwrap() = Some((std::time::Instant::now(), manifest.clone()));
                 Ok((manifest, false))
             }
             failure => {

@@ -141,32 +141,41 @@ impl Launcher {
         let minecraft_dir = self.paths().minecraft_dir();
         let installed = || VersionCatalog { versions: installed_versions(&minecraft_dir, kind), source: CatalogSource::Installed };
 
-        let Ok((manifest, manifest_cached)) = self.load_manifest_with_source().await else {
-            return Ok(installed());
-        };
         if kind == LoaderKind::Vanilla {
-            let source = if manifest_cached { CatalogSource::Cached } else { CatalogSource::Online };
-            return Ok(VersionCatalog { versions: manifest.versions, source });
+            return Ok(match self.load_manifest_with_source().await {
+                Ok((manifest, cached)) => VersionCatalog {
+                    versions: manifest.versions,
+                    source: if cached { CatalogSource::Cached } else { CatalogSource::Online },
+                },
+                Err(_) => installed(),
+            });
         }
 
         let provider = self.loader_provider(kind)?;
         let cache = loader_cache_file(self.paths().root(), kind);
-        let (supported, loader_cached): (Vec<String>, bool) =
-            match tokio::time::timeout(LOADER_TIMEOUT, provider.game_versions()).await {
-                Ok(Ok(list)) => {
-                    if let Some(dir) = cache.parent() {
-                        let _ = tokio::fs::create_dir_all(dir).await;
-                    }
-                    if let Ok(json) = serde_json::to_vec(&list) {
-                        let _ = tokio::fs::write(&cache, json).await;
-                    }
-                    (list, false)
+        // Las dos consultas son independientes: se hacen a la vez para esperar solo la mas lenta.
+        let (manifest, games) = tokio::join!(
+            self.load_manifest_with_source(),
+            tokio::time::timeout(LOADER_TIMEOUT, provider.game_versions())
+        );
+        let Ok((manifest, manifest_cached)) = manifest else {
+            return Ok(installed());
+        };
+        let (supported, loader_cached): (Vec<String>, bool) = match games {
+            Ok(Ok(list)) => {
+                if let Some(dir) = cache.parent() {
+                    let _ = tokio::fs::create_dir_all(dir).await;
                 }
-                _ => match tokio::fs::read(&cache).await.ok().and_then(|raw| serde_json::from_slice(&raw).ok()) {
-                    Some(list) => (list, true),
-                    None => return Ok(installed()),
-                },
-            };
+                if let Ok(json) = serde_json::to_vec(&list) {
+                    let _ = tokio::fs::write(&cache, json).await;
+                }
+                (list, false)
+            }
+            _ => match tokio::fs::read(&cache).await.ok().and_then(|raw| serde_json::from_slice(&raw).ok()) {
+                Some(list) => (list, true),
+                None => return Ok(installed()),
+            },
+        };
 
         let supported: HashSet<String> = supported.into_iter().collect();
         let versions = manifest.versions.into_iter().filter(|v| supported.contains(&v.id)).collect();
