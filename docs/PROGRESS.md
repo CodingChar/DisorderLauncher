@@ -70,7 +70,7 @@ Java ≥ 9 aceptado para versiones de Java 8 · runtimes gestionados redescargad
 - 🟡 Mods de Forge/NeoForge: ahora se listan (lee `mods.toml`/`neoforge.mods.toml`), activan/desactivan, quitan y se buscan en Modrinth con su categoria; probado con jars sinteticos, falta una prueba real con Modrinth y el juego (los E2E reales de Forge/NeoForge no incluyen mods).
 - ⬜ Skins locales: se guardan y previsualizan; verlas dentro del juego exige un mod compatible.
 - 🟡 Editor de skins: alternativa de teclado hecha (flechas mueven el cursor, Mayús salta 8, Intro/Espacio pintan; probada solo por compilacion, falta revisarla a mano).
-- ⬜ Tema: `typography.scale` y `density` se validan pero aun no se aplican a la interfaz.
+- ✅ Tema: `typography.scale` x `density.uiScale` se aplican como zoom; ⬜ `density.compact` aun no.
 - ⬜ Rendimiento: verificar ~2000 assets tarda ≈ 4,5–6 s (E/S de archivos en Windows).
 - ⬜ `style-src 'unsafe-inline'` sigue necesario por los estilos de Svelte.
 - ⬜ Rama de trabajo: el repo usa `master`; el plan menciona `main`.
