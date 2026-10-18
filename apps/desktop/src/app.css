@@ -3,6 +3,57 @@
  * Sin fuentes ni recursos remotos: el launcher debe verse igual sin conexion y sin pedir nada a terceros.
  * Los colores y radios son tokens: los temas JSON (Rust `themes`) los sobrescriben en `theme.ts`.
  */
+
+/* Fuentes propias (licencia OFL, ver public/fonts/LICENSE-*.txt): se sirven desde la app, nada remoto. */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-latin-600-normal.woff2') format('woff2');
+}
 :root {
   --bg: #0C0C0C;
   --surface: #141414;
