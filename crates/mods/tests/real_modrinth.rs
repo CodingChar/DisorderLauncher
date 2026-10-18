@@ -81,3 +81,31 @@ async fn update_and_rollback_roundtrip() {
     assert!(manager.mods_dir().join(&old_file).is_file(), "vuelve el archivo original");
     assert_eq!(service.check_updates(&manager, TARGET).await.unwrap().len(), 1, "otra vez hay actualizacion");
 }
+
+/// Forge y NeoForge: busca e instala JEI de verdad y comprueba que se lee su `mods.toml` / `neoforge.mods.toml`.
+async fn install_jei_and_read_meta(target: InstanceTarget<'_>) {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = ModManager::new(dir.path().join("game"));
+    let service = ModsService::new(http());
+
+    let hits = service.search("jei", target, 5, 0).await.unwrap();
+    let jei = hits.iter().find(|h| h.slug == "jei").unwrap_or_else(|| panic!("JEI no aparece: {:?}", hits.iter().map(|h| &h.slug).collect::<Vec<_>>()));
+
+    service.install(&manager, &jei.project_id, target, 4).await.unwrap();
+    let list = manager.list().await.unwrap();
+    let entry = list.iter().find(|m| m.meta.as_ref().is_some_and(|x| x.id == "jei")).unwrap_or_else(|| panic!("metadatos de JEI sin leer: {list:?}"));
+    assert!(entry.enabled);
+    assert!(entry.source.is_some());
+}
+
+#[tokio::test]
+#[ignore = "requiere internet"]
+async fn neoforge_mod_is_found_installed_and_read() {
+    install_jei_and_read_meta(InstanceTarget { minecraft_version: "1.21.1", loader: "neoforge" }).await;
+}
+
+#[tokio::test]
+#[ignore = "requiere internet"]
+async fn forge_mod_is_found_installed_and_read() {
+    install_jei_and_read_meta(InstanceTarget { minecraft_version: "1.20.1", loader: "forge" }).await;
+}
