@@ -12,6 +12,15 @@ pub fn run() {
   let _ = tracing::subscriber::set_global_default(tracing_subscriber::fmt().with_target(false).finish());
 
   tauri::Builder::default()
+    // Una sola ventana: abrir el launcher otra vez solo trae al frente la que ya existe
+    // (evita lanzar instancias sin control desde varias copias).
+    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+      if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+      }
+    }))
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_opener::init())
     .setup(|app| {
