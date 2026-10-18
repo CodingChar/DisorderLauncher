@@ -24,7 +24,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 | Mods + Modrinth | ✅ resolver, locales, updates, lectura de Forge/NeoForge | ✅ (Fabric) busqueda, instalacion, actualizar, volver atras; ✅ Forge 1.20.1 y NeoForge 1.21.1: busqueda, instalacion de JEI desde Modrinth y lectura de su `mods.toml` | |
 | Modpacks `.mrpack` | ✅ import/export/rollback | ✅ export+import con referencias Modrinth | |
 | Temas | ✅ validacion y almacen (incluye el tema azul oscuro) | 🖐 aplicacion en UI (negro y azul) | |
-| Skins + editor | ✅ backend, 18 tests de logica del editor | 🖐 editor, 3D, biblioteca; ⚠️ teclado del lienzo sin probar a mano | Skin local no se ve en el juego sin mod |
+| Skins + editor | ✅ backend, 18 tests de logica del editor | 🖐 editor, 3D, biblioteca; 🖐 teclado del lienzo en la ventana nativa (flechas, Mayús salta 8, limites, Intro pinta; teclas reales por CDP) | Skin local no se ve en el juego sin mod |
 | Interfaz reformada (maqueta) | ✅ `svelte-check`, build | 🖐 todas las vistas en navegador (820x560 y 1100x720, negro y azul); 🖐 ventana nativa (`tauri dev`, 2026-10-17): Jugar en «Mi mundo» (Vanilla), la consola mostró la salida real del juego (28 líneas) y «Cerrar juego» lo detuvo | Ver `docs/UI_MIGRATION.md` |
 | Descargas con redireccion | ✅ revalida https y host | — | |
 | Recuperacion de datos | ✅ migracion, cuarentena | — | |
