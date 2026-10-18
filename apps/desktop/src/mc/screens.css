@@ -1,0 +1,338 @@
+/* Controles y pantallas del modo Minecraft (todo en px de GUI). Ver stage.css para el escenario. */
+
+/* ── Campo de texto: <input> invisible + texto bitmap encima ── */
+
+.mc-field {
+  position: absolute;
+  height: 20px;
+  background: #000;
+  border: 1px solid #a0a0a0;
+  overflow: hidden;
+}
+
+.mc-field.focused {
+  border-color: #fff;
+}
+
+.mc-field.invalid {
+  border-color: #ff5555;
+}
+
+.mc-field.is-disabled {
+  opacity: 0.6;
+}
+
+.mc-field input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.mc-field input:focus-visible {
+  outline: none;
+}
+
+.mc-field .selection {
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  height: 10px;
+  background: #3050c0;
+  pointer-events: none;
+}
+
+.mc-field .field-text {
+  position: absolute;
+  left: 4px;
+  top: 5px;
+  line-height: 0;
+  pointer-events: none;
+}
+
+/* ── Deslizador ── */
+
+.mc-slider {
+  outline: none;
+}
+
+.mc-slider::before,
+.mc-slider::after {
+  background-image: var(--widgets);
+  background-size: 256px 256px;
+  background-position-y: -46px;
+}
+
+.mc-slider::after {
+  background-position-x: calc(var(--w) * 0.5px - 200px);
+}
+
+.mc-slider:focus-visible {
+  outline: 1px solid #fff;
+}
+
+/* Por encima de la mitad derecha del fondo (::after), que si no tapa el pulgar. */
+.mc-slider .handle {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  width: 8px;
+  height: 20px;
+}
+
+.mc-slider .handle::before,
+.mc-slider .handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 20px;
+  background-image: var(--btn);
+  background-size: 200px 20px;
+  background-repeat: no-repeat;
+}
+
+.mc-slider .handle::before {
+  left: 0;
+  background-position: 0 0;
+}
+
+.mc-slider .handle::after {
+  right: 0;
+  background-position: 100% 0;
+}
+
+.mc-slider:hover .handle::before,
+.mc-slider:hover .handle::after,
+.mc-slider:focus-visible .handle::before,
+.mc-slider:focus-visible .handle::after {
+  background-image: var(--btn-hover);
+}
+
+/* ── Listas (GuiSlot) ── */
+
+.mc-list {
+  position: absolute;
+  overflow: hidden;
+  outline-offset: 0;
+  background:
+    linear-gradient(rgba(var(--shade), 0.875), rgba(var(--shade), 0.875)),
+    var(--dirt) 0 0 / 32px 32px;
+}
+
+.mc-list::before,
+.mc-list::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mc-list::before {
+  top: 0;
+  background: linear-gradient(#000, rgba(0, 0, 0, 0));
+}
+
+.mc-list::after {
+  bottom: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0), #000);
+}
+
+.mc-list-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  will-change: transform;
+}
+
+.mc-row {
+  position: absolute;
+  left: 2px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.mc-row.selected {
+  background: #000;
+  box-shadow: 0 0 0 1px #808080;
+}
+
+.mc-row.disabled {
+  opacity: 0.55;
+}
+
+.mc-row-icon {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 32px;
+  height: 32px;
+}
+
+.mc-row-icon .layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+}
+
+.mc-row-text {
+  position: absolute;
+  line-height: 0;
+}
+
+.mc-scrollbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  background: #000;
+  z-index: 4;
+}
+
+.mc-thumb {
+  position: absolute;
+  left: 0;
+  width: 6px;
+  background: linear-gradient(#c0c0c0, #c0c0c0) 0 0 / 5px calc(100% - 1px) no-repeat, #808080;
+}
+
+.mc-list-empty {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+/* ── Barra de progreso ── */
+
+.mc-progress {
+  position: absolute;
+  height: 10px;
+  background: #000;
+  border: 1px solid #000;
+  outline: 1px solid #404040;
+  overflow: hidden;
+}
+
+.mc-progress .fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #55ff55;
+}
+
+.mc-progress .indeterminate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: #55ff55;
+  animation: mc-slide 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes mc-slide {
+  from { left: 0; }
+  to { left: calc(100% - 40px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-progress .indeterminate {
+    animation: none;
+    left: calc(50% - 20px);
+  }
+}
+
+.mc-progress-percent {
+  position: absolute;
+  line-height: 0;
+  pointer-events: none;
+}
+
+/* ── Dialogo modal ── */
+
+.mc-dialog-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* ── Visor (contenido que no es texto bitmap: 3D, lienzo de skin) ── */
+
+.mc-viewport {
+  position: absolute;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #000;
+}
+
+.mc-viewport.bare {
+  border: 0;
+  background: none;
+}
+
+/* ── Rejilla de iconos ── */
+
+.mc-icon-grid {
+  position: absolute;
+}
+
+.mc-icon-cell {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #404040;
+}
+
+.mc-icon-cell:hover {
+  border-color: #a0a0a0;
+}
+
+.mc-icon-cell.selected {
+  border-color: #fff;
+  background: #000;
+}
+
+.mc-icon-cell img {
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 32px;
+  height: 32px;
+}
+
+/* ── Paleta de colores del editor de skins ── */
+
+.mc-swatch {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #000;
+}
+
+.mc-swatch.selected {
+  outline: 1px solid #fff;
+  z-index: 1;
+}
+
+.mc-sample {
+  position: absolute;
+  border: 1px solid #fff;
+}

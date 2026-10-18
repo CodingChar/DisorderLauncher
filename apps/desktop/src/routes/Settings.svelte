@@ -1,18 +1,29 @@
 <script lang="ts">
-  import Button from '../lib/components/Button.svelte'
-  import PageHeading from '../lib/components/PageHeading.svelte'
-  import Card from '../lib/components/Card.svelte'
-  import Input from '../lib/components/Input.svelte'
-  import Select from '../lib/components/Select.svelte'
+  import { pushBack } from '../lib/mc/back'
+  import McButton from '../lib/mc/McButton.svelte'
+  import McCycle from '../lib/mc/McCycle.svelte'
+  import McDialog from '../lib/mc/McDialog.svelte'
+  import McField from '../lib/mc/McField.svelte'
+  import McLabel from '../lib/mc/McLabel.svelte'
+  import McList from '../lib/mc/McList.svelte'
+  import McScreen from '../lib/mc/McScreen.svelte'
+  import McText from '../lib/mc/McText.svelte'
+  import { useGui } from '../lib/mc/gui'
+  import type { RowSpec } from '../lib/mc/listTypes'
+  import { bandWidth } from '../lib/mc/pos'
   import { FEATURES } from '../lib/features'
+  import { nav } from '../lib/stores/nav.svelte'
   import { settings } from '../lib/stores/settings.svelte'
-  import type { DownloadProfile, Theme } from '../lib/types'
+  import type { DownloadProfile, Theme, ThemeEntry } from '../lib/types'
+
+  const gui = useGui()
+  const bw = $derived(bandWidth(gui.W))
 
   const DEFAULT_IDS = ['disorderlaucher.default.dark', 'disorderlaucher.default.light']
   const themes: { value: Theme; label: string }[] = [
-    { value: 'system', label: 'Igual que el sistema' },
-    { value: 'dark', label: 'Oscuro' },
+    { value: 'system', label: 'Sistema' },
     { value: 'light', label: 'Claro' },
+    { value: 'dark', label: 'Oscuro' },
   ]
   const speeds: { value: DownloadProfile; label: string; hint: string }[] = [
     { value: 'eco', label: 'Económica', hint: 'Usa menos internet; las descargas tardan más.' },
@@ -20,31 +31,59 @@
     { value: 'performance', label: 'Rápida', hint: 'Descarga lo más rápido posible.' },
   ]
 
+  let sub = $state<'main' | 'themes' | 'advanced'>('main')
   let theme = $state<Theme>(settings.value.theme)
   let speed = $state<DownloadProfile>(settings.value.downloadProfile)
   let javaPath = $state(settings.value.javaPath ?? '')
   let themeId = $state(settings.value.themeId ?? '')
   let msClientId = $state(settings.value.microsoftClientId ?? '')
-
-  // El boton de la luna de la cabecera tambien cambia el tema: mantener el formulario al dia.
-  $effect(() => {
-    themeId = settings.value.themeId ?? ''
-  })
-  // Los temas claro y oscuro se eligen arriba; aqui van los demas (incluido el azul y los importados).
-  const extraThemes = $derived(settings.themes.filter((t) => !DEFAULT_IDS.includes(t.id)))
-  const themeRemovable = $derived(!!themeId && settings.themes.some((t) => t.id === themeId && !t.builtin))
+  let pickId = $state('')
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
   let saving = $state(false)
+  let confirmRemove = $state(false)
+
+  // Mantener el formulario al dia si el tema cambia desde fuera de esta pantalla.
+  $effect(() => {
+    themeId = settings.value.themeId ?? ''
+  })
+
+  $effect(() => {
+    if (sub === 'main') return
+    return pushBack(() => (sub = 'main'))
+  })
+
+  // Los temas claro y oscuro se eligen con «Apariencia»; aqui van los demas (incluido el azul y los importados).
+  const extraThemes = $derived(settings.themes.filter((t) => !DEFAULT_IDS.includes(t.id)))
+  const themeRemovable = $derived(!!pickId && settings.themes.some((t) => t.id === pickId && !t.builtin))
+  const themeItems = $derived<{ id: string; name: string; theme?: ThemeEntry }[]>([
+    { id: '', name: 'Ninguno (usar la apariencia)' },
+    ...extraThemes.map((t) => ({ id: t.id, name: t.name, theme: t })),
+  ])
+  const currentThemeName = $derived(themeItems.find((t) => t.id === themeId)?.name ?? 'Ninguno')
+  const speedHint = $derived(speeds.find((s) => s.value === speed)?.hint ?? '')
+
+  function openThemes() {
+    pickId = themeId
+    error = null
+    notice = null
+    sub = 'themes'
+  }
+
+  function useTheme() {
+    themeId = pickId
+    notice = 'Tema elegido. Pulsa Guardar para aplicarlo.'
+    sub = 'main'
+  }
 
   async function importTheme() {
     error = null
     notice = null
     try {
-      const theme = await settings.importTheme()
-      if (theme) {
-        themeId = theme.id
-        notice = `Tema «${theme.name}» importado. Pulsa Guardar para usarlo.`
+      const imported = await settings.importTheme()
+      if (imported) {
+        pickId = imported.id
+        notice = `Tema «${imported.name}» importado. Elígelo y pulsa Usar tema.`
       }
     } catch (e) {
       error = (e as Error).message
@@ -52,11 +91,14 @@
   }
 
   async function removeTheme() {
-    if (!themeId) return
+    confirmRemove = false
+    if (!pickId) return
     error = null
     try {
-      await settings.removeTheme(themeId)
-      themeId = ''
+      const removed = pickId
+      await settings.removeTheme(removed)
+      if (themeId === removed) themeId = ''
+      pickId = ''
       notice = 'Tema quitado.'
     } catch (e) {
       error = (e as Error).message
@@ -84,102 +126,81 @@
       saving = false
     }
   }
+
+  function themeRow(t: { id: string; name: string; theme?: ThemeEntry }): RowSpec {
+    const active = t.id === themeId
+    return {
+      lines: [
+        { text: active ? `${t.name}  (En uso)` : t.name, color: active ? '#55ff55' : '#ffffff' },
+        { text: t.theme ? (t.theme.builtin ? 'Incluido' : 'Importado') : 'Solo cambia la apariencia' },
+      ],
+    }
+  }
 </script>
 
-<div class="page">
-  <PageHeading eyebrow="PREFERENCIAS" title="Ajustes" description="Apariencia, descargas y Java del launcher." />
+{#if sub === 'themes'}
+  <McScreen title="Tema especial">
+    <McList items={themeItems} getId={(t) => t.id} row={themeRow} bind:selectedId={pickId} onactivate={useTheme} x={-(bw >> 1)} y={22} w={bw} h={gui.H - 92} rowHeight={24} ariaLabel="Temas" />
+    {#if error}
+      <McText text={error} x={-155} y={gui.H - 68} w={310} align="center" color="#ff5555" role="alert" />
+    {:else if notice}
+      <McText text={notice} x={-155} y={gui.H - 68} w={310} align="center" color="#55ff55" role="status" />
+    {/if}
+    <McButton anchor="bottom" x={-154} y={-52} w={150} label="Usar tema" onclick={useTheme} />
+    <McButton anchor="bottom" x={4} y={-52} w={150} label="Importar tema..." onclick={importTheme} />
+    <McButton anchor="bottom" x={-154} y={-28} w={150} label="Quitar este tema" disabled={!themeRemovable} onclick={() => (confirmRemove = true)} />
+    <McButton anchor="bottom" x={4} y={-28} w={150} label="Hecho" onclick={() => (sub = 'main')} />
 
-  <section class="settings-panel panel">
+    {#if confirmRemove}
+      <McDialog
+        title="¿Quitar este tema?"
+        message="Se borrará el tema importado. Un tema solo cambia el aspecto; nunca ejecuta código."
+        buttons={[
+          { label: 'Cancelar', onclick: () => (confirmRemove = false) },
+          { label: 'Quitar', onclick: removeTheme },
+        ]}
+        cancelIndex={0}
+        onclose={() => (confirmRemove = false)}
+      />
+    {/if}
+  </McScreen>
+{:else if sub === 'advanced'}
+  <McScreen title="Opciones avanzadas">
+    <McLabel x={-155} y={40} color="#a0a0a0" text="ID de la aplicación de Microsoft" />
+    <McField x={-155} y={50} w={310} maxlength={64} bind:value={msClientId} placeholder="00000000-0000-0000-0000-000000000000" label="ID de la aplicación de Microsoft" hint="Solo si tienes tu propia aplicación registrada en Azure. Déjalo vacío para no usar Microsoft." />
+    <McButton anchor="bottom" y={-28} label="Hecho" onclick={() => (sub = 'main')} />
+  </McScreen>
+{:else}
+  <McScreen title="Ajustes">
     <form
-      class="form-stack"
+      class="mc-form"
       onsubmit={(e) => {
         e.preventDefault()
         save()
       }}
     >
-      <fieldset class="settings-block">
-        <legend>Apariencia</legend>
-        {#each themes as option (option.value)}
-          <label class="check-row"><input type="radio" bind:group={theme} value={option.value} /> {option.label}</label>
-        {/each}
-      </fieldset>
+      <McCycle y={22} label="Apariencia" options={themes} bind:value={theme} />
+      <McButton y={46} label="Tema especial..." ariaLabel="Tema especial: {currentThemeName}. Pulsa para cambiar" onclick={openThemes} />
+      <McCycle y={70} label="Descargas" options={speeds} bind:value={speed} />
+      <McText text={speedHint} x={-155} y={94} w={310} align="center" color="#808080" maxLines={1} />
 
-      <fieldset class="settings-block">
-        <legend>Tema especial</legend>
-        <Select
-          label="Tema"
-          bind:value={themeId}
-          options={[{ value: '', label: 'Ninguno (usar el de arriba)' }, ...extraThemes.map((t) => ({ value: t.id, label: t.name }))]}
-        />
-        <div class="form-actions">
-          <Button onclick={importTheme}>Importar tema…</Button>
-          <Button variant="ghost" disabled={!themeRemovable} onclick={removeTheme}>Quitar este tema</Button>
-        </div>
-        <small class="field-help">Un tema solo cambia colores, formas y tipografía; nunca ejecuta código. El botón de la luna de la cabecera activa el tema azul oscuro.</small>
-      </fieldset>
+      <McLabel x={-155} y={112} color="#a0a0a0" text="Java propio (opcional)" />
+      <McField x={-155} y={122} w={310} maxlength={260} bind:value={javaPath} placeholder="Déjalo vacío para que se gestione solo" label="Java propio (opcional)" />
+      <McText text="Solo se usa si es compatible con la versión de Minecraft; si no, el launcher elige uno adecuado." x={-155} y={146} w={310} color="#808080" maxLines={2} />
 
-      <fieldset class="settings-block">
-        <legend>Velocidad de descarga</legend>
-        {#each speeds as option (option.value)}
-          <label class="check-row">
-            <input type="radio" bind:group={speed} value={option.value} />
-            <span>{option.label} <small>{option.hint}</small></span>
-          </label>
-        {/each}
-      </fieldset>
-
-      <div class="settings-block">
-        <Input
-          label="Java propio (opcional)"
-          bind:value={javaPath}
-          placeholder="Déjalo vacío para que se gestione solo"
-          hint="Solo se usa si es compatible con la versión de Minecraft; si no, el launcher elige uno adecuado."
-        />
-      </div>
-
+      <McLabel x={-155} y={170} color="#707070" max={310} text={`Carpeta de datos: ${settings.dataDir || '—'}`} />
       {#if FEATURES.microsoftSettings}
-      <details class="settings-block advanced">
-        <summary>Opciones avanzadas</summary>
-        <Input
-          label="ID de la aplicación de Microsoft"
-          bind:value={msClientId}
-          placeholder="00000000-0000-0000-0000-000000000000"
-          hint="Solo si tienes tu propia aplicación registrada en Azure. Déjalo vacío para no usar Microsoft."
-        />
-      </details>
+        <McButton x={-155} y={gui.H - 78} w={150} label="Avanzado..." ariaLabel="Opciones avanzadas" onclick={() => (sub = 'advanced')} />
       {/if}
 
-      <div class="field">
-        <span class="field-label">Carpeta de datos</span>
-        <code class="mono-box">{settings.dataDir || '—'}</code>
-      </div>
+      {#if error}
+        <McText text={error} x={-155} y={gui.H - 50} w={310} color="#ff5555" maxLines={2} role="alert" />
+      {:else if notice}
+        <McText text={notice} x={-155} y={gui.H - 50} w={310} color="#55ff55" maxLines={2} role="status" />
+      {/if}
 
-      {#if error}<p class="form-error" role="alert">{error}</p>{/if}
-      {#if notice}<p class="form-ok" role="status">{notice}</p>{/if}
-
-      <div><Button variant="primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Button></div>
+      <McButton anchor="bottom" x={-154} y={-28} w={150} type="submit" label={saving ? 'Guardando…' : 'Guardar'} disabled={saving} />
+      <McButton anchor="bottom" x={4} y={-28} w={150} label="Atrás" onclick={() => nav.go('menu')} />
     </form>
-  </section>
-</div>
-
-<style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    max-width: 800px;
-  }
-
-  .advanced summary {
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  .advanced[open] summary {
-    margin-bottom: 14px;
-  }
-</style>
+  </McScreen>
+{/if}

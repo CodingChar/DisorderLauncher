@@ -1,38 +1,43 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import Button from '../lib/components/Button.svelte'
-  import PageHeading from '../lib/components/PageHeading.svelte'
-  import Avatar from '../lib/components/Avatar.svelte'
-  import Icon from '../lib/components/Icon.svelte'
-  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
-  import Input from '../lib/components/Input.svelte'
+  import { pushBack } from '../lib/mc/back'
+  import McButton from '../lib/mc/McButton.svelte'
+  import McDialog from '../lib/mc/McDialog.svelte'
+  import McList from '../lib/mc/McList.svelte'
+  import McScreen from '../lib/mc/McScreen.svelte'
+  import McText from '../lib/mc/McText.svelte'
+  import { useGui } from '../lib/mc/gui'
+  import type { RowSpec } from '../lib/mc/listTypes'
+  import { bandWidth } from '../lib/mc/pos'
+  import { findItemIcon } from '../lib/itemIcons'
   import { accounts } from '../lib/stores/accounts.svelte'
+  import { nav } from '../lib/stores/nav.svelte'
+  import { skins } from '../lib/stores/skins.svelte'
   import { providerLabel } from '../lib/text'
   import type { AccountRecord, AuthState } from '../lib/types'
+  import ProfileForm from './parts/ProfileForm.svelte'
 
-  let name = $state('')
+  const gui = useGui()
+  const bw = $derived(bandWidth(gui.W))
+
+  let sub = $state<'main' | 'new'>('main')
+  let selectedId = $state<string | null>(accounts.defaultId)
   let error = $state<string | null>(null)
-  let busy = $state(false)
   let toRemove = $state<AccountRecord | null>(null)
 
   onMount(() => {
     accounts.loadMicrosoft()
     accounts.refreshStates()
+    if (!skins.loaded) skins.load()
   })
 
-  async function add() {
-    if (busy) return
-    busy = true
-    error = null
-    try {
-      await accounts.createLocal(name)
-      name = ''
-    } catch (e) {
-      error = (e as Error).message
-    } finally {
-      busy = false
-    }
-  }
+  $effect(() => {
+    if (sub === 'main') return
+    return pushBack(() => (sub = 'main'))
+  })
+
+  const selected = $derived(accounts.list.find((a) => a.id === selectedId) ?? null)
+  const showMicrosoft = $derived(accounts.microsoft.enabled || accounts.list.some((a) => a.provider === 'microsoft'))
 
   async function use(id: string) {
     error = null
@@ -59,6 +64,7 @@
     error = null
     try {
       await accounts.remove(target.id)
+      if (selectedId === target.id) selectedId = accounts.defaultId
     } catch (e) {
       error = (e as Error).message
     }
@@ -77,126 +83,89 @@
     const s = accounts.states[id]
     return s === 'MicrosoftExpired' || s === 'MicrosoftDisconnected'
   }
+
+  function row(a: AccountRecord): RowSpec {
+    const skinId = a.providerData.type === 'local' ? a.providerData.skinId : null
+    const face = skinId ? skins.previews[skinId] : undefined
+    const grass = findItemIcon('grass-block')
+    const status = stateText(accounts.states[a.id])
+    const active = a.id === accounts.defaultId
+    return {
+      icon: face
+        ? [
+            { src: face, crop: [8, 8, 8, 8], imageWidth: 64 },
+            { src: face, crop: [40, 8, 8, 8], imageWidth: 64 },
+          ]
+        : grass
+          ? { src: grass.src }
+          : undefined,
+      lines: [
+        { text: a.label },
+        { text: providerLabel[a.provider] },
+        active ? { text: 'Perfil activo', color: '#55ff55' } : { text: status ?? '', color: needsSignIn(a.id) ? '#ffaa00' : '#808080' },
+      ],
+    }
+  }
+
+  // Un solo mensaje bajo la lista: lo mas importante primero.
+  const message = $derived.by((): { text: string; color: string; role?: 'alert' | 'status' } | null => {
+    if (error) return { text: error, color: '#ff5555', role: 'alert' }
+    if (accounts.microsoft.loginInProgress) return { text: 'Completa el inicio de sesión en tu navegador. Esta ventana se actualizará sola.', color: '#a0a0a0', role: 'status' }
+    if (accounts.loginMessage) return { text: accounts.loginMessage, color: '#ffffff', role: 'status' }
+    const status = selected ? stateText(accounts.states[selected.id]) : null
+    if (status && selected && needsSignIn(selected.id)) return { text: `${selected.label}: ${status}.`, color: '#ffaa00' }
+    if (showMicrosoft && !accounts.microsoft.enabled) return { text: 'El inicio de sesión con Microsoft no está activado en esta versión. Offline Gaming funciona con normalidad.', color: '#808080' }
+    return null
+  })
 </script>
 
-<div class="page">
-  <PageHeading eyebrow="DISORDERLAUNCHER" title="Perfiles" description="Elige con qué nombre juegas. Solo uno puede estar en uso a la vez." />
+{#if sub === 'new'}
+  <ProfileForm title="Añadir perfil" hint="Offline Gaming: juega sin cuenta, con el nombre que elijas." oncancel={() => (sub = 'main')} ondone={() => (sub = 'main')} />
+{:else}
+  <McScreen title="Perfiles">
+    <McList
+      items={accounts.list}
+      getId={(a) => a.id}
+      {row}
+      bind:selectedId
+      onactivate={(a) => use(a.id)}
+      x={-(bw >> 1)}
+      y={22}
+      w={bw}
+      h={gui.H - 118}
+      empty="Aún no tienes perfiles. Crea uno con «Añadir»."
+      ariaLabel="Perfiles guardados"
+    />
+    {#if message}<McText text={message.text} x={-155} y={gui.H - 92} w={310} align="center" color={message.color} role={message.role} maxLines={2} />{/if}
 
-  {#if error}<p class="form-error" role="alert">{error}</p>{/if}
-
-  <section class="settings-panel panel" aria-label="Perfiles guardados">
-    <div class="section-title">
-      <h3>Tus perfiles</h3>
-      <span>{accounts.list.length} {accounts.list.length === 1 ? 'perfil' : 'perfiles'}</span>
-    </div>
-
-    {#each accounts.list as account (account.id)}
-      {@const status = stateText(accounts.states[account.id])}
-      <div class="account-row" class:active={account.id === accounts.defaultId}>
-        <Avatar />
-        <div class="account-main">
-          <h3>{account.label}</h3>
-          <p class="subtle">
-            {providerLabel[account.provider]}{account.id === accounts.defaultId ? ' · En uso' : ''}
-          </p>
-          {#if status}<p class="subtle" class:warn={needsSignIn(account.id)}>{status}</p>{/if}
-        </div>
-        <div class="account-actions">
-          {#if account.provider === 'microsoft' && needsSignIn(account.id) && accounts.microsoft.enabled}
-            <Button variant="primary" disabled={accounts.microsoft.loginInProgress} onclick={connect}>Volver a iniciar sesión</Button>
-          {/if}
-          {#if account.id === accounts.defaultId}
-            <span class="pill"><span class="status-dot"></span>EN USO</span>
-          {:else}
-            <Button onclick={() => use(account.id)}>Usar</Button>
-          {/if}
-          <Button variant="ghost" onclick={() => (toRemove = account)}>Quitar</Button>
-        </div>
-      </div>
-    {/each}
-
-    {#if accounts.microsoft.enabled || accounts.list.some((a) => a.provider === 'microsoft')}
-    <div class="account-row">
-      <Icon name="grid" size={30} />
-      <div class="account-main">
-        <h3>Microsoft</h3>
-        {#if !accounts.microsoft.enabled}
-          <p class="subtle">El inicio de sesión con Microsoft no está activado en esta versión. Offline Gaming funciona con normalidad.</p>
-          <details>
-            <summary>Opciones avanzadas</summary>
-            <p class="subtle">Si tienes una aplicación registrada en Azure, indica su identificador en Ajustes › Avanzado.</p>
-          </details>
-        {:else if accounts.microsoft.loginInProgress}
-          <p class="subtle" role="status">Completa el inicio de sesión en tu navegador. Esta ventana se actualizará sola.</p>
-        {:else}
-          <p class="subtle">Conecta tu cuenta para jugar con tu perfil oficial. Se abrirá tu navegador.</p>
-        {/if}
-        {#if accounts.loginMessage}<p class="subtle" role="status"><strong>{accounts.loginMessage}</strong></p>{/if}
-      </div>
-      <div class="account-actions">
-        {#if accounts.microsoft.loginInProgress}
-          <Button onclick={() => accounts.cancelLogin()}>Cancelar</Button>
-        {:else}
-          <Button disabled={!accounts.microsoft.enabled} onclick={connect}>Conectar cuenta</Button>
-        {/if}
-      </div>
-    </div>
+    <McButton anchor="bottom" x={-155} y={-52} w={100} label="Usar" ariaLabel="Usar este perfil" disabled={!selected || selected.id === accounts.defaultId} onclick={() => selected && use(selected.id)} />
+    <McButton anchor="bottom" x={-50} y={-52} w={100} label="Quitar..." ariaLabel="Quitar este perfil" disabled={!selected} onclick={() => (toRemove = selected)} />
+    <McButton anchor="bottom" x={55} y={-52} w={100} label="Añadir..." ariaLabel="Añadir perfil sin conexión" onclick={() => (sub = 'new')} />
+    <McButton anchor="bottom" x={-155} y={-28} w={100} label="Skins" onclick={() => nav.go('skins')} />
+    {#if showMicrosoft}
+      {#if accounts.microsoft.loginInProgress}
+        <McButton anchor="bottom" x={-50} y={-28} w={100} label="Cancelar" ariaLabel="Cancelar el inicio de sesión" onclick={() => accounts.cancelLogin()} />
+      {:else if selected && selected.provider === 'microsoft' && needsSignIn(selected.id) && accounts.microsoft.enabled}
+        <McButton anchor="bottom" x={-50} y={-28} w={100} label="Reconectar" ariaLabel="Volver a iniciar sesión" onclick={connect} />
+      {:else}
+        <McButton anchor="bottom" x={-50} y={-28} w={100} label="Conectar cuenta" ariaLabel="Conectar cuenta de Microsoft" disabled={!accounts.microsoft.enabled} onclick={connect} />
+      {/if}
     {/if}
-  </section>
+    <McButton anchor="bottom" x={55} y={-28} w={100} label="Atrás" onclick={() => nav.go('menu')} />
 
-  <section class="settings-panel panel">
-    <form
-      class="form-stack"
-      onsubmit={(e) => {
-        e.preventDefault()
-        add()
-      }}
-    >
-      <div class="section-title"><h3>Añadir perfil sin conexión</h3></div>
-      <p class="subtle">Offline Gaming: juega sin cuenta, con el nombre que elijas.</p>
-      <Input label="Nombre" bind:value={name} {error} maxlength={16} placeholder="Alex" />
-      <div>
-        <Button type="submit" disabled={busy || name.trim().length === 0}>Crear perfil</Button>
-      </div>
-    </form>
-  </section>
-
-  <ConfirmDialog
-    open={toRemove !== null}
-    title="¿Quitar este perfil?"
-    message={toRemove
-      ? toRemove.provider === 'microsoft'
-        ? `Se cerrará la sesión de «${toRemove.label}» en este equipo. Tus instancias no se borran.`
-        : `Se quitará el perfil «${toRemove.label}». Tus instancias no se borran.`
-      : ''}
-    confirmLabel="Quitar"
-    onconfirm={confirmRemove}
-    oncancel={() => (toRemove = null)}
-  />
-</div>
-
-<style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    max-width: 800px;
-  }
-
-  .warn {
-    color: var(--text-primary);
-    font-weight: 600;
-  }
-
-  details {
-    color: var(--text-secondary);
-    font-size: 12px;
-  }
-
-  summary {
-    cursor: pointer;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-  }
-</style>
+    {#if toRemove}
+      <McDialog
+        title="¿Quitar este perfil?"
+        message={toRemove.provider === 'microsoft'
+          ? `Se cerrará la sesión de «${toRemove.label}» en este equipo. Tus instancias no se borran.`
+          : `Se quitará el perfil «${toRemove.label}». Tus instancias no se borran.`}
+        buttons={[
+          { label: 'Cancelar', onclick: () => (toRemove = null) },
+          { label: 'Quitar', onclick: confirmRemove },
+        ]}
+        cancelIndex={0}
+        onclose={() => (toRemove = null)}
+      />
+    {/if}
+  </McScreen>
+{/if}

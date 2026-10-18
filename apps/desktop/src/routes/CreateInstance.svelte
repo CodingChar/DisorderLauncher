@@ -1,24 +1,36 @@
 <script lang="ts">
-  import Button from '../lib/components/Button.svelte'
-  import PageHeading from '../lib/components/PageHeading.svelte'
-  import CustomVersionPicker from '../lib/components/CustomVersionPicker.svelte'
-  import IconPicker from '../lib/components/IconPicker.svelte'
-  import Input from '../lib/components/Input.svelte'
-  import PerformanceOptions from '../lib/components/PerformanceOptions.svelte'
-  import ProgressBar from '../lib/components/ProgressBar.svelte'
-  import Select from '../lib/components/Select.svelte'
-  import VersionPicker from '../lib/components/VersionPicker.svelte'
+  import { pushBack } from '../lib/mc/back'
+  import McButton from '../lib/mc/McButton.svelte'
+  import McCycle from '../lib/mc/McCycle.svelte'
+  import McField from '../lib/mc/McField.svelte'
+  import McLabel from '../lib/mc/McLabel.svelte'
+  import McProgress from '../lib/mc/McProgress.svelte'
+  import McScreen from '../lib/mc/McScreen.svelte'
+  import McTabs from '../lib/mc/McTabs.svelte'
+  import McText from '../lib/mc/McText.svelte'
+  import { useGui } from '../lib/mc/gui'
+  import { CustomVersions } from '../lib/customVersions.svelte'
+  import { LOADER_OPTIONS, PERFORMANCE_LEVELS, javaError, javaSelection, memoryError, memoryPolicy } from '../lib/instanceForm'
+  import { findItemIcon } from '../lib/itemIcons'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
+  import { useVersionPicker } from '../lib/versionPicker.svelte'
   import type { LoaderKind, Optimization } from '../lib/types'
+  import AdvancedOptions from './parts/AdvancedOptions.svelte'
+  import CustomVersionScreen from './parts/CustomVersionScreen.svelte'
+  import IconScreen from './parts/IconScreen.svelte'
+  import VersionScreen from './parts/VersionScreen.svelte'
+
+  const gui = useGui()
+
+  type Sub = 'main' | 'version' | 'advanced' | 'icon'
+  let sub = $state<Sub>('main')
 
   let name = $state('Mi mundo')
   let version = $state('')
   // «Oficial»: la lista de Mojang. «Personalizado»: versiones instaladas fuera del launcher (OptiFine, Forge...).
   let source = $state<'official' | 'custom'>('official')
-  let customVersion = $state('')
-  let customDir = $state<string | null>(null)
-  let copyData = $state(false)
+  const custom = new CustomVersions()
   let loader = $state<LoaderKind>(nav.createLoader)
   let error = $state<string | null>(null)
   let busy = $state(false)
@@ -26,17 +38,27 @@
   let icon = $state('')
   let optimization = $state<Optimization>('off')
   let memoryMode = $state<'auto' | 'fixed'>('auto')
-  let maxGb = $state('4')
+  let maxGb = $state(4)
   let javaMode = $state<'auto' | 'path'>('auto')
   let javaPath = $state('')
 
-  const loaderOptions = [
-    { value: 'vanilla', label: 'Minecraft original (sin mods)' },
-    { value: 'fabric', label: 'Fabric (permite instalar mods)' },
-    { value: 'quilt', label: 'Quilt (compatible con mods de Fabric)' },
-    { value: 'forge', label: 'Forge (mods de Forge)' },
-    { value: 'neoforge', label: 'NeoForge (mods recientes, desde 1.20.2)' },
-  ]
+  const picker = useVersionPicker({ loader: () => loader, value: () => version, setValue: (v) => (version = v) })
+
+  // Las versiones instaladas fuera del launcher se buscan la primera vez que se abre esa pestana.
+  $effect(() => {
+    if (source === 'custom') custom.ensureLoaded()
+  })
+
+  // «Atras» (o Esc) en una subpantalla vuelve a la principal, no a Mis instancias.
+  $effect(() => {
+    if (sub === 'main') return
+    return pushBack(() => (sub = 'main'))
+  })
+
+  const iconLabel = $derived(icon ? (findItemIcon(icon)?.label ?? 'Por defecto') : 'Por defecto')
+  const level = $derived(PERFORMANCE_LEVELS.find((l) => l.value === optimization) ?? PERFORMANCE_LEVELS[0])
+  const chosenVersion = $derived(source === 'custom' ? custom.value : version)
+  const canCreate = $derived(!busy && !importing && !!chosenVersion && name.trim().length > 0)
 
   async function importPack() {
     if (importing) return
@@ -53,14 +75,10 @@
   }
 
   async function create() {
-    if (busy) return
-    const gb = Number(maxGb.replace(',', '.'))
-    if (memoryMode === 'fixed' && (!Number.isFinite(gb) || gb < 0.5 || gb > 64)) {
-      error = 'Escribe una cantidad de memoria entre 0,5 y 64 GB.'
-      return
-    }
-    if (javaMode === 'path' && javaPath.trim().length === 0) {
-      error = 'Indica la carpeta de Java o elige «Automático».'
+    if (busy || !canCreate) return
+    const problem = memoryError(memoryMode, maxGb) ?? javaError(javaMode, javaPath)
+    if (problem) {
+      error = problem
       return
     }
     busy = true
@@ -68,15 +86,15 @@
     try {
       const instance =
         source === 'custom'
-          ? await instances.createCustom(name, customDir, customVersion, copyData)
+          ? await instances.createCustom(name, custom.dir, custom.value, custom.copyData)
           : await instances.create(name, version, loader)
       // Los ajustes avanzados solo se guardan si se cambiaron; lo normal es dejarlos en automatico.
       if (memoryMode === 'fixed' || javaMode === 'path' || icon || optimization !== 'off') {
         await instances.update(instance.id, {
           ...(icon ? { icon } : {}),
           ...(optimization !== 'off' ? { optimization } : {}),
-          ...(memoryMode === 'fixed' ? { memory: { mode: 'fixed' as const, minMb: 512, maxMb: Math.round(gb * 1024) } } : {}),
-          ...(javaMode === 'path' ? { java: { mode: 'path' as const, path: javaPath.trim() } } : {}),
+          ...(memoryMode === 'fixed' ? { memory: memoryPolicy('fixed', maxGb) } : {}),
+          ...(javaMode === 'path' ? { java: javaSelection('path', javaPath) } : {}),
         })
       }
       nav.go('home')
@@ -88,113 +106,60 @@
   }
 </script>
 
-<div class="page">
-  <PageHeading eyebrow="NUEVA INSTANCIA" title="Crea tu mundo" description="Elige un nombre, el tipo de instancia y la versión de Minecraft." />
-
-  <section class="settings-panel panel">
+{#if sub === 'version' && source === 'official'}
+  <VersionScreen {loader} value={version} entries={picker.entries} level={picker.level} disabled={busy} onchange={(id) => (version = id)} onlevel={(l) => (picker.level = l)} onback={() => (sub = 'main')} />
+{:else if sub === 'version'}
+  <CustomVersionScreen {custom} disabled={busy} onback={() => (sub = 'main')} />
+{:else if sub === 'icon'}
+  <IconScreen bind:value={icon} loader={source === 'custom' ? 'vanilla' : loader} disabled={busy} onback={() => (sub = 'main')} />
+{:else if sub === 'advanced'}
+  <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} />
+{:else}
+  <McScreen title="Crea tu mundo">
     <form
-      class="form-stack"
+      class="mc-form"
       onsubmit={(e) => {
         e.preventDefault()
         create()
       }}
     >
-      <Input label="Nombre" bind:value={name} maxlength={64} />
-      <div class="source-tabs" role="tablist" aria-label="Origen de la versión">
-        <button type="button" role="tab" class="secondary" class:active={source === 'official'} aria-selected={source === 'official'} disabled={busy} onclick={() => (source = 'official')}>
-          Versiones oficiales
-        </button>
-        <button type="button" role="tab" class="secondary" class:active={source === 'custom'} aria-selected={source === 'custom'} disabled={busy} onclick={() => (source = 'custom')}>
-          Personalizado
-        </button>
-      </div>
+      <McTabs
+        tabs={[
+          { id: 'official', label: 'Versiones oficiales' },
+          { id: 'custom', label: 'Personalizado' },
+        ]}
+        bind:value={source}
+        x={-155}
+        y={22}
+        w={310}
+        disabled={busy || importing}
+      />
+
+      <McLabel x={-155} y={46} color="#a0a0a0" text="Nombre" />
+      <McField x={-155} y={56} w={310} maxlength={64} bind:value={name} disabled={busy} placeholder="Mi mundo" label="Nombre de la instancia" />
 
       {#if source === 'official'}
-        <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
-        <IconPicker bind:value={icon} {loader} disabled={busy} />
-        <VersionPicker {loader} bind:value={version} disabled={busy} />
+        <McCycle x={-155} y={82} w={150} label="Tipo" options={LOADER_OPTIONS} bind:value={loader} disabled={busy} />
+        <McButton x={5} y={82} w={150} label="Versión: {version || 'Elegir...'}" ariaLabel="Versión de Minecraft: {version || 'sin elegir'}. Pulsa para cambiar" disabled={busy} onclick={() => (sub = 'version')} />
       {:else}
-        <p class="subtle">
-          ¿Instalaste OptiFine, Forge u otra versión con el launcher de Minecraft? Elígela aquí y se usará en una instancia nueva.
-        </p>
-        <IconPicker bind:value={icon} loader="vanilla" disabled={busy} />
-        <CustomVersionPicker bind:value={customVersion} bind:dir={customDir} bind:copyData disabled={busy} />
+        <McButton x={-155} y={82} w={310} label="Versión instalada: {custom.value || 'Elegir...'}" ariaLabel="Versión instalada: {custom.value || 'sin elegir'}. Pulsa para cambiar" disabled={busy} onclick={() => (sub = 'version')} />
       {/if}
 
-      <details class="settings-block advanced">
-        <summary>Opciones avanzadas</summary>
-        <p class="subtle">Puedes dejarlas como están: no hace falta tocar nada para jugar. Cámbialas solo si sabes lo que necesita tu instancia.</p>
+      <McButton x={-155} y={106} w={150} label="Icono: {iconLabel}" disabled={busy} onclick={() => (sub = 'icon')} />
+      <McCycle x={5} y={106} w={150} label="Rendimiento" options={PERFORMANCE_LEVELS} bind:value={optimization} disabled={busy} />
 
-        <PerformanceOptions bind:value={optimization} disabled={busy} />
-
-        <fieldset class="group">
-          <legend>Memoria (RAM)</legend>
-          <label class="check-row"><input type="radio" bind:group={memoryMode} value="auto" /> Automática (recomendado)</label>
-          <label class="check-row"><input type="radio" bind:group={memoryMode} value="fixed" /> Elegir cantidad</label>
-          {#if memoryMode === 'fixed'}
-            <Input label="Máximo en GB" bind:value={maxGb} maxlength={5} hint="Más memoria no siempre es mejor. 4 GB suele bastar." />
-          {/if}
-        </fieldset>
-
-        <fieldset class="group">
-          <legend>Java</legend>
-          <label class="check-row"><input type="radio" bind:group={javaMode} value="auto" /> Automático (recomendado)</label>
-          <label class="check-row"><input type="radio" bind:group={javaMode} value="path" /> Usar mi propio Java</label>
-          {#if javaMode === 'path'}
-            <Input label="Carpeta de Java" bind:value={javaPath} placeholder="C:\Program Files\Java\jdk-21" hint="La carpeta que contiene «bin»." />
-          {/if}
-        </fieldset>
-      </details>
-
-      {#if error}
-        <p class="form-error" role="alert">{error}</p>
+      <McButton x={-155} y={130} w={150} label="Opciones avanzadas..." disabled={busy} onclick={() => (sub = 'advanced')} />
+      {#if importing && instances.importPercent !== null}
+        <McProgress percent={instances.importPercent} label="Importando modpack" x={5} y={140} w={150} />
+      {:else}
+        <McButton x={5} y={130} w={150} label={importing ? 'Importando…' : 'Importar modpack...'} disabled={importing || busy} onclick={importPack} />
       {/if}
 
-      <div class="form-actions">
-        <Button variant="primary" type="submit" disabled={busy || (source === 'custom' ? !customVersion : !version) || name.trim().length === 0}>
-          {busy ? 'Creando…' : 'Crear instancia'}
-        </Button>
-        <Button variant="ghost" onclick={() => nav.go('instances')}>Cancelar</Button>
-      </div>
+      <McText text={level.hint} x={-155} y={156} w={310} color="#808080" maxLines={2} />
+      {#if error}<McText text={error} x={-155} y={gui.H - 50} w={310} color="#ff5555" maxLines={2} role="alert" />{/if}
+
+      <McButton anchor="bottom" x={-155} y={-28} w={150} type="submit" label={busy ? 'Creando…' : 'Crear instancia'} disabled={!canCreate} />
+      <McButton anchor="bottom" x={5} y={-28} w={150} label="Cancelar" onclick={() => nav.go('instances')} />
     </form>
-  </section>
-
-  <section class="settings-panel panel">
-    <div class="section-title">
-      <h3>¿Tienes un modpack?</h3>
-    </div>
-    <p class="subtle">Importa un archivo <strong>.mrpack</strong> (Modrinth) y se crea la instancia con todo lo necesario.</p>
-    {#if importing && instances.importPercent !== null}
-      <ProgressBar percent={instances.importPercent} label="Importando modpack" />
-    {/if}
-    <div class="form-actions pack-actions">
-      <Button disabled={importing || busy} onclick={importPack}>{importing ? 'Importando…' : 'Importar modpack…'}</Button>
-    </div>
-  </section>
-</div>
-
-<style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    max-width: 800px;
-  }
-
-
-  .source-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .source-tabs button.active {
-    border-color: var(--action);
-    box-shadow: 0 0 0 1px var(--action);
-    background: var(--surface-raised);
-  }
-
-  .pack-actions {
-    margin-top: 16px;
-  }
-</style>
+  </McScreen>
+{/if}

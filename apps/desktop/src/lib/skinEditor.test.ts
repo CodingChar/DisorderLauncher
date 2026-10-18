@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   SIZE,
   History,
+  MC_COLORS,
   blankSkin,
   boxParts,
   faceMaskAt,
+  extractPalette,
   faceRects,
   floodFill,
   getPixel,
@@ -17,6 +19,7 @@ import {
   rgbaToHex,
   setPixel,
   upgradeLegacy,
+  type Pixels,
   type Rgba,
 } from './skinEditor'
 
@@ -224,5 +227,22 @@ describe('partes del cuerpo', () => {
     const sum = (['head', 'body', 'arms', 'legs'] as const).reduce((n, g) => n + count(groupMask('classic', 'base', g)), 0)
     expect(sum).toBe(count(layerMask('classic', 'base')))
     expect(count(groupMask('classic', 'base', 'all'))).toBe(count(layerMask('classic', 'base')))
+  })
+})
+
+describe('paleta del editor', () => {
+  it('extrae los colores mas usados ignorando lo transparente', () => {
+    const img = new Uint8ClampedArray(SIZE * SIZE * 4) as Pixels
+    setPixel(img, 0, 0, [255, 0, 0, 255])
+    setPixel(img, 1, 0, [255, 0, 0, 255])
+    setPixel(img, 2, 0, [0, 255, 0, 255])
+    setPixel(img, 3, 0, [0, 0, 255, 0])
+    expect(extractPalette(img)).toEqual(['#ff0000', '#00ff00'])
+    expect(extractPalette(img, 1)).toEqual(['#ff0000'])
+  })
+
+  it('una textura vacia no tiene paleta y la base de Minecraft son 16 colores distintos', () => {
+    expect(extractPalette(new Uint8ClampedArray(SIZE * SIZE * 4) as Pixels)).toEqual([])
+    expect(new Set(MC_COLORS).size).toBe(16)
   })
 })

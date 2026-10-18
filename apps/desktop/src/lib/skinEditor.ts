@@ -294,3 +294,23 @@ export function hexToRgba(hex: string, alpha = 255): Rgba {
 export function rgbaToHex([r, g, b]: Rgba): string {
   return `#${[r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('')}`
 }
+
+/** Los 16 colores de chat de Minecraft: paleta base del editor. */
+export const MC_COLORS: string[] = [
+  '#000000', '#0000aa', '#00aa00', '#00aaaa', '#aa0000', '#aa00aa', '#ffaa00', '#aaaaaa',
+  '#555555', '#5555ff', '#55ff55', '#55ffff', '#ff5555', '#ff55ff', '#ffff55', '#ffffff',
+]
+
+/** Los `limit` colores opacos mas usados de la textura (de mayor a menor frecuencia), como `#rrggbb`. */
+export function extractPalette(img: Pixels, limit = 16): string[] {
+  const counts = new Map<string, number>()
+  for (let i = 0; i < img.length; i += 4) {
+    if (img[i + 3] === 0) continue
+    const hex = rgbaToHex([img[i], img[i + 1], img[i + 2], 255])
+    counts.set(hex, (counts.get(hex) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .slice(0, limit)
+    .map(([hex]) => hex)
+}

@@ -1,4 +1,5 @@
 export type View =
+  | 'menu'
   | 'home'
   | 'instances'
   | 'explore'
@@ -11,8 +12,9 @@ export type View =
   | 'skins'
   | 'skinEditor'
 
-/** Etiqueta de cada vista para las migas de pan de la cabecera. */
+/** Nombre de cada vista (titulo accesible de la pantalla). */
 export const viewLabel: Record<View, string> = {
+  menu: 'Menú principal',
   home: 'Inicio',
   instances: 'Mis instancias',
   explore: 'Explorar',
@@ -26,8 +28,9 @@ export const viewLabel: Record<View, string> = {
   skinEditor: 'Editor de skins',
 }
 
-/** Entrada de la barra lateral que se resalta para cada vista (las secundarias cuelgan de una principal). */
+/** Pantalla principal a la que pertenece cada vista (las secundarias cuelgan de una principal). */
 export const navParent: Record<View, View> = {
+  menu: 'menu',
   home: 'home',
   instances: 'instances',
   explore: 'explore',
@@ -42,7 +45,7 @@ export const navParent: Record<View, View> = {
 }
 
 class NavStore {
-  view = $state<View>('home')
+  view = $state<View>('menu')
   /** Tipo de instancia que `Crear instancia` preselecciona (lo fijan los atajos de Explorar). */
   createLoader = $state<'vanilla' | 'fabric'>('vanilla')
 

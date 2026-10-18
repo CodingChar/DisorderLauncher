@@ -1,31 +1,46 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import Button from '../lib/components/Button.svelte'
-  import PageHeading from '../lib/components/PageHeading.svelte'
-    import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
-  import IconPicker from '../lib/components/IconPicker.svelte'
-  import Input from '../lib/components/Input.svelte'
-  import PerformanceOptions from '../lib/components/PerformanceOptions.svelte'
-  import Select from '../lib/components/Select.svelte'
+  import { goBack, pushBack } from '../lib/mc/back'
+  import McButton from '../lib/mc/McButton.svelte'
+  import McCycle from '../lib/mc/McCycle.svelte'
+  import McDialog from '../lib/mc/McDialog.svelte'
+  import McField from '../lib/mc/McField.svelte'
+  import McLabel from '../lib/mc/McLabel.svelte'
+  import McList from '../lib/mc/McList.svelte'
+  import McScreen from '../lib/mc/McScreen.svelte'
+  import McText from '../lib/mc/McText.svelte'
+  import { useGui } from '../lib/mc/gui'
+  import type { RowSpec } from '../lib/mc/listTypes'
+  import { bandWidth } from '../lib/mc/pos'
   import { api } from '../lib/api'
+  import { PERFORMANCE_LEVELS, formFromInstance, javaSelection, memoryError, memoryPolicy } from '../lib/instanceForm'
+  import { findItemIcon, normalizeIconId } from '../lib/itemIcons'
   import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
-  import { normalizeIconId } from '../lib/itemIcons'
   import { nav } from '../lib/stores/nav.svelte'
-  import { isCustomVersion, versionLabel } from '../lib/text'
   import { sessions } from '../lib/stores/sessions.svelte'
-  import VersionPicker from '../lib/components/VersionPicker.svelte'
+  import { isCustomVersion, versionLabel } from '../lib/text'
+  import { useVersionPicker } from '../lib/versionPicker.svelte'
   import type { Optimization } from '../lib/types'
+  import AdvancedOptions from './parts/AdvancedOptions.svelte'
+  import IconScreen from './parts/IconScreen.svelte'
+  import VersionScreen from './parts/VersionScreen.svelte'
+
+  const gui = useGui()
+  const bw = $derived(bandWidth(gui.W))
 
   const instance = $derived(instances.selected)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
+
+  type Sub = 'main' | 'version' | 'advanced' | 'icon' | 'more' | 'profile'
+  let sub = $state<Sub>('main')
 
   // Copia de trabajo del formulario; se inicializa una vez al abrir la pantalla.
   let name = $state('')
   let version = $state('')
   let profileId = $state('')
   let memoryMode = $state<'auto' | 'fixed'>('auto')
-  let maxGb = $state('4')
+  let maxGb = $state(4)
   let javaMode = $state<'auto' | 'path'>('auto')
   let javaPath = $state('')
   let icon = $state('')
@@ -36,6 +51,9 @@
   let saving = $state(false)
   let confirmDelete = $state(false)
 
+  // La edicion no cambia la version al cargar la lista (la instancia ya tiene la suya).
+  const picker = useVersionPicker({ loader: () => instance?.loader ?? 'vanilla', value: () => version, setValue: (v) => (version = v), autoSelect: false })
+
   onMount(() => {
     if (!instance) return
     name = instance.name
@@ -43,26 +61,32 @@
     profileId = instance.profileId
     icon = normalizeIconId(instance.icon)
     optimization = instance.optimization ?? 'off'
-    if (instance.memory.mode === 'fixed') {
-      memoryMode = 'fixed'
-      maxGb = String(Math.round((instance.memory.maxMb / 1024) * 10) / 10)
-    }
-    if (instance.java.mode === 'path') {
-      javaMode = 'path'
-      javaPath = instance.java.path
-    }
+    const form = formFromInstance(instance)
+    memoryMode = form.memoryMode
+    maxGb = form.maxGb
+    javaMode = form.javaMode
+    javaPath = form.javaPath
   })
 
+  $effect(() => {
+    if (sub === 'main') return
+    return pushBack(() => (sub = 'main'))
+  })
+
+  const custom = $derived(isCustomVersion(version))
   const profileOptions = $derived(accounts.list.map((a) => ({ value: a.id, label: a.label })))
+  const profileLabel = $derived(accounts.list.find((a) => a.id === profileId)?.label ?? '')
+  const iconLabel = $derived(icon ? (findItemIcon(icon)?.label ?? 'Por defecto') : 'Por defecto')
+  const level = $derived(PERFORMANCE_LEVELS.find((l) => l.value === optimization) ?? PERFORMANCE_LEVELS[0])
 
   async function save() {
     if (!instance || saving) return
     error = null
     notice = null
 
-    const gb = Number(maxGb.replace(',', '.'))
-    if (memoryMode === 'fixed' && (!Number.isFinite(gb) || gb < 0.5 || gb > 64)) {
-      error = 'Escribe una cantidad de memoria entre 0,5 y 64 GB.'
+    const problem = memoryError(memoryMode, maxGb)
+    if (problem) {
+      error = problem
       return
     }
 
@@ -71,15 +95,12 @@
       await instances.update(instance.id, {
         name,
         // Una version personalizada se queda como esta: no se cambia por otra de la lista oficial.
-        ...(isCustomVersion(version) ? {} : { minecraftVersion: version }),
+        ...(custom ? {} : { minecraftVersion: version }),
         profileId,
         icon,
         optimization,
-        memory:
-          memoryMode === 'auto'
-            ? { mode: 'auto' }
-            : { mode: 'fixed', minMb: 512, maxMb: Math.round(gb * 1024) },
-        java: javaMode === 'auto' ? { mode: 'auto' } : { mode: 'path', path: javaPath.trim() },
+        memory: memoryPolicy(memoryMode, maxGb),
+        java: javaSelection(javaMode, javaPath),
       })
       notice = 'Cambios guardados.'
     } catch (e) {
@@ -123,92 +144,115 @@
       error = (e as Error).message
     }
   }
+
+  function profileRow(a: { label: string; provider: string; id: string }): RowSpec {
+    return { lines: [{ text: a.label }, { text: a.provider === 'microsoft' ? 'Microsoft' : 'Offline Gaming' }, { text: a.id === profileId ? 'Perfil que juega' : '', color: '#55ff55' }] }
+  }
 </script>
 
-<div class="page">
-  <PageHeading eyebrow="CONFIGURAR INSTANCIA" title={instance?.name ?? 'Instancia'} description="Nombre, versión, perfil, memoria y Java de esta instancia." />
-
-  {#if !instance}
-    <p class="library-notice">No hay ninguna instancia seleccionada.</p>
-  {:else}
-    {#if busy}
-      <p class="library-notice" role="status">Esta instancia se está usando. Podrás editarla cuando termine.</p>
-    {/if}
-
-    <section class="settings-panel panel">
-      <form
-        class="form-stack"
-        onsubmit={(e) => {
-          e.preventDefault()
-          save()
-        }}
-      >
-        <Input label="Nombre" bind:value={name} maxlength={64} />
-        {#if isCustomVersion(version)}
-          <p class="subtle">Versión personalizada: <strong>{versionLabel(version)}</strong>. Para usar otra, crea una instancia nueva.</p>
-        {:else}
-          <VersionPicker loader={instance.loader} bind:value={version} disabled={busy} autoSelect={false} />
-        {/if}
-        <IconPicker bind:value={icon} loader={instance.loader} disabled={busy} />
-        <Select label="Perfil que juega" bind:value={profileId} options={profileOptions} disabled={busy} />
-
-        <PerformanceOptions bind:value={optimization} disabled={busy} />
-
-        <fieldset class="group">
-          <legend>Memoria (RAM)</legend>
-          <label class="check-row"><input type="radio" bind:group={memoryMode} value="auto" /> Automática (recomendado)</label>
-          <label class="check-row"><input type="radio" bind:group={memoryMode} value="fixed" /> Elegir cantidad</label>
-          {#if memoryMode === 'fixed'}
-            <Input label="Máximo en GB" bind:value={maxGb} maxlength={5} hint="Más memoria no siempre es mejor. 4 GB suele bastar." />
-          {/if}
-        </fieldset>
-
-        <fieldset class="group">
-          <legend>Java</legend>
-          <label class="check-row"><input type="radio" bind:group={javaMode} value="auto" /> Automático (recomendado)</label>
-          <label class="check-row"><input type="radio" bind:group={javaMode} value="path" /> Usar mi propio Java</label>
-          {#if javaMode === 'path'}
-            <Input label="Carpeta de Java" bind:value={javaPath} placeholder="C:\Program Files\Java\jdk-21" hint="La carpeta que contiene «bin»." />
-          {/if}
-        </fieldset>
-
-        {#if error}<p class="form-error" role="alert">{error}</p>{/if}
-        {#if notice}<p class="form-ok" role="status">{notice}</p>{/if}
-
-        <div class="form-actions">
-          <Button variant="primary" type="submit" disabled={busy || saving || name.trim().length === 0}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </Button>
-          <Button variant="ghost" onclick={() => nav.go('instances')}>Volver a Mis instancias</Button>
-        </div>
-      </form>
-    </section>
-
-    <section class="settings-panel panel">
-      <div class="section-title"><h3>Más acciones</h3></div>
-      <div class="form-actions">
-        <Button disabled={busy} onclick={duplicate}>Duplicar</Button>
-        <Button disabled={busy} onclick={exportPack}>Exportar como modpack…</Button>
-        <Button disabled={busy} onclick={() => (confirmDelete = true)}>Eliminar…</Button>
-      </div>
-    </section>
-
-    <ConfirmDialog
-      open={confirmDelete}
-      title="¿Eliminar esta instancia?"
-      message="Se borrarán sus mundos, mods y ajustes. Esta acción no se puede deshacer."
-      confirmLabel="Eliminar"
-      onconfirm={remove}
-      oncancel={() => (confirmDelete = false)}
+{#if !instance}
+  <McScreen title="Configurar instancia">
+    <McText text="No hay ninguna instancia seleccionada." x={-155} y={90} w={310} align="center" color="#a0a0a0" />
+    <McButton anchor="bottom" y={-28} label="Volver" onclick={goBack} />
+  </McScreen>
+{:else if sub === 'version'}
+  <VersionScreen loader={instance.loader} value={version} entries={picker.entries} level={picker.level} disabled={busy} onchange={(id) => (version = id)} onlevel={(l) => (picker.level = l)} onback={() => (sub = 'main')} />
+{:else if sub === 'icon'}
+  <IconScreen bind:value={icon} loader={instance.loader} disabled={busy} onback={() => (sub = 'main')} />
+{:else if sub === 'advanced'}
+  <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} />
+{:else if sub === 'profile'}
+  <McScreen title="Perfil que juega">
+    <McList
+      items={accounts.list}
+      getId={(a) => a.id}
+      row={profileRow}
+      selectedId={profileId}
+      onselect={(a) => !busy && (profileId = a.id)}
+      onactivate={(a) => {
+        profileId = a.id
+        sub = 'main'
+      }}
+      x={-(bw >> 1)}
+      y={24}
+      w={bw}
+      h={gui.H - 88}
+      ariaLabel="Perfiles"
     />
-  {/if}
-</div>
+    <McButton anchor="bottom" y={-28} label="Hecho" onclick={() => (sub = 'main')} />
+  </McScreen>
+{:else if sub === 'more'}
+  <McScreen title="Más acciones">
+    <McButton y={28} label="Duplicar" disabled={busy} onclick={duplicate} />
+    <McButton y={52} label="Exportar como modpack..." disabled={busy} onclick={exportPack} />
+    <McButton y={76} label="Eliminar..." disabled={busy} onclick={() => (confirmDelete = true)} />
+    {#if error}
+      <McText text={error} x={-155} y={108} w={310} align="center" color="#ff5555" maxLines={3} role="alert" />
+    {:else if notice}
+      <McText text={notice} x={-155} y={108} w={310} align="center" color="#55ff55" maxLines={3} role="status" />
+    {/if}
+    <McButton anchor="bottom" y={-28} label="Hecho" onclick={() => (sub = 'main')} />
 
-<style>
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    max-width: 800px;
-  }
-</style>
+    {#if confirmDelete}
+      <McDialog
+        title="¿Eliminar esta instancia?"
+        message={`Se borrarán sus mundos, mods y ajustes de «${instance.name}». Esta acción no se puede deshacer.`}
+        buttons={[
+          { label: 'Cancelar', onclick: () => (confirmDelete = false) },
+          { label: 'Eliminar', onclick: remove },
+        ]}
+        cancelIndex={0}
+        onclose={() => (confirmDelete = false)}
+      />
+    {/if}
+  </McScreen>
+{:else}
+  <McScreen title={instance.name}>
+    <form
+      class="mc-form"
+      onsubmit={(e) => {
+        e.preventDefault()
+        save()
+      }}
+    >
+      <McLabel x={-155} y={24} color="#a0a0a0" text="Nombre" />
+      <McField x={-155} y={34} w={310} maxlength={64} bind:value={name} disabled={busy} placeholder="Nombre de la instancia" label="Nombre de la instancia" />
+
+      <McButton
+        x={-155}
+        y={60}
+        w={150}
+        label="Versión: {versionLabel(version)}"
+        ariaLabel={custom ? `Versión personalizada: ${versionLabel(version)}` : `Versión de Minecraft: ${version}. Pulsa para cambiar`}
+        disabled={busy || custom}
+        onclick={() => (sub = 'version')}
+      />
+      <McButton x={5} y={60} w={150} label="Icono: {iconLabel}" disabled={busy} onclick={() => (sub = 'icon')} />
+
+      {#if accounts.list.length <= 6}
+        <McCycle x={-155} y={84} w={150} label="Perfil" options={profileOptions} bind:value={profileId} disabled={busy} />
+      {:else}
+        <McButton x={-155} y={84} w={150} label="Perfil: {profileLabel}" disabled={busy} onclick={() => (sub = 'profile')} />
+      {/if}
+      <McCycle x={5} y={84} w={150} label="Rendimiento" options={PERFORMANCE_LEVELS} bind:value={optimization} disabled={busy} />
+
+      <McButton x={-155} y={108} w={150} label="Opciones avanzadas..." disabled={busy} onclick={() => (sub = 'advanced')} />
+      <McButton x={5} y={108} w={150} label="Más acciones..." onclick={() => (sub = 'more')} />
+
+      <McText text={level.hint} x={-155} y={134} w={310} color="#808080" maxLines={2} />
+      {#if custom}<McText text="Versión personalizada: para usar otra, crea una instancia nueva." x={-155} y={156} w={310} color="#808080" maxLines={2} />{/if}
+
+      {#if busy}
+        <McText text="Esta instancia se está usando. Podrás editarla cuando termine." x={-155} y={gui.H - 62} w={310} color="#ffaa00" role="status" />
+      {/if}
+      {#if error}
+        <McText text={error} x={-155} y={gui.H - 50} w={310} color="#ff5555" maxLines={2} role="alert" />
+      {:else if notice}
+        <McText text={notice} x={-155} y={gui.H - 50} w={310} color="#55ff55" maxLines={2} role="status" />
+      {/if}
+
+      <McButton anchor="bottom" x={-155} y={-28} w={150} type="submit" label={saving ? 'Guardando…' : 'Guardar'} ariaLabel="Guardar cambios" disabled={busy || saving || name.trim().length === 0} />
+      <McButton anchor="bottom" x={5} y={-28} w={150} label="Volver" onclick={goBack} />
+    </form>
+  </McScreen>
+{/if}

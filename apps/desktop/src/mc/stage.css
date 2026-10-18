@@ -1,0 +1,354 @@
+/*
+ * Modo Minecraft: escenario en «pixeles de GUI» (los de Minecraft 1.7.10).
+ * McStage calcula la escala entera (--s) y el tamano virtual (--W, --H, --cx); todo lo que hay dentro
+ * se coloca con coordenadas enteras y se escala con transform. Ver docs/UI_MIGRATION_MINECRAFT.md.
+ */
+
+:root {
+  --s: 2; /* px de pantalla por px de GUI */
+  --W: 410; /* ancho virtual */
+  --H: 280; /* alto virtual */
+  --cx: 205; /* W / 2 */
+  --shade: 0, 0, 0; /* tinte del fondo (los temas lo cambian) */
+
+  --widgets: url('/assets/widgets.png');
+  --btn: url('/assets/button.png');
+  --btn-hover: url('/assets/button-hover.png');
+  --dirt: url('/assets/options_background.png');
+
+  --pano-0: url('/assets/panorama/panorama_0.png');
+  --pano-1: url('/assets/panorama/panorama_1.png');
+  --pano-2: url('/assets/panorama/panorama_2.png');
+  --pano-3: url('/assets/panorama/panorama_3.png');
+  --pano-4: url('/assets/panorama/panorama_4.png');
+  --pano-5: url('/assets/panorama/panorama_5.png');
+}
+
+:root[data-theme='light'] {
+  --shade: 56, 60, 72;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #5f7ab4;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  touch-action: manipulation;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+:focus-visible {
+  outline: 1px solid #fff;
+  outline-offset: 0;
+}
+
+/* ───────────────────────── Panorama ───────────────────────── */
+
+.panorama-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #5f7ab4;
+  pointer-events: none;
+}
+
+/* Sobredimensionado para que el desenfoque no deje bordes transparentes. */
+.panorama {
+  position: absolute;
+  inset: -40px;
+  perspective: 800px;
+  perspective-origin: 50% 50%;
+  filter: blur(2.5px);
+}
+
+.pano-cube {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.pano-face {
+  position: absolute;
+  left: -513px;
+  top: -513px;
+  width: 1026px; /* 2 px de solape para ocultar costuras */
+  height: 1026px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.pano-0 { background-image: var(--pano-0); transform: translateZ(-512px); }
+.pano-1 { background-image: var(--pano-1); transform: rotateY(-90deg) translateZ(-512px); }
+.pano-2 { background-image: var(--pano-2); transform: rotateY(180deg) translateZ(-512px); }
+.pano-3 { background-image: var(--pano-3); transform: rotateY(90deg) translateZ(-512px); }
+.pano-4 { background-image: var(--pano-4); transform: rotateX(-90deg) translateZ(-512px); }
+.pano-5 { background-image: var(--pano-5); transform: rotateX(90deg) translateZ(-512px); }
+
+/* Los dos degradados de GuiMainMenu. */
+.panorama-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5)),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
+}
+
+/* Fondo de tierra de las pantallas de opciones, tenido con el color del tema. */
+.dirt-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(var(--shade), 0.75), rgba(var(--shade), 0.75)),
+    var(--dirt) 0 0 / calc(32px * var(--s)) calc(32px * var(--s));
+  image-rendering: pixelated;
+}
+
+/* ───────────────────────── Escenario (px de GUI) ───────────────────────── */
+
+.mc-stage {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  width: calc(var(--W) * 1px);
+  height: calc(var(--H) * 1px);
+  overflow: hidden;
+  transform: scale(var(--s));
+  transform-origin: 0 0;
+  white-space: pre;
+}
+
+.mc-stage,
+.mc-stage * {
+  image-rendering: pixelated;
+}
+
+.mc-screen {
+  position: absolute;
+  inset: 0;
+}
+
+.mc-form {
+  display: contents;
+}
+
+/* ── Logo y splash ── */
+
+.title-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+}
+
+.logo {
+  position: absolute;
+  left: 50%;
+  top: 30px;
+  display: block;
+  transform: translateX(-50%);
+}
+
+.splash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ── Texto bitmap ── */
+
+.bitmap-label {
+  display: inline-block;
+  position: relative;
+  line-height: 0;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.bitmap-label canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.mc-label {
+  position: absolute;
+  line-height: 0;
+  white-space: nowrap;
+}
+
+.mc-label.block .bitmap-label {
+  display: block;
+}
+
+/* ── Botones ── */
+
+.mc-button,
+.mc-language {
+  position: absolute;
+  height: 20px;
+}
+
+.mc-button {
+  --sprite: var(--btn);
+}
+
+/* GuiButton dibuja dos mitades: la izquierda y la derecha de la textura. */
+.mc-button::before,
+.mc-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background-image: var(--sprite);
+  background-size: 200px 20px;
+  background-repeat: no-repeat;
+}
+
+.mc-button::before {
+  left: 0;
+  background-position: 0 0;
+}
+
+.mc-button::after {
+  right: 0;
+  background-position: 100% 0;
+}
+
+.mc-button:hover:not(:disabled),
+.mc-button:focus-visible:not(:disabled) {
+  --sprite: var(--btn-hover);
+}
+
+.mc-button .caption {
+  position: absolute;
+  top: 6px; /* (20 - 8) / 2 */
+  height: 9px;
+  line-height: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mc-button .caption > .c-normal {
+  display: block;
+}
+
+.mc-button .caption > .c-hover,
+.mc-button .caption > .c-off,
+.mc-button .caption > .c-active {
+  display: none;
+}
+
+.mc-button:hover:not(:disabled):not(.is-active) .caption > .c-normal,
+.mc-button:focus-visible:not(:disabled):not(.is-active) .caption > .c-normal {
+  display: none;
+}
+
+.mc-button:hover:not(:disabled):not(.is-active) .caption > .c-hover,
+.mc-button:focus-visible:not(:disabled):not(.is-active) .caption > .c-hover {
+  display: block;
+}
+
+.mc-button:disabled .caption > .c-normal,
+.mc-button.is-active .caption > .c-normal {
+  display: none;
+}
+
+.mc-button:disabled .caption > .c-off {
+  display: block;
+}
+
+.mc-button.is-active:not(:disabled) .caption > .c-active {
+  display: block;
+}
+
+/* Deshabilitado y pestana activa usan el sprite apagado de widgets.png. */
+.mc-button:disabled::before,
+.mc-button:disabled::after,
+.mc-button.is-active::before,
+.mc-button.is-active::after {
+  background-image: var(--widgets);
+  background-size: 256px 256px;
+  background-position-y: -46px;
+}
+
+.mc-button:disabled::after,
+.mc-button.is-active::after {
+  background-position-x: calc(var(--w) * 0.5px - 200px);
+}
+
+.mc-button:disabled {
+  pointer-events: none;
+}
+
+.mc-language {
+  width: 20px;
+  background: var(--widgets) 0 -106px / 256px 256px no-repeat;
+}
+
+.mc-language:hover,
+.mc-language:focus-visible {
+  background-position: 0 -126px;
+}
+
+/* ── Pie ── */
+
+.footer-text {
+  position: absolute;
+  top: calc(var(--H) * 1px - 10px);
+  height: 9px;
+}
+
+.footer-left {
+  left: 2px;
+}
+
+.footer-right {
+  right: 1px;
+}
+
+.footer-text .bitmap-label {
+  display: block;
+}

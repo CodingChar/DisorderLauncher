@@ -1,10 +1,12 @@
+import { hoverFromAction, shadeFromBackground, DEFAULT_HOVER } from './mc/color'
+import { palette } from './mc/palette.svelte'
 import type { ThemeEntry } from './types'
 
 /** Variables CSS que escribe el motor de temas; se limpian al volver a un tema incluido. */
 const VARS = [
   '--bg', '--surface', '--surface-alt', '--surface-raised', '--text-primary', '--text-secondary',
   '--border', '--border-strong', '--action', '--action-text',
-  '--r-sm', '--r-md', '--r-lg', '--r-xl', '--font-display', '--font-body', '--shadow', '--shadow-soft', 'zoom',
+  '--r-sm', '--r-md', '--r-lg', '--r-xl', '--font-display', '--font-body', '--shadow', '--shadow-soft', 'zoom', '--shade',
 ]
 
 /**
@@ -42,10 +44,12 @@ export function applyThemeObject(theme: ThemeEntry) {
   set('--shadow', `0 12px 30px rgba(${rgb}, ${alpha.toFixed(3)})`)
   set('--shadow-soft', `0 4px 14px rgba(${rgb}, ${(alpha * 0.75).toFixed(3)})`)
 
-  // Tamano de texto del tema x escala de interfaz: Rust ya valido ambos (0.8-1.4).
-  const zoom = theme.typography.scale * theme.density.uiScale
-  if (zoom === 1) root.style.removeProperty('zoom')
-  else root.style.setProperty('zoom', zoom.toFixed(3))
+  // Modo Minecraft: los sprites son PNG fijos, asi que un tema solo tiñe el fondo y el resalte del texto.
+  // El zoom del documento (`typography.scale` x `density.uiScale`) ya no se aplica: romperia la rejilla de pixeles del escenario.
+  const shade = shadeFromBackground(c.background)
+  set('--shade', shade)
+  palette.hover = hoverFromAction(c.action, shade)
+  root.style.removeProperty('zoom')
 
   root.dataset.theme = theme.mode
   root.dataset.animations = theme.effects.animations ? 'on' : 'off'
@@ -54,5 +58,6 @@ export function applyThemeObject(theme: ThemeEntry) {
 export function clearThemeVars() {
   const root = document.documentElement
   for (const name of VARS) root.style.removeProperty(name)
+  palette.hover = DEFAULT_HOVER
   delete root.dataset.animations
 }

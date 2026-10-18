@@ -1,13 +1,23 @@
 <script lang="ts">
-  import Button from '../lib/components/Button.svelte'
-  import Icon from '../lib/components/Icon.svelte'
-  import PageHeading from '../lib/components/PageHeading.svelte'
-  import ProgressBar from '../lib/components/ProgressBar.svelte'
+  import McButton from '../lib/mc/McButton.svelte'
+  import McLabel from '../lib/mc/McLabel.svelte'
+  import McList from '../lib/mc/McList.svelte'
+  import McProgress from '../lib/mc/McProgress.svelte'
+  import McScreen from '../lib/mc/McScreen.svelte'
+  import McText from '../lib/mc/McText.svelte'
+  import { wrap } from '../lib/mc/font'
+  import { useGui } from '../lib/mc/gui'
+  import type { RowSpec } from '../lib/mc/listTypes'
+  import { bandWidth } from '../lib/mc/pos'
   import { api } from '../lib/api'
   import { FEATURES } from '../lib/features'
+  import { findItemIcon } from '../lib/itemIcons'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
   import { sessions } from '../lib/stores/sessions.svelte'
+
+  const gui = useGui()
+  const bw = $derived(bandWidth(gui.W))
 
   const instance = $derived(instances.selected)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
@@ -15,6 +25,7 @@
   let working = $state(false)
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
+  let selectedId = $state<string>('repair')
 
   async function run(action: () => Promise<string | void>) {
     if (working) return
@@ -50,64 +61,69 @@
       if (created) nav.go('home')
     })
 
-  /** Herramientas que todavia no existen: no se muestran (ver `FEATURES`) y, si se activan, nunca fingen funcionar. */
-  const soon = [
-    { icon: 'archive', name: 'Copia de seguridad', description: 'Guarda tus instancias y su configuración en un archivo comprimido.' },
-    { icon: 'clipboard', name: 'Informe de diagnóstico', description: 'Resume tu equipo y las últimas sesiones para pedir ayuda.' },
-    { icon: 'trash', name: 'Limpiar caché', description: 'Borra descargas y archivos temporales que ya no usas.' },
+  interface Tool {
+    id: string
+    icon: string
+    title: string
+    description: string
+    soon?: boolean
+  }
+
+  const tools: Tool[] = [
+    { id: 'repair', icon: 'redstone', title: 'Reparar instancia', description: 'Comprueba los archivos de la instancia activa y vuelve a descargar lo que falte o esté dañado.' },
+    { id: 'export', icon: 'ender-pearl', title: 'Exportar modpack', description: 'Guarda la instancia activa como un archivo .mrpack para compartirla. No incluye mundos ni registros.' },
+    { id: 'import', icon: 'crafting-table', title: 'Importar modpack', description: 'Crea una instancia nueva a partir de un archivo .mrpack de Modrinth.' },
   ]
+
+  /** Herramientas que todavia no existen: no se muestran (ver `FEATURES`) y, si se activan, nunca fingen funcionar. */
+  const soon: Tool[] = [
+    { id: 'backup', icon: 'tnt', title: 'Copia de seguridad', description: 'Guarda tus instancias y su configuración en un archivo comprimido.', soon: true },
+    { id: 'diagnostic', icon: 'torch', title: 'Informe de diagnóstico', description: 'Resume tu equipo y las últimas sesiones para pedir ayuda.', soon: true },
+    { id: 'cache', icon: 'golden-apple', title: 'Limpiar caché', description: 'Borra descargas y archivos temporales que ya no usas.', soon: true },
+  ]
+
+  const list = $derived(FEATURES.comingSoonTools ? [...tools, ...soon] : tools)
+  const selected = $derived(list.find((t) => t.id === selectedId) ?? list[0])
+  const textWidth = $derived(bw - 10 - 37 - 2)
+
+  function row(t: Tool): RowSpec {
+    const icon = findItemIcon(t.icon)
+    const description = wrap(t.description, textWidth - 1, t.soon ? 1 : 2)
+    return {
+      icon: icon ? { src: icon.src } : undefined,
+      disabled: t.soon,
+      lines: [{ text: t.title }, { text: description[0] ?? '' }, { text: t.soon ? 'PRÓXIMAMENTE' : (description[1] ?? '') }],
+    }
+  }
+
+  const canRun = $derived.by(() => {
+    if (selected.soon || working) return false
+    if (selected.id === 'repair') return !!instance && !busy
+    if (selected.id === 'export') return !!instance
+    return true
+  })
+
+  function execute() {
+    if (!canRun) return
+    if (selected.id === 'repair') repair()
+    else if (selected.id === 'export') exportPack()
+    else if (selected.id === 'import') importPack()
+  }
 </script>
 
-<PageHeading eyebrow="DISORDERLAUNCHER" title="Herramientas" description="Utilidades para cuidar tus instancias." />
+<McScreen title="Herramientas">
+  <McLabel center y={22} color="#a0a0a0" max={gui.W - 8} text={instance ? `Instancia activa: ${instance.name}` : 'No hay ninguna instancia activa'} />
+  <McList items={list} getId={(t) => t.id} {row} bind:selectedId onactivate={execute} x={-(bw >> 1)} y={34} w={bw} h={gui.H - 118} ariaLabel="Herramientas" />
 
-<div class="library-toolbar">
-  <span>{instance ? `Instancia activa: ${instance.name}` : 'No hay ninguna instancia activa'}</span>
-  <span class="tiny-label">LAS ACCIONES USAN LA INSTANCIA ACTIVA</span>
-</div>
+  {#if working && instances.importPercent !== null}
+    <McProgress percent={instances.importPercent} label="Importando modpack" x={-155} w={310} y={gui.H - 64} />
+  {/if}
+  {#if error}
+    <McText text={error} x={-155} y={gui.H - 78} w={310} color="#ff5555" maxLines={2} role="alert" />
+  {:else if notice}
+    <McText text={notice} x={-155} y={gui.H - 78} w={310} color="#55ff55" maxLines={2} role="status" />
+  {/if}
 
-{#if error}<p class="form-error" role="alert">{error}</p>{/if}
-{#if notice}<p class="form-ok" role="status">{notice}</p>{/if}
-
-<div class="tool-grid">
-  <section class="tool-card panel">
-    <div class="tool-icon"><Icon name="zap" size={22} /></div>
-    <h3>Reparar instancia</h3>
-    <p>Comprueba los archivos de la instancia activa y vuelve a descargar lo que falte o esté dañado.</p>
-    <div class="tool-foot">
-      <Button disabled={!instance || busy} onclick={repair}>Reparar</Button>
-    </div>
-  </section>
-
-  <section class="tool-card panel">
-    <div class="tool-icon"><Icon name="download" size={22} /></div>
-    <h3>Exportar modpack</h3>
-    <p>Guarda la instancia activa como un archivo .mrpack para compartirla. No incluye mundos ni registros.</p>
-    <div class="tool-foot">
-      <Button disabled={!instance || working} onclick={exportPack}>Exportar</Button>
-    </div>
-  </section>
-
-  <section class="tool-card panel">
-    <div class="tool-icon"><Icon name="grid" size={22} /></div>
-    <h3>Importar modpack</h3>
-    <p>Crea una instancia nueva a partir de un archivo .mrpack de Modrinth.</p>
-    {#if working && instances.importPercent !== null}
-      <ProgressBar percent={instances.importPercent} label="Importando modpack" />
-    {/if}
-    <div class="tool-foot">
-      <Button disabled={working} onclick={importPack}>Importar</Button>
-    </div>
-  </section>
-
-  {#each FEATURES.comingSoonTools ? soon : [] as tool (tool.name)}
-    <section class="tool-card panel">
-      <div class="tool-icon"><Icon name={tool.icon} size={22} /></div>
-      <h3>{tool.name}</h3>
-      <p>{tool.description}</p>
-      <div class="tool-foot">
-        <span class="tiny-label">PRÓXIMAMENTE</span>
-        <Button disabled>No disponible</Button>
-      </div>
-    </section>
-  {/each}
-</div>
+  <McButton anchor="bottom" y={-52} label={working ? 'Trabajando…' : 'Ejecutar'} ariaLabel={`Ejecutar: ${selected.title}`} disabled={!canRun} onclick={execute} />
+  <McButton anchor="bottom" y={-28} label="Atrás" onclick={() => nav.go('menu')} />
+</McScreen>

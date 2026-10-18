@@ -1,15 +1,7 @@
 import { api } from '../api'
 import type { LoaderKind, VersionCatalog, VersionEntry } from '../types'
 
-export type VersionKind = VersionEntry['type']
-
-/** Texto corto para cada tipo de version en la lista. */
-export const versionKindLabel: Record<VersionKind, string> = {
-  release: 'Estable',
-  snapshot: 'Snapshot',
-  old_beta: 'Beta',
-  old_alpha: 'Alpha',
-}
+export { versionKindLabel, type VersionKind } from '../versionPicker'
 
 class VersionsStore {
   list = $state<VersionEntry[]>([])

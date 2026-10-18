@@ -1,23 +1,30 @@
 <script lang="ts">
-  import Avatar from '../lib/components/Avatar.svelte'
-  import Button from '../lib/components/Button.svelte'
-  import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
-  import ItemLogo from '../lib/components/ItemLogo.svelte'
-  import PageHeading from '../lib/components/PageHeading.svelte'
-  import ProgressBar from '../lib/components/ProgressBar.svelte'
+  import McButton from '../lib/mc/McButton.svelte'
+  import McCycle from '../lib/mc/McCycle.svelte'
+  import McDialog from '../lib/mc/McDialog.svelte'
+  import McField from '../lib/mc/McField.svelte'
+  import McLabel from '../lib/mc/McLabel.svelte'
+  import McList from '../lib/mc/McList.svelte'
+  import McProgress from '../lib/mc/McProgress.svelte'
+  import McScreen from '../lib/mc/McScreen.svelte'
+  import McText from '../lib/mc/McText.svelte'
+  import { useGui } from '../lib/mc/gui'
+  import type { RowSpec } from '../lib/mc/listTypes'
+  import { bandWidth } from '../lib/mc/pos'
   import { loaderName, phaseLabel, versionLabel } from '../lib/text'
   import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
-  import { sessions } from '../lib/stores/sessions.svelte'
+  import { sessions, type LogLine } from '../lib/stores/sessions.svelte'
+
+  const gui = useGui()
+  const bw = $derived(bandWidth(gui.W))
 
   const instance = $derived(instances.selected)
   const session = $derived(instance ? sessions.get(instance.id) : undefined)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
   const running = $derived(session?.phase === 'running')
-  const profile = $derived(
-    (instance && accounts.list.find((a) => a.id === instance.profileId)) || accounts.current,
-  )
+  const profile = $derived((instance && accounts.list.find((a) => a.id === instance.profileId)) || accounts.current)
 
   const percent = $derived.by(() => {
     const p = session?.progress
@@ -49,16 +56,10 @@
     }
   })
 
-  const pillText = $derived.by(() => {
-    if (!session) return 'LISTA'
-    if (session.phase === 'running') return 'EN EJECUCIÓN'
-    if (session.phase === 'failed') return 'CON PROBLEMAS'
-    if (session.phase === 'exited') return 'CERRADA'
-    return 'PREPARANDO'
-  })
+  const crashed = $derived(session?.phase === 'exited' && !!session.exitCode && session.exitCode !== 0)
+  const isProblem = $derived(session?.phase === 'failed' || crashed)
 
   // Un fallo (o un cierre inesperado) se muestra en un dialogo con la accion adecuada.
-  const crashed = $derived(session?.phase === 'exited' && !!session.exitCode && session.exitCode !== 0)
   const failure = $derived.by(() => {
     if (session?.phase === 'failed') {
       const message = session.message ?? 'No se pudo iniciar Minecraft.'
@@ -70,6 +71,10 @@
     return null
   })
 
+  function dismissFailure() {
+    if (instance) sessions.dismiss(instance.id)
+  }
+
   function onFailureConfirm() {
     if (!instance || !failure) return
     const id = instance.id
@@ -79,21 +84,30 @@
     else if (failure.signIn) nav.go('accounts')
   }
 
-  const isProblem = $derived(
-    session?.phase === 'failed' || (session?.phase === 'exited' && !!session.exitCode && session.exitCode !== 0),
-  )
+  const failureButtons = $derived.by(() => {
+    if (!failure) return []
+    const confirm = failure.retry ? 'Reintentar' : failure.repair ? 'Reparar' : failure.signIn ? 'Ir a Perfiles' : 'Entendido'
+    const buttons = [{ label: confirm, onclick: onFailureConfirm }]
+    if (failure.retry || failure.repair || failure.signIn) buttons.push({ label: 'Cerrar', onclick: dismissFailure })
+    return buttons
+  })
 
-  const memoryText = $derived(
-    !instance
-      ? ''
-      : instance.memory.mode === 'fixed'
-        ? `${Math.round((instance.memory.maxMb / 1024) * 10) / 10} GB como máximo`
-        : 'Automática',
+  const infoLine = $derived(
+    instance
+      ? [`Minecraft ${versionLabel(instance.minecraftVersion)}`, loaderName(instance.loader), profile ? `Perfil: ${profile.label}` : null, session?.startedAt ? `Inicio ${session.startedAt}` : null]
+          .filter(Boolean)
+          .join(' · ')
+      : '',
   )
 
   // ------------------------------------------------------------------ consola (salida real del juego)
   let filter = $state('')
   let level = $state<'all' | 'WARN' | 'ERROR'>('all')
+  const levels = [
+    { value: 'all' as const, label: 'Todos' },
+    { value: 'WARN' as const, label: 'Avisos' },
+    { value: 'ERROR' as const, label: 'Errores' },
+  ]
 
   const lines = $derived(instance ? sessions.logOf(instance.id) : [])
   const visible = $derived(
@@ -110,131 +124,69 @@
     return 'INFO'
   }
 
-  const emptyHeading = $derived(
-    filter || level !== 'all' ? 'Sin resultados para este filtro.' : running || busy ? 'Esperando la salida del juego…' : 'Aún no hay salida del juego.',
+  function lineRow(line: LogLine): RowSpec {
+    const kind = levelOf(line.text)
+    const color = line.stream === 'stderr' || kind === 'ERROR' ? '#ff5555' : kind === 'WARN' ? '#ffaa00' : /\bDEBUG\b/.test(line.text) ? '#808080' : '#ffffff'
+    return { lines: [{ text: line.text, color }] }
+  }
+
+  const emptyText = $derived(
+    filter || level !== 'all'
+      ? 'Sin resultados para este filtro.'
+      : (running || busy ? 'Esperando la salida del juego...' : 'Aún no hay salida del juego.') + ' Lo que escriba Minecraft aparecerá aquí al pulsar Jugar.',
   )
 </script>
 
-<PageHeading eyebrow="ESTADO DE LA SESIÓN" title="Centro de sesión" description="Tu instancia activa, su estado y lo que escribe el juego mientras está abierto." />
+<McScreen title={instance?.name ?? 'Centro de sesión'}>
+  {#if instance}
+    <McLabel center y={20} color="#a0a0a0" max={gui.W - 8} text={infoLine} />
+    {#if session && (session.phase === 'installing' || session.phase === 'repairing')}
+      <McProgress {percent} label={statusText} x={-100} y={46} />
+    {:else}
+      <McLabel center y={32} color={isProblem ? '#ff5555' : '#ffffff'} max={gui.W - 8} text={statusText} />
+    {/if}
 
-{#if instance}
-  <section class="session-card panel" aria-label="Instancia activa">
-    <div class="session-profile">
-      <Avatar />
-      <div>
-        <strong>{profile?.label ?? 'Sin perfil'}</strong>
-        <span>PERFIL DE LA SESIÓN</span>
-      </div>
-      <span class="pill">
-        <span class="status-dot" class:warn={isProblem}></span>
-        {pillText}
-      </span>
-    </div>
+    <McField x={-155} y={58} w={190} bind:value={filter} placeholder="Buscar en la consola..." label="Buscar en la consola" />
+    <McCycle x={39} y={58} w={116} label="Mostrar" options={levels} bind:value={level} />
+    <McList
+      items={visible}
+      getId={(l) => String(l.id)}
+      row={lineRow}
+      x={-(bw >> 1)}
+      y={82}
+      w={bw}
+      h={gui.H - 140}
+      rowHeight={10}
+      selectable={false}
+      followEnd
+      empty={emptyText}
+      ariaLabel="Salida del juego"
+    />
 
-    <div class="session-identity">
-      <ItemLogo loader={instance.loader} icon={instance.icon} />
-      <div>
-        <h2>{instance.name}</h2>
-        <p>Minecraft {versionLabel(instance.minecraftVersion)} <span>·</span> {loaderName(instance.loader)}</p>
-      </div>
-      {#if session?.startedAt}<span class="session-started">Inicio: {session.startedAt}</span>{/if}
-    </div>
+    {#if running}
+      <McButton anchor="bottom" x={-154} y={-52} w={150} label="Cerrar juego" onclick={() => sessions.stop(instance.id)} />
+    {:else}
+      <McButton anchor="bottom" x={-154} y={-52} w={150} label={busy ? 'Un momento…' : 'Jugar'} disabled={busy} onclick={() => sessions.launch(instance.id)} />
+    {/if}
+    <McButton anchor="bottom" x={4} y={-52} w={150} label="Limpiar consola" disabled={lines.length === 0} onclick={() => sessions.clearLog(instance.id)} />
+    <McButton anchor="bottom" x={-150} y={-28} w={72} label="Mods" disabled={busy || instance.loader === 'vanilla'} onclick={() => nav.go('mods')} />
+    <McButton anchor="bottom" x={-74} y={-28} w={72} label="Configurar" disabled={busy} onclick={() => nav.go('edit')} />
+    <McButton anchor="bottom" x={2} y={-28} w={72} label="Reparar" disabled={busy} onclick={() => sessions.repair(instance.id)} />
+    <McButton anchor="bottom" x={78} y={-28} w={72} label="Cambiar" ariaLabel="Cambiar instancia" onclick={() => nav.go('instances')} />
 
-    <div class="session-details">
-      <span>Memoria <strong>{memoryText}</strong></span>
-      <span>Java <strong>{instance.java.mode === 'path' ? 'Propio' : 'Automático'}</strong></span>
-      <span>Tipo <strong>{instance.loader === 'vanilla' ? 'Original (sin mods)' : loaderName(instance.loader)}</strong></span>
-      <span>Estado <strong>{statusText}</strong></span>
-    </div>
-
-    <div class="session-actions">
-      {#if running}
-        <Button large onclick={() => sessions.stop(instance.id)}>Cerrar juego</Button>
-      {:else}
-        <Button variant="primary" large disabled={busy} onclick={() => sessions.launch(instance.id)}>
-          {busy ? 'Un momento…' : 'JUGAR'}
-        </Button>
-      {/if}
-      {#if instance.loader !== 'vanilla'}
-        <Button variant="ghost" disabled={busy} onclick={() => nav.go('mods')}>Mods</Button>
-      {/if}
-      <Button variant="ghost" disabled={busy} onclick={() => nav.go('edit')}>Configurar</Button>
-      <Button variant="ghost" disabled={busy} onclick={() => sessions.repair(instance.id)}>Reparar</Button>
-      <Button variant="ghost" onclick={() => nav.go('instances')}>Cambiar instancia</Button>
-    </div>
-
-    <div class="session-status" aria-live="polite">
-      <p class:problem={isProblem}>{statusText}</p>
-      {#if session && (session.phase === 'installing' || session.phase === 'repairing')}
-        <ProgressBar {percent} label={statusText} />
-      {/if}
-    </div>
-  </section>
-
-  <ConfirmDialog
-    open={failure !== null}
-    title={failure?.retry ? 'Sin conexión' : failure?.signIn ? 'Inicia sesión de nuevo' : 'Algo salió mal'}
-    message={failure?.message ?? ''}
-    confirmLabel={failure?.retry ? 'Reintentar' : failure?.repair ? 'Reparar' : failure?.signIn ? 'Ir a Perfiles' : 'Entendido'}
-    cancelLabel={failure?.retry || failure?.repair || failure?.signIn ? 'Cerrar' : ''}
-    onconfirm={onFailureConfirm}
-    oncancel={() => instance && sessions.dismiss(instance.id)}
-  />
-
-  <section class="console-panel panel" aria-label="Consola de la instancia">
-    <div class="console-heading">
-      <div>
-        <span class="terminal-symbol" aria-hidden="true">›_</span>
-        <h3>Consola de la instancia</h3>
-        <span class="tiny-label">SALIDA DEL JUEGO</span>
-      </div>
-      <button class="text-link" disabled={lines.length === 0} onclick={() => sessions.clearLog(instance.id)}>Limpiar consola</button>
-    </div>
-
-    <div class="console-tools">
-      <input aria-label="Buscar en la consola" placeholder="Buscar en la consola…" bind:value={filter} />
-      <select aria-label="Tipo de mensajes" bind:value={level}>
-        <option value="all">Todos</option>
-        <option value="WARN">Avisos</option>
-        <option value="ERROR">Errores</option>
-      </select>
-      <span>{visible.length} {visible.length === 1 ? 'línea' : 'líneas'}</span>
-    </div>
-
-    <div class="console-output" role="log" aria-label="Salida del juego">
-      {#if visible.length}
-        {#each visible as line (line.id)}
-          {@const kind = levelOf(line.text)}
-          <div class="log-line" class:warning={kind === 'WARN'} class:error={kind === 'ERROR'}>
-            <span>{String(line.id).padStart(2, '0')}</span>
-            <code>{line.text}</code>
-          </div>
-        {/each}
-      {:else}
-        <div class="console-empty">
-          <span aria-hidden="true">›_</span>
-          <strong>{emptyHeading}</strong>
-          <p>Lo que escriba Minecraft aparecerá aquí al pulsar JUGAR. Es útil si algo falla y necesitas pedir ayuda.</p>
-        </div>
-      {/if}
-    </div>
-
-    <div class="console-status">
-      <span>
-        <span class="status-dot" class:warn={!running}></span>
-        {running ? 'Minecraft está abierto' : 'Minecraft no está abierto'}
-      </span>
-      <span>Solo lectura</span>
-    </div>
-  </section>
-{:else}
-  <section class="session-card panel">
-    <div class="session-empty">
-      <div>
-        <h2>Crea tu primera instancia</h2>
-        <p>Una instancia es tu mundo de Minecraft con su propia versión. Elige la que quieras y juega.</p>
-      </div>
-      <Button variant="primary" large onclick={() => nav.create()}>Crear instancia</Button>
-    </div>
-  </section>
-{/if}
+    {#if failure}
+      <McDialog
+        title={failure.retry ? 'Sin conexión' : failure.signIn ? 'Inicia sesión de nuevo' : 'Algo salió mal'}
+        message={failure.message}
+        buttons={failureButtons}
+        cancelIndex={0}
+        onclose={dismissFailure}
+      />
+    {/if}
+  {:else}
+    <McText text="Crea tu primera instancia" x={-155} y={70} w={310} align="center" />
+    <McText text="Una instancia es tu mundo de Minecraft con su propia versión. Elige la que quieras y juega." x={-155} y={88} w={310} align="center" color="#a0a0a0" maxLines={3} />
+    <McButton label="Crear instancia" y={130} onclick={() => nav.create()} />
+    <McButton anchor="bottom" y={-28} label="Atrás" onclick={() => nav.go('menu')} />
+  {/if}
+</McScreen>
