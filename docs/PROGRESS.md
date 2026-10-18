@@ -70,6 +70,12 @@ Java ≥ 9 aceptado para versiones de Java 8 · runtimes gestionados redescargad
 - 🟡 Mods de Forge/NeoForge: ahora se listan (lee `mods.toml`/`neoforge.mods.toml`), activan/desactivan, quitan y se buscan en Modrinth con su categoria; probado con jars sinteticos, falta una prueba real con Modrinth y el juego (los E2E reales de Forge/NeoForge no incluyen mods).
 - ✅ Skins locales: se guardan, previsualizan y se aplican en el juego (resource pack `DisorderLauncher-skin.zip` generado al lanzar; verificado en Vanilla 1.12.2). Limite: el modelo de brazos lo decide Minecraft por UUID.
 - 🟡 Editor de skins: alternativa de teclado hecha (flechas mueven el cursor, Mayús salta 8, Intro/Espacio pintan; probada solo por compilacion, falta revisarla a mano).
+- ✅ Ventana unica (`tauri-plugin-single-instance`): abrir el launcher otra vez trae al frente la ventana existente.
+- ✅ Red solo bajo demanda: el arranque no hace peticiones propias; WebView2 sin actualizaciones/sincronizacion en segundo plano. Las listas de versiones se piden al abrir «Crear instancia» y se guardan para uso sin conexion.
+- ✅ Versiones: catalogo completo (919 en Mojang: estables, snapshots, beta, alpha) filtrado por tipo de instancia; sin red se usa la ultima lista o lo ya instalado, y crear instancias con loader usa el loader instalado.
+- ✅ Icono elegible por instancia (12 objetos en pixel art propios).
+- ✅ Editor de skins: recuadros con el nombre de cada parte del cuerpo y selector «Parte del cuerpo».
+- ✅ Optimizacion para equipos modestos (`Instance.optimization`): banderas de la JVM, opciones graficas iniciales (una vez) y mods de rendimiento de Modrinth; verificado con Vanilla 1.12.2 (SerialGC + `options.txt`) y Modrinth real (Sodium, Lithium, FerriteCore, EntityCulling, ModernFix).
 - ✅ Tema: `typography.scale` x `density.uiScale` se aplican como zoom; ⬜ `density.compact` aun no.
 - ⬜ Rendimiento: verificar ~2000 assets tarda ≈ 4,5–6 s (E/S de archivos en Windows).
 - ⬜ `style-src 'unsafe-inline'` sigue necesario por los estilos de Svelte.

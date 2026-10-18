@@ -38,6 +38,9 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `mods_check_updates` | `id` | `{ file, projectId, title, currentVersion, latestVersion }[]` |
 | `mods_update` | `id`, `file` | `InstalledMod` (guarda la version anterior) |
 | `mods_rollback` | `id`, `file` | `void` (restaura la version anterior) |
+| `minecraft_version_catalog` | `loader` | `{ versions: VersionEntry[], source: 'online' \| 'cached' \| 'installed' }` — todas las versiones (estables, snapshots, beta y alpha) que admite ese tipo de instancia; con red filtra por lo que soporta Fabric/Quilt/Forge/NeoForge; sin red usa la ultima lista guardada o lo ya instalado |
+| `instances_optimize_mods` | `id` | `{ installed: string[], skipped: { name, reason }[] }` — instala los mods de rendimiento recomendados (Sodium/Embeddium, Lithium, FerriteCore, EntityCulling, ModernFix...) en instancias con mods |
+| `instances_update` (campos nuevos) | `icon?`, `optimization?` | `icon`: id de `itemIcons` (cadena vacia = el del tipo); `optimization`: `off` \| `balanced` \| `lowEnd` |
 | `skins_list` | — | `{ id, name, model: 'classic' \| 'slim', source, width, height, createdAt, updatedAt }[]` |
 | `skins_import` | — | `SkinAsset \| null` — selector de PNG; se valida la firma real, 64x64 / 64x32 y ≤ 256 KB; se recodifica a RGBA sin metadatos |
 | `skins_read` | `id` | `string` (data URL PNG) |
