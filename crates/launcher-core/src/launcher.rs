@@ -58,6 +58,8 @@ pub struct Launcher {
     settings: Mutex<Settings>,
     pub(crate) theme_store: themes::ThemeStore,
     pub(crate) skin_library: skins::SkinLibrary,
+    /// Un candado por instancia para los cambios de mods (el archivo de registro se lee, cambia y guarda entero).
+    mods_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
     running: Mutex<HashMap<String, Option<GameKiller>>>,
 }
@@ -113,6 +115,7 @@ impl Launcher {
             theme_store: themes::ThemeStore::new(paths.themes_dir()),
             skin_library: skins::SkinLibrary::new(paths.skins_dir()),
             running: Mutex::new(HashMap::new()),
+            mods_locks: Mutex::new(HashMap::new()),
             paths,
         }
     }
@@ -311,6 +314,18 @@ impl Launcher {
                 profile_id,
             })
             .await?)
+    }
+
+    /// Espera el turno para cambiar los mods de una instancia (una operacion a la vez por instancia).
+    pub(crate) async fn mods_guard(&self, instance_id: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        let lock = self
+            .mods_locks
+            .lock()
+            .unwrap()
+            .entry(instance_id.to_string())
+            .or_default()
+            .clone();
+        lock.lock_owned().await
     }
 
     pub(crate) fn loader_provider(&self, kind: LoaderKind) -> Result<&Arc<dyn LoaderProvider>, LauncherError> {

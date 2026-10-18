@@ -887,3 +887,40 @@ async fn real_version_catalog_is_filtered_per_loader() {
     assert!(!ids(launcher.version_catalog(LoaderKind::NeoForge).await.unwrap()).contains(&"1.12.2".to_string()));
     assert!(ids(launcher.version_catalog(LoaderKind::Forge).await.unwrap()).contains(&"1.12.2".to_string()));
 }
+
+/// Varias operaciones de mods a la vez sobre la misma instancia no se pisan entre si.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn simultaneous_mod_changes_on_one_instance_are_all_kept() {
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(dir.path().join("data")), Arc::new(Collector::default())));
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher
+        .instances_create("Mods", "1.20.1", LoaderKind::Fabric, Some("0.15.0".into()))
+        .await
+        .unwrap();
+
+    let jars: Vec<std::path::PathBuf> = (0..10)
+        .map(|i| {
+            let path = dir.path().join(format!("mod{i}.jar"));
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+            zip.start_file("fabric.mod.json", zip::write::SimpleFileOptions::default()).unwrap();
+            write!(zip, r#"{{"schemaVersion":1,"id":"testmod{i}","version":"1.0.{i}","name":"Test {i}"}}"#).unwrap();
+            zip.finish().unwrap();
+            path
+        })
+        .collect();
+
+    let tasks: Vec<_> = jars
+        .into_iter()
+        .map(|jar| {
+            let launcher = launcher.clone();
+            let id = instance.id.clone();
+            tokio::spawn(async move { launcher.mods_add_local(&id, &jar).await.unwrap() })
+        })
+        .collect();
+    for t in tasks {
+        t.await.unwrap();
+    }
+    assert_eq!(launcher.mods_list(&instance.id).await.unwrap().mods.len(), 10);
+}

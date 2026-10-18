@@ -90,6 +90,7 @@ impl Launcher {
 
     pub async fn mods_set_enabled(&self, instance_id: &str, file: &str, enabled: bool) -> Result<(), LauncherError> {
         self.ensure_idle(instance_id)?;
+        let _turn = self.mods_guard(instance_id).await;
         let (_, manager) = self.mod_context(instance_id).await?;
         manager.set_enabled(file, enabled).await?;
         Ok(())
@@ -97,6 +98,7 @@ impl Launcher {
 
     pub async fn mods_remove(&self, instance_id: &str, file: &str) -> Result<(), LauncherError> {
         self.ensure_idle(instance_id)?;
+        let _turn = self.mods_guard(instance_id).await;
         let (_, manager) = self.mod_context(instance_id).await?;
         Ok(manager.remove(file).await?)
     }
@@ -104,6 +106,7 @@ impl Launcher {
     /// Agrega un `.jar` elegido por el usuario en el selector de archivos.
     pub async fn mods_add_local(&self, instance_id: &str, source: &Path) -> Result<ModEntry, LauncherError> {
         self.ensure_idle(instance_id)?;
+        let _turn = self.mods_guard(instance_id).await;
         let (instance, manager) = self.mod_context(instance_id).await?;
         Self::require_mod_support(&instance)?;
         Ok(manager.add_local(source).await?)
@@ -120,6 +123,7 @@ impl Launcher {
     /// Instala un mod de Modrinth con sus dependencias obligatorias.
     pub async fn mods_install(&self, instance_id: &str, project_id: &str) -> Result<Vec<InstalledMod>, LauncherError> {
         self.ensure_idle(instance_id)?;
+        let _turn = self.mods_guard(instance_id).await;
         let (instance, manager) = self.mod_context(instance_id).await?;
         Self::require_mod_support(&instance)?;
         let loader = loader_name(instance.loader);
@@ -138,6 +142,7 @@ impl Launcher {
 
     pub async fn mods_update(&self, instance_id: &str, file: &str) -> Result<InstalledMod, LauncherError> {
         self.ensure_idle(instance_id)?;
+        let _turn = self.mods_guard(instance_id).await;
         let (instance, manager) = self.mod_context(instance_id).await?;
         Self::require_mod_support(&instance)?;
         let loader = loader_name(instance.loader);
@@ -147,6 +152,7 @@ impl Launcher {
 
     pub async fn mods_rollback(&self, instance_id: &str, file: &str) -> Result<(), LauncherError> {
         self.ensure_idle(instance_id)?;
+        let _turn = self.mods_guard(instance_id).await;
         let (_, manager) = self.mod_context(instance_id).await?;
         Ok(self.mods_service.rollback(&manager, file).await?)
     }
