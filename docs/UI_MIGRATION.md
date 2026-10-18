@@ -81,7 +81,7 @@ Leyenda: ✅ hecho · 🟡 en curso · ⬜ pendiente. El que avance una fase act
 - **Ventana nativa**: verificada el 2026-10-17 con `tauri dev` y backend real: arranca bajo la CSP de desarrollo sin errores, Jugar lanza la instancia existente, la consola muestra la salida real del juego y «Cerrar juego» lo detiene. Sigue sin recorrerse a mano la creacion de perfiles/instancias nuevas.
 
 - Crear instancia ya incluye «Opciones avanzadas» (memoria y Java), igual que la maqueta.
-- Icono de instancia elegible (maqueta): requiere cambio de contrato; ver «Decisiones».
+- Icono de instancia elegible: hecho (12 iconos propios en pixel art, `itemIcons.ts`; campo `icon` en la instancia).
 - `Mods` y `SkinEditor` solo recibieron el aspecto por los componentes compartidos y la cabecera; no se rediseño su disposicion interna.
 - Fuentes Space Grotesk e IBM Plex Sans incluidas en `apps/desktop/public/fonts` (woff2 latin, licencia OFL, via @font-face en `app.css`); verificado en la ventana nativa bajo la CSP: se cargan sin errores.
 - `typography.scale` x `density.uiScale` de los temas se aplican como `zoom` del documento (`theme.ts`, con prueba). `density.compact` sigue sin aplicarse.

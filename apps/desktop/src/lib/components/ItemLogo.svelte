@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { findItemIcon } from '../itemIcons'
   import type { LoaderKind } from '../types'
 
-  let { loader }: { loader: LoaderKind } = $props()
+  /** `icon`: id elegido por la persona; sin el, se usa el logo del tipo de instancia. */
+  let { loader, icon = null, size = 38 }: { loader: LoaderKind; icon?: string | null; size?: number } = $props()
+
+  const chosen = $derived(findItemIcon(icon))
 
   type Shape = { d: string; fill: string }
 
@@ -25,14 +29,20 @@
   const item = $derived(shapes[loader === 'neoforge' ? 'diamond' : 'apple'])
 </script>
 
-{#if block}
+{#if chosen}
+  <svg class="item-logo" viewBox="0 0 16 16" width={size} height={size} shape-rendering="crispEdges" aria-hidden="true">
+    {#each chosen.pixels as color, i (i)}
+      {#if color}<rect x={i % 16} y={Math.floor(i / 16)} width="1" height="1" fill={color} />{/if}
+    {/each}
+  </svg>
+{:else if block}
   <div class="block {block}" aria-hidden="true">
     <span></span>
     <i></i>
     <b></b>
   </div>
 {:else}
-  <svg class="item-logo" viewBox="0 0 32 32" width="38" height="38" aria-hidden="true">
+  <svg class="item-logo" viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
     {#each item as shape, i (i)}
       <path d={shape.d} fill={shape.fill} />
     {/each}

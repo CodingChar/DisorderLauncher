@@ -24,7 +24,7 @@
 
 <section class="instance-card" class:selected aria-label={instance.name}>
   <div class="instance-top">
-    <ItemLogo loader={instance.loader} />
+    <ItemLogo loader={instance.loader} icon={instance.icon} />
     <span class="loader-badge">{loaderName(instance.loader)}</span>
     {#if running}
       <span class="active-instance"><span class="status-dot"></span>En ejecución</span>

@@ -2,6 +2,7 @@
   import Button from '../lib/components/Button.svelte'
   import PageHeading from '../lib/components/PageHeading.svelte'
   import Card from '../lib/components/Card.svelte'
+  import IconPicker from '../lib/components/IconPicker.svelte'
   import Input from '../lib/components/Input.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
   import Select from '../lib/components/Select.svelte'
@@ -16,6 +17,7 @@
   let error = $state<string | null>(null)
   let busy = $state(false)
   let importing = $state(false)
+  let icon = $state('')
   let memoryMode = $state<'auto' | 'fixed'>('auto')
   let maxGb = $state('4')
   let javaMode = $state<'auto' | 'path'>('auto')
@@ -59,8 +61,9 @@
     try {
       const instance = await instances.create(name, version, loader)
       // Los ajustes avanzados solo se guardan si se cambiaron; lo normal es dejarlos en automatico.
-      if (memoryMode === 'fixed' || javaMode === 'path') {
+      if (memoryMode === 'fixed' || javaMode === 'path' || icon) {
         await instances.update(instance.id, {
+          ...(icon ? { icon } : {}),
           ...(memoryMode === 'fixed' ? { memory: { mode: 'fixed' as const, minMb: 512, maxMb: Math.round(gb * 1024) } } : {}),
           ...(javaMode === 'path' ? { java: { mode: 'path' as const, path: javaPath.trim() } } : {}),
         })
@@ -87,6 +90,7 @@
     >
       <Input label="Nombre" bind:value={name} maxlength={64} />
       <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
+      <IconPicker bind:value={icon} {loader} disabled={busy} />
 
       <VersionPicker {loader} bind:value={version} disabled={busy} />
 

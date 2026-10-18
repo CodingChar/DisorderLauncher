@@ -209,6 +209,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         profileId: defaultId,
         java: { mode: 'auto' },
         memory: { mode: 'auto' },
+        icon: null,
         createdAt: now,
         updatedAt: now,
       }
@@ -222,6 +223,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       if (c.name !== undefined && !String(c.name).trim()) throw 'el nombre no puede estar vacio'
       if (c.java?.mode === 'path' && !String(c.java.path).includes('jre')) throw 'No se encontro Java en esa carpeta.'
       Object.assign(inst, c, { updatedAt: new Date().toISOString() })
+      if (c.icon !== undefined) inst.icon = c.icon === '' ? null : c.icon
       instances = [...instances]
       return inst
     }
@@ -329,7 +331,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         await sleep(80)
       }
       const now = new Date().toISOString()
-      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, createdAt: now, updatedAt: now }
+      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, createdAt: now, updatedAt: now }
       instances = [...instances, inst]
       return inst
     }

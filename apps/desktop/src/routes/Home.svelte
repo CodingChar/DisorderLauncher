@@ -132,7 +132,7 @@
     </div>
 
     <div class="session-identity">
-      <ItemLogo loader={instance.loader} />
+      <ItemLogo loader={instance.loader} icon={instance.icon} />
       <div>
         <h2>{instance.name}</h2>
         <p>Minecraft {instance.minecraftVersion} <span>·</span> {loaderName(instance.loader)}</p>

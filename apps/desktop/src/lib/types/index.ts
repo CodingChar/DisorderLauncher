@@ -38,6 +38,8 @@ export interface Instance {
   profileId: string
   java: JavaSelection
   memory: MemoryPolicy
+  /** Icono elegido (id de `itemIcons`); `null`: el del tipo de instancia. */
+  icon: string | null
   createdAt: string
   updatedAt: string
 }
@@ -103,6 +105,8 @@ export interface InstanceChanges {
   profileId?: string
   java?: JavaSelection
   memory?: MemoryPolicy
+  /** Cadena vacia: vuelve al icono por defecto. */
+  icon?: string
 }
 
 export type Theme = 'system' | 'light' | 'dark'

@@ -1,5 +1,5 @@
 use crate::file::InstanceFile;
-use crate::model::{validate_memory, validate_name, validate_required, validate_version};
+use crate::model::{validate_icon, validate_memory, validate_name, validate_required, validate_version};
 use crate::{
     Instance, InstanceError, InstanceUpdate, JavaSelection, MemoryPolicy, NewInstance,
 };
@@ -124,6 +124,7 @@ impl InstanceRepository for FileInstanceRepository {
             profile_id: new.profile_id,
             java: JavaSelection::Auto,
             memory: MemoryPolicy::Auto,
+            icon: None,
             game_dir,
             created_at: now,
             updated_at: now,
@@ -154,6 +155,9 @@ impl InstanceRepository for FileInstanceRepository {
         if let Some(memory) = changes.memory {
             validate_memory(&memory)?;
             instance.memory = memory;
+        }
+        if let Some(icon) = changes.icon {
+            instance.icon = validate_icon(&icon)?;
         }
         instance.updated_at = Utc::now();
         self.write(&instance).await?;
@@ -347,6 +351,27 @@ mod tests {
             ..Default::default()
         };
         assert!(matches!(repo.update(&inst.id, bad_mem).await, Err(InstanceError::Invalid(_))));
+    }
+
+    #[tokio::test]
+    async fn icon_is_a_short_id_that_can_be_set_cleared_and_is_copied() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("A")).await.unwrap();
+        assert_eq!(inst.icon, None);
+
+        let set = repo.update(&inst.id, InstanceUpdate { icon: Some("diamond-sword".into()), ..Default::default() }).await.unwrap();
+        assert_eq!(set.icon.as_deref(), Some("diamond-sword"));
+        assert_eq!(repo.duplicate(&inst.id).await.unwrap().icon.as_deref(), Some("diamond-sword"));
+        // Sin tocar el icono, otros cambios lo conservan.
+        let renamed = repo.update(&inst.id, InstanceUpdate { name: Some("B".into()), ..Default::default() }).await.unwrap();
+        assert_eq!(renamed.icon.as_deref(), Some("diamond-sword"));
+
+        for bad in ["../x", "A B", "Diamond", "a/b", &"x".repeat(33)] {
+            let r = repo.update(&inst.id, InstanceUpdate { icon: Some(bad.into()), ..Default::default() }).await;
+            assert!(matches!(r, Err(InstanceError::Invalid(_))), "{bad}");
+        }
+        let cleared = repo.update(&inst.id, InstanceUpdate { icon: Some(String::new()), ..Default::default() }).await.unwrap();
+        assert_eq!(cleared.icon, None);
     }
 
     #[tokio::test]

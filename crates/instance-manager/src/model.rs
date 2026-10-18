@@ -19,6 +19,9 @@ pub struct Instance {
     pub profile_id: String,
     pub java: JavaSelection,
     pub memory: MemoryPolicy,
+    /// Icono elegido para la instancia (id de la interfaz, p. ej. `diamond-sword`). `None`: el del tipo.
+    #[serde(default)]
+    pub icon: Option<String>,
     /// Derivado de la ubicacion en disco; no se guarda en `instance.json`.
     pub game_dir: PathBuf,
     pub created_at: DateTime<Utc>,
@@ -68,6 +71,8 @@ pub struct InstanceUpdate {
     pub profile_id: Option<String>,
     pub java: Option<JavaSelection>,
     pub memory: Option<MemoryPolicy>,
+    /// Cadena vacia: vuelve al icono por defecto.
+    pub icon: Option<String>,
 }
 
 pub(crate) fn validate_name(name: &str) -> Result<String, InstanceError> {
@@ -84,6 +89,19 @@ pub(crate) fn validate_name(name: &str) -> Result<String, InstanceError> {
         return Err(InstanceError::Invalid("el nombre contiene caracteres no permitidos".into()));
     }
     Ok(name.to_string())
+}
+
+/// El icono es un id corto de la interfaz (`a-z`, `0-9`, `-`); nunca una ruta.
+pub(crate) fn validate_icon(icon: &str) -> Result<Option<String>, InstanceError> {
+    let icon = icon.trim();
+    if icon.is_empty() {
+        return Ok(None);
+    }
+    let ok = icon.len() <= 32 && icon.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if !ok {
+        return Err(InstanceError::Invalid("el icono no es valido".into()));
+    }
+    Ok(Some(icon.to_string()))
 }
 
 pub(crate) fn validate_memory(memory: &MemoryPolicy) -> Result<(), InstanceError> {

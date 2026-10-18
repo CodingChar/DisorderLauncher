@@ -16,6 +16,9 @@ pub struct InstanceFile {
     pub profile_id: String,
     pub java: JavaSelection,
     pub memory: MemoryPolicy,
+    /// Campo agregado despues: los archivos antiguos no lo tienen.
+    #[serde(default)]
+    pub icon: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -41,6 +44,7 @@ impl InstanceFile {
             profile_id: instance.profile_id.clone(),
             java: instance.java.clone(),
             memory: instance.memory.clone(),
+            icon: instance.icon.clone(),
             created_at: instance.created_at,
             updated_at: instance.updated_at,
         }
@@ -59,6 +63,7 @@ impl InstanceFile {
             profile_id: self.profile_id,
             java: self.java,
             memory: self.memory,
+            icon: self.icon,
             game_dir,
             created_at: self.created_at,
             updated_at: self.updated_at,

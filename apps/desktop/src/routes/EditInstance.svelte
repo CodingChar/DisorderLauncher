@@ -3,6 +3,7 @@
   import Button from '../lib/components/Button.svelte'
   import PageHeading from '../lib/components/PageHeading.svelte'
     import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
+  import IconPicker from '../lib/components/IconPicker.svelte'
   import Input from '../lib/components/Input.svelte'
   import Select from '../lib/components/Select.svelte'
   import { api } from '../lib/api'
@@ -23,6 +24,7 @@
   let maxGb = $state('4')
   let javaMode = $state<'auto' | 'path'>('auto')
   let javaPath = $state('')
+  let icon = $state('')
 
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
@@ -34,6 +36,7 @@
     name = instance.name
     version = instance.minecraftVersion
     profileId = instance.profileId
+    icon = instance.icon ?? ''
     if (instance.memory.mode === 'fixed') {
       memoryMode = 'fixed'
       maxGb = String(Math.round((instance.memory.maxMb / 1024) * 10) / 10)
@@ -63,6 +66,7 @@
         name,
         minecraftVersion: version,
         profileId,
+        icon,
         memory:
           memoryMode === 'auto'
             ? { mode: 'auto' }
@@ -133,6 +137,7 @@
       >
         <Input label="Nombre" bind:value={name} maxlength={64} />
         <VersionPicker loader={instance.loader} bind:value={version} disabled={busy} autoSelect={false} />
+        <IconPicker bind:value={icon} loader={instance.loader} disabled={busy} />
         <Select label="Perfil que juega" bind:value={profileId} options={profileOptions} disabled={busy} />
 
         <fieldset class="group">
