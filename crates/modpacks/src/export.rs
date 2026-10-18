@@ -10,6 +10,9 @@ use std::path::{Path, PathBuf};
 const EXPORT_DIRS: &[&str] = &["config", "mods", "resourcepacks", "shaderpacks", "datapacks"];
 const EXPORT_FILES: &[&str] = &["options.txt"];
 const MAX_EXPORT_FILES: usize = 20_000;
+/// Resource pack con la skin del perfil que genera el launcher al lanzar (`launcher-core/skin_pack.rs`):
+/// es personal y se rehace sola, asi que no viaja en el paquete.
+const GENERATED_SKIN_PACK: &str = "DisorderLauncher-skin.zip";
 
 pub struct ExportInput<'a> {
     pub name: &'a str,
@@ -132,7 +135,9 @@ fn walk(root: &Path, relative: &Path, skip: &HashSet<String>, out: &mut Vec<Stri
             walk(root, &rel, skip, out)?;
         } else if kind.is_file() {
             let rel_str = rel.to_string_lossy().replace('\\', "/");
-            if rel_str.ends_with(".part") || skip.contains(&rel_str) || validate_relative_path(&rel_str).is_err() {
+            if rel_str.ends_with(".part")
+                || entry.file_name() == GENERATED_SKIN_PACK
+                || skip.contains(&rel_str) || validate_relative_path(&rel_str).is_err() {
                 continue;
             }
             out.push(rel_str);

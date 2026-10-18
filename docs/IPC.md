@@ -47,7 +47,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `skins_rename` / `skins_set_model` / `skins_remove` | `id`, … | `SkinAsset` / `SkinAsset` / `void` (quitar desvincula la skin de los perfiles) |
 | `skins_save` | `id?`, `name`, `pngBase64`, `model` | `SkinAsset` — guarda lo dibujado en el editor (crea o actualiza); se revalida y normaliza en Rust |
 | `skins_export` | `id` | `boolean` — pide donde guardar |
-| `accounts_set_skin` | `accountId`, `skinId \| null` | `void` — solo perfiles Offline Gaming; no registra nada en Microsoft; al lanzar, la skin se aplica con un resource pack de la instancia (`skin_pack.rs`) |
+| `accounts_set_skin` | `accountId`, `skinId \| null` | `void` — solo perfiles Offline Gaming; no registra nada en Microsoft; al lanzar, la skin se aplica con un pack de la instancia adaptado a su version (`skin_pack.rs`, `skins::adapt`) |
 | `themes_list` | — | `{ builtin, id, name, mode, colors, typography, shape, density, effects }[]` — incluidos primero |
 | `themes_import` | — | `Theme \| null` — selector de `.json`; Rust valida (colores `#RRGGBB`, fuentes seguras, rangos, contraste AA, sin campos desconocidos) |
 | `themes_remove` | `id` | `void` (solo temas del usuario; si estaba en uso vuelve al incluido) |

@@ -15,6 +15,8 @@ pub struct CheckedSkin {
     pub height: u32,
     /// PNG recodificado en RGBA de 8 bits, sin metadatos.
     pub png: Vec<u8>,
+    /// Los mismos pixeles ya decodificados (`width * height * 4` bytes RGBA).
+    pub rgba: Vec<u8>,
     pub detected_model: SkinModel,
 }
 
@@ -57,7 +59,7 @@ pub fn check_skin_png(bytes: &[u8]) -> Result<CheckedSkin, SkinError> {
 
     let detected_model = detect_model(&rgba, width, height);
     let png = encode_rgba(&rgba, width, height)?;
-    Ok(CheckedSkin { width, height, png, detected_model })
+    Ok(CheckedSkin { width, height, png, rgba, detected_model })
 }
 
 fn to_rgba(data: &[u8], color: png::ColorType) -> Result<Vec<u8>, SkinError> {

@@ -671,15 +671,24 @@ impl Launcher {
         Ok(plan)
     }
 
-    /// Lleva la skin del perfil Offline Gaming al juego (resource pack de la instancia).
-    /// Un fallo aqui no impide jugar: solo se registra.
+    /// Lleva la skin del perfil Offline Gaming al juego (pack de texturas de la instancia).
+    /// Con un perfil sin skin, o de otro proveedor (Microsoft usa su skin oficial), retira el pack
+    /// que haya dejado un perfil anterior. Un fallo aqui no impide jugar: solo se registra.
     async fn sync_profile_skin(&self, instance: &Instance, account: &identity_api::AccountRecord) {
-        let identity_api::ProviderAccountData::Local(local) = &account.provider_data else { return };
-        let png = match &local.skin_id {
-            Some(id) => self.skin_library.read_png(id).await.ok(),
-            None => None,
+        let skin = match &account.provider_data {
+            identity_api::ProviderAccountData::Local(local) => match &local.skin_id {
+                Some(id) => match (self.skin_library.get(id).await, self.skin_library.read_png(id).await) {
+                    (Some(asset), Ok(png)) => Some(crate::skin_pack::ProfileSkin { png, model: asset.model }),
+                    _ => {
+                        tracing::warn!(skin = %id, "la skin del perfil ya no existe; se juega sin ella");
+                        None
+                    }
+                },
+                None => None,
+            },
+            _ => None,
         };
-        if let Err(e) = crate::skin_pack::sync(&instance.game_dir, &instance.minecraft_version, png).await {
+        if let Err(e) = crate::skin_pack::sync(&instance.game_dir, &instance.minecraft_version, skin).await {
             tracing::warn!(error = %e, "no se pudo aplicar la skin del perfil al juego");
         }
     }
