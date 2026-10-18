@@ -20,13 +20,17 @@
   const shown = $derived(fitText(text ?? '', max ? max - 1 : 0)) // el lienzo anade 1 px de sombra
   const width = $derived(stringWidth(shown))
 
+  // El tamano del lienzo se fija aqui, junto al dibujo, y no con el atributo `width` de la plantilla:
+  // cambiar ese atributo borra el lienzo y, si el dibujo no llega en la misma pasada, el texto desaparece.
   $effect(() => {
     if (!canvas || !fontStatus.ready) return
     const image = renderText(shown, color)
     canvas.width = image.width
     canvas.height = image.height
-    canvas.getContext('2d')!.drawImage(image, 0, 0)
+    const ctx = canvas.getContext('2d')!
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(image, 0, 0)
   })
 </script>
 
-<span class="bitmap-label" style:margin-left={center ? `${-(width >> 1)}px` : undefined}>{#if sr}<span class="sr-only">{text}</span>{/if}<canvas bind:this={canvas} width={Math.max(1, width + 1)} height="9" aria-hidden="true"></canvas></span>
+<span class="bitmap-label" style:margin-left={center ? `${-(width >> 1)}px` : undefined}>{#if sr}<span class="sr-only">{text}</span>{/if}<canvas bind:this={canvas} style:width="{Math.max(1, width + 1)}px" style:height="9px" aria-hidden="true"></canvas></span>

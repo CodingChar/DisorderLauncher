@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { getCurrentWindow } from '@tauri-apps/api/window'
-  import BitmapText from '../lib/mc/BitmapText.svelte'
   import McButton from '../lib/mc/McButton.svelte'
   import McLabel from '../lib/mc/McLabel.svelte'
-  import { stringWidth } from '../lib/mc/font'
+  import BitmapText from '../lib/mc/BitmapText.svelte'
+  import { renderText, stringWidth } from '../lib/mc/font'
+  import { fontStatus } from '../lib/mc/fontStatus.svelte'
   import { useGui } from '../lib/mc/gui'
   import { drawLogo } from '../lib/mc/logo'
   import { posStyle } from '../lib/mc/pos'
@@ -24,7 +25,7 @@
   const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
   let logo = $state<HTMLCanvasElement>()
-  let splashEl = $state<HTMLDivElement>()
+  let splashEl = $state<HTMLCanvasElement>()
   let logoWidth = $state(288)
   let logoHeight = $state(28)
   let splash = $state('¡Bienvenido!')
@@ -47,12 +48,38 @@
     logoHeight = size.height
   })
 
+  // Como GuiMainMenu: amarillo puro, girado -20 grados y con latido de escala. Se dibuja a la resolucion
+  // real del dispositivo con vecino mas cercano (como la fuente de Minecraft), sin escalar texto en CSS.
+  const SPLASH_COLOR = '#ffff00'
+
   function placeSplash(now: number, still: boolean) {
-    if (!splashEl) return
+    const canvas = splashEl
+    if (!canvas || !fontStatus.ready) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const pulse = still ? 0 : Math.abs(Math.sin(((now % 1000) / 1000) * Math.PI * 2) * 0.1)
-    const factor = ((1.8 - pulse) * 100) / (splashWidth + 32)
-    splashEl.style.transform = `translate(${gui.cx + logoWidth / 2 - 47}px, ${logoTop + logoHeight - 4}px) rotate(-20deg) scale(${factor}) translate(${-(splashWidth >> 1)}px, -8px)`
+    const scale = ((1.8 - pulse) * 100) / (splashWidth + 32)
+    const glyph = renderText(splash, SPLASH_COLOR)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.imageSmoothingEnabled = false
+    // Unidades de GUI a pixeles de dispositivo; luego posicion, giro y escala del splash.
+    ctx.setTransform(gui.factor, 0, 0, gui.factor, 0, 0)
+    ctx.translate(gui.cx + logoWidth / 2 - 47, logoTop + logoHeight - 4)
+    ctx.rotate(-20 * (Math.PI / 180))
+    ctx.scale(scale, scale)
+    ctx.drawImage(glyph, -(splashWidth >> 1), -8)
   }
+
+  // El lienzo cubre la pantalla entera en px de GUI y se ajusta al tamano del escenario.
+  $effect(() => {
+    const canvas = splashEl
+    if (!canvas) return
+    canvas.width = gui.W * gui.factor
+    canvas.height = gui.H * gui.factor
+    void [gui.W, gui.H, gui.cx, logoWidth, logoHeight, splashWidth, fontStatus.ready]
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden) placeSplash(0, true)
+  })
 
   onMount(() => {
     const motion = matchMedia('(prefers-reduced-motion: reduce)')
@@ -86,12 +113,6 @@
     }
   })
 
-  // El escenario no se reencaja solo: la posicion del splash depende del logo y de la ventana.
-  $effect(() => {
-    void [gui.W, gui.cx, logoWidth, logoHeight, splashWidth]
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden) placeSplash(0, true)
-  })
-
   function quit() {
     getCurrentWindow().close()
   }
@@ -101,7 +122,7 @@
   <header class="title-zone">
     <h1 class="sr-only">DisorderLauncher</h1>
     <canvas class="logo" bind:this={logo} style="top:{logoTop}px;width:{logoWidth}px;height:{logoHeight}px" aria-hidden="true"></canvas>
-    <div class="splash" bind:this={splashEl} aria-hidden="true"><BitmapText text={splash} color="#ffff00" sr={false} /></div>
+    <canvas class="splash" bind:this={splashEl} style="width:calc(var(--W) * 1px);height:calc(var(--H) * 1px)" aria-hidden="true"></canvas>
   </header>
 
   {#each notes as note, i (note.text)}
