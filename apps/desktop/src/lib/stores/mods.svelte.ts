@@ -56,6 +56,16 @@ class ModsStore {
     return this.run(id, file, () => api.modsRemove(id, file))
   }
 
+  /** Instala los mods de rendimiento recomendados (Sodium, Lithium...) y resume el resultado. */
+  optimize(id: string) {
+    return this.run(id, 'optimize', async () => {
+      const report = await api.instancesOptimizeMods(id)
+      const done = report.installed.length > 0 ? `Instalados: ${report.installed.join(', ')}.` : 'No se instaló nada nuevo.'
+      const skipped = report.skipped.length > 0 ? ` No disponibles para esta versión: ${report.skipped.map((s) => s.name).join(', ')}.` : ''
+      return done + skipped
+    })
+  }
+
   addLocal(id: string) {
     return this.run(id, 'add', async () => {
       const added = await api.modsAddLocal(id)

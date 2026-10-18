@@ -626,6 +626,7 @@ impl Launcher {
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
 
         let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
+        ctx.extra_jvm_args = self.apply_optimization(instance).await;
         ctx.game_assets_dir = game_assets_dir;
         ctx.overlay = overlay;
         ctx.memory = match &instance.memory {

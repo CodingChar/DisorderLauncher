@@ -131,6 +131,15 @@ pub async fn minecraft_version_catalog(
   state.launcher.version_catalog(loader).await.map_err(user_message)
 }
 
+/// Instala los mods de rendimiento recomendados para la instancia (Sodium, Lithium...).
+#[tauri::command]
+pub async fn instances_optimize_mods(
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<launcher_core::OptimizationReport, String> {
+  state.launcher.optimization_install_mods(&id).await.map_err(user_message)
+}
+
 #[tauri::command]
 pub async fn settings_get(state: State<'_, AppState>) -> Result<launcher_core::SettingsSnapshot, String> {
   Ok(state.launcher.settings_snapshot())

@@ -22,6 +22,9 @@ pub struct Instance {
     /// Icono elegido para la instancia (id de la interfaz, p. ej. `diamond-sword`). `None`: el del tipo.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Ajustes de rendimiento para equipos modestos.
+    #[serde(default)]
+    pub optimization: Optimization,
     /// Derivado de la ubicacion en disco; no se guarda en `instance.json`.
     pub game_dir: PathBuf,
     pub created_at: DateTime<Utc>,
@@ -73,6 +76,20 @@ pub struct InstanceUpdate {
     pub memory: Option<MemoryPolicy>,
     /// Cadena vacia: vuelve al icono por defecto.
     pub icon: Option<String>,
+    pub optimization: Option<Optimization>,
+}
+
+/// Nivel de optimizacion de una instancia: ajusta la JVM y las opciones graficas iniciales del juego.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Optimization {
+    /// Sin cambios (valores de Minecraft).
+    #[default]
+    Off,
+    /// Recolector de basura mas suave y graficos algo reducidos.
+    Balanced,
+    /// Para equipos modestos: lo minimo en graficos y la JVM mas ligera.
+    LowEnd,
 }
 
 pub(crate) fn validate_name(name: &str) -> Result<String, InstanceError> {

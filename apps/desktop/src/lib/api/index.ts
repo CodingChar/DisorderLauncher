@@ -23,6 +23,7 @@ import type {
   Settings,
   SettingsSnapshot,
   ThemeEntry,
+  OptimizationReport,
   VersionCatalog,
   VersionEntry,
 } from '../types'
@@ -89,6 +90,7 @@ export const api = {
   modsAddLocal: (id: string) => call<ModEntry | null>('mods_add_local', { id }),
   modsSearch: (id: string, query: string, page = 0) => call<ProjectHit[]>('mods_search', { id, query, page }),
   modsInstall: (id: string, projectId: string) => call<InstalledMod[]>('mods_install', { id, projectId }),
+  instancesOptimizeMods: (id: string) => call<OptimizationReport>('instances_optimize_mods', { id }),
   modsCheckUpdates: (id: string) => call<UpdateInfo[]>('mods_check_updates', { id }),
   modsUpdate: (id: string, file: string) => call<InstalledMod>('mods_update', { id, file }),
   modsRollback: (id: string, file: string) => call<void>('mods_rollback', { id, file }),

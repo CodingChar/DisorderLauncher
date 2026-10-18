@@ -1,7 +1,7 @@
 use crate::file::InstanceFile;
 use crate::model::{validate_icon, validate_memory, validate_name, validate_required, validate_version};
 use crate::{
-    Instance, InstanceError, InstanceUpdate, JavaSelection, MemoryPolicy, NewInstance,
+    Instance, InstanceError, InstanceUpdate, JavaSelection, MemoryPolicy, NewInstance, Optimization,
 };
 use chrono::Utc;
 use std::path::{Path, PathBuf};
@@ -125,6 +125,7 @@ impl InstanceRepository for FileInstanceRepository {
             java: JavaSelection::Auto,
             memory: MemoryPolicy::Auto,
             icon: None,
+            optimization: Optimization::default(),
             game_dir,
             created_at: now,
             updated_at: now,
@@ -155,6 +156,9 @@ impl InstanceRepository for FileInstanceRepository {
         if let Some(memory) = changes.memory {
             validate_memory(&memory)?;
             instance.memory = memory;
+        }
+        if let Some(optimization) = changes.optimization {
+            instance.optimization = optimization;
         }
         if let Some(icon) = changes.icon {
             instance.icon = validate_icon(&icon)?;

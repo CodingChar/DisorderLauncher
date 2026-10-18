@@ -109,3 +109,17 @@ async fn neoforge_mod_is_found_installed_and_read() {
 async fn forge_mod_is_found_installed_and_read() {
     install_jei_and_read_meta(InstanceTarget { minecraft_version: "1.20.1", loader: "forge" }).await;
 }
+
+/// Los mods de rendimiento recomendados se pueden pedir por su slug de Modrinth.
+#[tokio::test]
+#[ignore = "requiere internet"]
+async fn performance_mods_install_by_slug() {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = ModManager::new(dir.path().join("game"));
+    let service = ModsService::new(http());
+    for slug in ["sodium", "lithium", "ferrite-core", "entityculling", "modernfix"] {
+        let installed = service.install(&manager, slug, TARGET, 4).await.unwrap_or_else(|e| panic!("{slug}: {e}"));
+        println!("{slug}: {} archivo(s)", installed.len());
+    }
+    assert!(manager.list().await.unwrap().len() >= 5);
+}

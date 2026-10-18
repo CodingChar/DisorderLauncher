@@ -5,6 +5,7 @@
     import ConfirmDialog from '../lib/components/ConfirmDialog.svelte'
   import IconPicker from '../lib/components/IconPicker.svelte'
   import Input from '../lib/components/Input.svelte'
+  import PerformanceOptions from '../lib/components/PerformanceOptions.svelte'
   import Select from '../lib/components/Select.svelte'
   import { api } from '../lib/api'
   import { accounts } from '../lib/stores/accounts.svelte'
@@ -12,6 +13,7 @@
   import { nav } from '../lib/stores/nav.svelte'
   import { sessions } from '../lib/stores/sessions.svelte'
   import VersionPicker from '../lib/components/VersionPicker.svelte'
+  import type { Optimization } from '../lib/types'
 
   const instance = $derived(instances.selected)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
@@ -25,6 +27,7 @@
   let javaMode = $state<'auto' | 'path'>('auto')
   let javaPath = $state('')
   let icon = $state('')
+  let optimization = $state<Optimization>('off')
 
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
@@ -37,6 +40,7 @@
     version = instance.minecraftVersion
     profileId = instance.profileId
     icon = instance.icon ?? ''
+    optimization = instance.optimization ?? 'off'
     if (instance.memory.mode === 'fixed') {
       memoryMode = 'fixed'
       maxGb = String(Math.round((instance.memory.maxMb / 1024) * 10) / 10)
@@ -67,6 +71,7 @@
         minecraftVersion: version,
         profileId,
         icon,
+        optimization,
         memory:
           memoryMode === 'auto'
             ? { mode: 'auto' }
@@ -139,6 +144,8 @@
         <VersionPicker loader={instance.loader} bind:value={version} disabled={busy} autoSelect={false} />
         <IconPicker bind:value={icon} loader={instance.loader} disabled={busy} />
         <Select label="Perfil que juega" bind:value={profileId} options={profileOptions} disabled={busy} />
+
+        <PerformanceOptions bind:value={optimization} disabled={busy} />
 
         <fieldset class="group">
           <legend>Memoria (RAM)</legend>

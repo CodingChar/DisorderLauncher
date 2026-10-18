@@ -95,6 +95,9 @@
     {#if tab === 'installed'}
       <div class="toolbar">
         <Button disabled={running || mods.busy !== null} onclick={() => instance && mods.addLocal(instance.id)}>Agregar archivo…</Button>
+        <Button disabled={running || mods.busy !== null} onclick={() => instance && mods.optimize(instance.id)}>
+          {mods.busy === 'optimize' ? 'Instalando…' : 'Mejorar rendimiento'}
+        </Button>
         <Button disabled={mods.busy !== null || !overview?.mods.some((m) => m.source)} onclick={() => instance && mods.checkUpdates(instance.id)}>
           {mods.busy === 'updates' ? 'Buscando…' : 'Buscar actualizaciones'}
         </Button>

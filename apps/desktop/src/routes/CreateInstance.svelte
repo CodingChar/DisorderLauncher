@@ -4,12 +4,13 @@
   import Card from '../lib/components/Card.svelte'
   import IconPicker from '../lib/components/IconPicker.svelte'
   import Input from '../lib/components/Input.svelte'
+  import PerformanceOptions from '../lib/components/PerformanceOptions.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
   import Select from '../lib/components/Select.svelte'
   import VersionPicker from '../lib/components/VersionPicker.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
-  import type { LoaderKind } from '../lib/types'
+  import type { LoaderKind, Optimization } from '../lib/types'
 
   let name = $state('Mi mundo')
   let version = $state('')
@@ -18,6 +19,7 @@
   let busy = $state(false)
   let importing = $state(false)
   let icon = $state('')
+  let optimization = $state<Optimization>('off')
   let memoryMode = $state<'auto' | 'fixed'>('auto')
   let maxGb = $state('4')
   let javaMode = $state<'auto' | 'path'>('auto')
@@ -61,9 +63,10 @@
     try {
       const instance = await instances.create(name, version, loader)
       // Los ajustes avanzados solo se guardan si se cambiaron; lo normal es dejarlos en automatico.
-      if (memoryMode === 'fixed' || javaMode === 'path' || icon) {
+      if (memoryMode === 'fixed' || javaMode === 'path' || icon || optimization !== 'off') {
         await instances.update(instance.id, {
           ...(icon ? { icon } : {}),
+          ...(optimization !== 'off' ? { optimization } : {}),
           ...(memoryMode === 'fixed' ? { memory: { mode: 'fixed' as const, minMb: 512, maxMb: Math.round(gb * 1024) } } : {}),
           ...(javaMode === 'path' ? { java: { mode: 'path' as const, path: javaPath.trim() } } : {}),
         })
@@ -97,6 +100,8 @@
       <details class="settings-block advanced">
         <summary>Opciones avanzadas</summary>
         <p class="subtle">Puedes dejarlas como están: no hace falta tocar nada para jugar. Cámbialas solo si sabes lo que necesita tu instancia.</p>
+
+        <PerformanceOptions bind:value={optimization} disabled={busy} />
 
         <fieldset class="group">
           <legend>Memoria (RAM)</legend>

@@ -106,6 +106,8 @@ pub struct LaunchContext {
     /// Directorio de juego de la instancia (saves, mods, options).
     pub game_dir: PathBuf,
     pub memory: MemorySettings,
+    /// Banderas de la JVM que agrega el launcher (p. ej. optimizacion para equipos modestos).
+    pub extra_jvm_args: Vec<String>,
     pub window_size: Option<(u32, u32)>,
     /// Valor de `${game_assets}` cuando el indice de assets es legacy
     /// (`map_to_resources` -> `<gameDir>/resources`). Por defecto `assets/virtual/<indice>`.
@@ -121,6 +123,7 @@ impl LaunchContext {
             data_dir: data_dir.into(),
             game_dir: game_dir.into(),
             memory: MemorySettings::default(),
+            extra_jvm_args: Vec::new(),
             window_size: None,
             game_assets_dir: None,
             overlay: None,
@@ -198,6 +201,7 @@ impl LaunchPlanBuilder {
         if let Some(max) = ctx.memory.max_mb {
             jvm_args.push(format!("-Xmx{max}M"));
         }
+        jvm_args.extend(ctx.extra_jvm_args.iter().cloned());
         // `-cp`/`${classpath}` los emite `command_args` a partir de `classpath`.
         for raw in strip_classpath_args(raw_jvm) {
             jvm_args.push(placeholders.apply(&raw)?);

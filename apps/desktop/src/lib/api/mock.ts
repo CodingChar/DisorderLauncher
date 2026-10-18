@@ -210,6 +210,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         java: { mode: 'auto' },
         memory: { mode: 'auto' },
         icon: null,
+        optimization: 'off',
         createdAt: now,
         updatedAt: now,
       }
@@ -331,7 +332,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         await sleep(80)
       }
       const now = new Date().toISOString()
-      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, createdAt: now, updatedAt: now }
+      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, optimization: 'off', createdAt: now, updatedAt: now }
       instances = [...instances, inst]
       return inst
     }
@@ -408,6 +409,11 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
     case 'settings_update':
       settings = { ...args.settings }
       return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
+    case 'instances_optimize_mods': {
+      const inst = instances.find((i) => i.id === args.id)
+      if (!inst || inst.loader === 'vanilla') throw 'Esta instancia no admite mods. Crea una con Fabric, Quilt, Forge o NeoForge para añadir mods de rendimiento.'
+      return { installed: ['Sodium (grafico)', 'Lithium (logica del juego)', 'FerriteCore (memoria)'], skipped: [{ name: 'ImmediatelyFast', reason: 'No hay una version compatible con esta version de Minecraft.' }] }
+    }
     case 'minecraft_version_catalog':
       return { versions: mockCatalog(String(args.loader)), source: 'online' }
     case 'minecraft_list_versions':

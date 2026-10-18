@@ -29,6 +29,14 @@ export type MemoryPolicy =
   | { mode: 'auto' }
   | { mode: 'fixed'; minMb: number; maxMb: number }
 
+/** Nivel de optimizacion de una instancia para equipos modestos. */
+export type Optimization = 'off' | 'balanced' | 'lowEnd'
+
+export interface OptimizationReport {
+  installed: string[]
+  skipped: { name: string; reason: string }[]
+}
+
 export interface Instance {
   id: string
   name: string
@@ -40,6 +48,7 @@ export interface Instance {
   memory: MemoryPolicy
   /** Icono elegido (id de `itemIcons`); `null`: el del tipo de instancia. */
   icon: string | null
+  optimization: Optimization
   createdAt: string
   updatedAt: string
 }
@@ -107,6 +116,7 @@ export interface InstanceChanges {
   memory?: MemoryPolicy
   /** Cadena vacia: vuelve al icono por defecto. */
   icon?: string
+  optimization?: Optimization
 }
 
 export type Theme = 'system' | 'light' | 'dark'
