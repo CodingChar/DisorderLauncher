@@ -38,6 +38,12 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 - Frontend: 18 pruebas (Vitest) de la logica del editor; `svelte-check` sin errores.
 - Pruebas reales (manuales): `real_vanilla_install_launch_and_stop`, `real_fabric_install_launch_and_stop`, `real_quilt_install_launch_and_stop`, `real_fabric_with_modrinth_mod_loads_the_mod`, `real_forge_install_launch_and_stop`, `real_neoforge_install_launch_and_stop`, `real_fabric_install`, `real_quilt_install`, `real_modpack_export_and_import_use_modrinth_references`, `real_manifest_…`, y las de Modrinth (incluye `forge_mod_is_found_installed_and_read` y `neoforge_mod_is_found_installed_and_read`) en `crates/mods/tests/real_modrinth.rs`.
 
+Ultima corrida completa de las 19 pruebas reales (`cargo test --workspace -- --ignored --test-threads=1`, 2026-10-18): todas ok (Vanilla, Fabric, Quilt, Forge y NeoForge instalan y arrancan; Modrinth; modpacks; catalogo de versiones; rendimiento).
+
+## Consumo en reposo (release, Windows 10)
+
+Launcher (exe) 24 MB; WebView2 ≈ 280 MB de memoria total (165 MB privada) con 5 procesos tras limitarlo a un renderer, GPU en proceso y sin crashpad (antes ≈ 310 MB). CPU en reposo ≈ 0. Ejecutable de 17,4 MB (LTO + strip), MSI de 6,5 MB. Ordenes IPC de lectura: 4–6 ms.
+
 ## Rendimiento (Windows 10, release)
 
 | Medicion | Resultado |
