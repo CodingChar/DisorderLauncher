@@ -596,7 +596,7 @@
 
   @media (max-width: 1100px) {
     .layout {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
@@ -727,11 +727,12 @@
   }
 
   .canvas-wrap {
+    min-width: 0;
     overflow: auto;
     max-width: 100%;
     border-radius: var(--r-sm);
     border: 1px solid var(--border);
-    background: #1e1e1e;
+    background: var(--bg);
   }
 
   canvas {

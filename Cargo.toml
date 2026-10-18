@@ -52,3 +52,11 @@ sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 base64 = "0.22"
 getrandom = "0.3"
 zeroize = "1"
+
+# Binario de produccion mas pequeño y rapido. Se mantiene `panic = "unwind"` (por defecto): un panico en
+# una tarea no debe cerrar el launcher ni dejar el juego sin su proceso padre.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"
+opt-level = 3

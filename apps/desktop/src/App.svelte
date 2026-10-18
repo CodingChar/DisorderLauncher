@@ -75,9 +75,8 @@
     window.addEventListener('offline', goOffline)
 
     ;(async () => {
-      await sessions.init()
-      await accounts.listen()
-      await Promise.all([settings.load(), accounts.load(), instances.load(), accounts.loadMicrosoft()])
+      // Suscripciones y lecturas iniciales a la vez: ninguna depende de otra y el arranque tarda lo de la mas lenta.
+      await Promise.all([sessions.init(), accounts.listen(), settings.load(), accounts.load(), instances.load(), accounts.loadMicrosoft()])
       notices = await api.startupNotices().catch(() => [])
     })()
 
