@@ -118,7 +118,7 @@
       </div>
     </div>
     <p class="muted fineprint">
-      La skin se guarda y se muestra aquí. Para verla dentro del juego necesitas un mod compatible; no se registra en tu cuenta de Microsoft.
+      La skin se guarda aquí y se aplica dentro del juego al abrir una instancia de este perfil (Minecraft decide si los brazos son anchos o finos). No se registra en tu cuenta de Microsoft.
     </p>
   </Card>
 

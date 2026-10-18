@@ -8,6 +8,7 @@ mod mods_ops;
 mod paths;
 mod registry;
 mod settings;
+mod skin_pack;
 mod skins_ops;
 mod themes_ops;
 

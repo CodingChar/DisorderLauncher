@@ -610,6 +610,8 @@ impl Launcher {
         self.emit_state(id, LaunchState::PreparingJava);
         let java = self.select_java(instance, &descriptor).await?;
 
+        self.sync_profile_skin(instance, &account).await;
+
         let overlay = self.prepare_loader(instance, &data_dir, &java).await?;
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
 
@@ -630,6 +632,19 @@ impl Launcher {
             tracing::warn!(error = %e, "no se pudo actualizar el ultimo uso del perfil");
         }
         Ok(plan)
+    }
+
+    /// Lleva la skin del perfil Offline Gaming al juego (resource pack de la instancia).
+    /// Un fallo aqui no impide jugar: solo se registra.
+    async fn sync_profile_skin(&self, instance: &Instance, account: &identity_api::AccountRecord) {
+        let identity_api::ProviderAccountData::Local(local) = &account.provider_data else { return };
+        let png = match &local.skin_id {
+            Some(id) => self.skin_library.read_png(id).await.ok(),
+            None => None,
+        };
+        if let Err(e) = crate::skin_pack::sync(&instance.game_dir, &instance.minecraft_version, png).await {
+            tracing::warn!(error = %e, "no se pudo aplicar la skin del perfil al juego");
+        }
     }
 
     async fn install(

@@ -31,9 +31,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 test-support = { path = "../test-support" }
-zip = { workspace = true }
 url = { workspace = true }
