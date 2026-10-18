@@ -78,7 +78,7 @@ Leyenda: ✅ hecho · 🟡 en curso · ⬜ pendiente. El que avance una fase act
 
 ## Pendiente conocido de la reforma
 
-- **Ventana nativa**: verificado `svelte-check`, 18 tests, `vite build`, `clippy -D warnings`, `cargo test --workspace` (todo verde) y recorrido completo en el navegador con el backend simulado (820x560 y 1100x720, tema negro y azul). NO se reejecuto `tauri dev` con el backend real tras la reforma (el puerto 5173 estaba ocupado por otro proceso): conviene lanzar un juego real y confirmar que la consola muestra su salida.
+- **Ventana nativa**: verificada el 2026-10-17 con `tauri dev` y backend real: arranca bajo la CSP de desarrollo sin errores, Jugar lanza la instancia existente, la consola muestra la salida real del juego y «Cerrar juego» lo detiene. Sigue sin recorrerse a mano la creacion de perfiles/instancias nuevas.
 
 - Icono de instancia elegible (maqueta): requiere cambio de contrato; ver «Decisiones».
 - `Mods` y `SkinEditor` solo recibieron el aspecto por los componentes compartidos y la cabecera; no se rediseño su disposicion interna.
