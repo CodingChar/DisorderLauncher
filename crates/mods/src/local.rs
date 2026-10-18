@@ -1,4 +1,4 @@
-use crate::{load_lock, read_fabric_meta, save_lock, FabricModMeta, LockedMod, ModError};
+use crate::{load_lock, read_mod_meta, save_lock, LockedMod, ModError, ModMeta};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ pub struct ModEntry {
     pub description: Option<String>,
     pub size: u64,
     #[serde(skip)]
-    pub meta: Option<FabricModMeta>,
+    pub meta: Option<ModMeta>,
     /// De donde se instalo, si fue desde Modrinth.
     pub source: Option<ModSource>,
 }
@@ -88,7 +88,7 @@ impl ModManager {
             let size = item.metadata().await?.len();
 
             let path = item.path();
-            let meta = tokio::task::spawn_blocking(move || read_fabric_meta(&path))
+            let meta = tokio::task::spawn_blocking(move || read_mod_meta(&path))
                 .await
                 .ok()
                 .and_then(Result::ok);
@@ -148,7 +148,7 @@ impl ModManager {
         Ok(())
     }
 
-    /// Copia un jar elegido por el usuario. Debe ser un mod de Fabric valido.
+    /// Copia un jar elegido por el usuario. Debe ser un mod valido (Fabric, Quilt, Forge o NeoForge).
     pub async fn add_local(&self, source: &Path) -> Result<ModEntry, ModError> {
         let file_name = source
             .file_name()
@@ -160,7 +160,7 @@ impl ModManager {
         }
 
         let check = source.to_path_buf();
-        tokio::task::spawn_blocking(move || read_fabric_meta(&check))
+        tokio::task::spawn_blocking(move || read_mod_meta(&check))
             .await
             .map_err(|e| std::io::Error::other(e.to_string()))??;
 
@@ -255,6 +255,42 @@ mod tests {
         writer.write_all(meta_json.as_bytes()).unwrap();
         writer.finish().unwrap();
         path
+    }
+
+    fn make_forge_mod(dir: &Path, file: &str, toml: &str, entry: &str) -> PathBuf {
+        std::fs::create_dir_all(dir).unwrap();
+        let path = dir.join(file);
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        writer.start_file(entry, zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(toml.as_bytes()).unwrap();
+        writer.finish().unwrap();
+        path
+    }
+
+    #[tokio::test]
+    async fn lists_forge_and_neoforge_mods_with_their_dependencies() {
+        let (dir, m) = game();
+        let src = dir.path().join("src");
+        let forge = "[[mods]]
+modId = \"jei\"
+version = \"1.0\"
+displayName = \"JEI\"
+[[dependencies.jei]]
+modId = \"cloth\"
+mandatory = true
+";
+        let neo = "[[mods]]
+modId = \"cloth\"
+displayName = \"Cloth\"
+";
+        let a = make_forge_mod(&src, "jei.jar", forge, "META-INF/mods.toml");
+        let b = make_forge_mod(&src, "cloth.jar", neo, "META-INF/neoforge.mods.toml");
+        m.add_local(&a).await.unwrap();
+        let entries = m.list().await.unwrap();
+        assert_eq!(entries[0].name, "JEI");
+        assert_eq!(ModManager::missing_dependencies(&entries).len(), 1);
+        m.add_local(&b).await.unwrap();
+        assert!(ModManager::missing_dependencies(&m.list().await.unwrap()).is_empty());
     }
 
     fn game() -> (tempfile::TempDir, ModManager) {

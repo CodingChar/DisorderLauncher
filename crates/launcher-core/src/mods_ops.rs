@@ -20,7 +20,7 @@ pub struct ModsOverview {
     pub supported: bool,
 }
 
-/// Categoria de Modrinth con la que se filtran mods. Quilt carga los mods de Fabric.
+/// Categoria de Modrinth con la que se filtran mods. Quilt carga los mods de Fabric; Forge y NeoForge tienen la suya.
 fn loader_name(kind: LoaderKind) -> String {
     match kind {
         LoaderKind::Quilt => "fabric".to_string(),
@@ -29,7 +29,7 @@ fn loader_name(kind: LoaderKind) -> String {
 }
 
 fn supports_mods(kind: LoaderKind) -> bool {
-    matches!(kind, LoaderKind::Fabric | LoaderKind::Quilt)
+    !matches!(kind, LoaderKind::Vanilla)
 }
 
 impl From<ModError> for LauncherError {
@@ -42,7 +42,7 @@ impl From<ModError> for LauncherError {
             ModError::NotCompatible(_) | ModError::MissingDependency(_) | ModError::NothingToRollback => {
                 Self::InvalidInput(sentence(&e.to_string()))
             }
-            ModError::NotAMod => Self::InvalidInput("Ese archivo no es un mod de Fabric valido.".into()),
+            ModError::NotAMod => Self::InvalidInput("Ese archivo no es un mod valido (Fabric, Quilt, Forge o NeoForge).".into()),
             ModError::InvalidFileName => Self::InvalidInput("Nombre de archivo no valido.".into()),
             ModError::NotFound => Self::InvalidInput("No se encontro ese mod.".into()),
             _ => Self::Storage,
@@ -74,7 +74,7 @@ impl Launcher {
         if supports_mods(instance.loader) {
             Ok(())
         } else {
-            Err(LauncherError::InvalidInput("Esta instancia no admite mods. Crea una con Fabric o Quilt.".into()))
+            Err(LauncherError::InvalidInput("Esta instancia no admite mods. Crea una con Fabric, Quilt, Forge o NeoForge.".into()))
         }
     }
 

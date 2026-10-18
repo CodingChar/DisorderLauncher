@@ -67,7 +67,7 @@ Java ≥ 9 aceptado para versiones de Java 8 · runtimes gestionados redescargad
 
 ### Mejoras conocidas
 - ✅ Redirecciones: tras seguir un redirect se vuelve a exigir https y host permitido (`download-manager`); el hash sigue protegiendo la integridad.
-- ⬜ Mods de Forge/NeoForge: no se administran desde el launcher (solo Fabric/Quilt); hay que copiarlos a la carpeta.
+- 🟡 Mods de Forge/NeoForge: ahora se listan (lee `mods.toml`/`neoforge.mods.toml`), activan/desactivan, quitan y se buscan en Modrinth con su categoria; probado con jars sinteticos, falta una prueba real con Modrinth y el juego (los E2E reales de Forge/NeoForge no incluyen mods).
 - ⬜ Skins locales: se guardan y previsualizan; verlas dentro del juego exige un mod compatible.
 - 🟡 Editor de skins: alternativa de teclado hecha (flechas mueven el cursor, Mayús salta 8, Intro/Espacio pintan; probada solo por compilacion, falta revisarla a mano).
 - ⬜ Tema: `typography.scale` y `density` se validan pero aun no se aplican a la interfaz.

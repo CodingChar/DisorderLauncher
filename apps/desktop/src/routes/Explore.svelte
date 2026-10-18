@@ -42,7 +42,7 @@
     <div class="explore-copy">
       <span class="eyebrow">CON MODS</span>
       <h2>Un mundo a tu medida</h2>
-      <p>Instancias con Fabric para añadir mods: buscas en Modrinth y se instalan con lo que necesitan.</p>
+      <p>Instancias con Fabric (también Quilt, Forge y NeoForge) para añadir mods: buscas en Modrinth y se instalan con lo que necesitan.</p>
       <Button onclick={() => nav.create('fabric')}>Crear instancia con mods <Icon name="arrow" size={16} /></Button>
     </div>
   </section>

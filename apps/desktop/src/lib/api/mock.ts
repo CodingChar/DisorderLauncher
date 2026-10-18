@@ -239,7 +239,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       const mods = installedMods.get(args.id) ?? []
       const needsApi = mods.some((m) => m.enabled && m.needsApi) && !mods.some((m) => m.enabled && m.name === 'Fabric API')
       return {
-        supported: inst?.loader === 'fabric' || inst?.loader === 'quilt',
+        supported: !!inst && inst.loader !== 'vanilla',
         mods: mods.map(({ needsApi: _n, ...m }) => m),
         missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, requires: 'Fabric API' }] : [],
       }

@@ -59,8 +59,8 @@
     <Card>
       <h3>La gestión de mods no está disponible aquí</h3>
       <p class="muted">
-        Instalar y actualizar mods desde el launcher funciona con instancias <strong>Fabric</strong> o <strong>Quilt</strong>.
-        En Forge y NeoForge puedes copiar tus mods a la carpeta de la instancia.
+        Las instancias <strong>originales</strong> no llevan mods. Para instalarlos y actualizarlos desde el launcher crea una instancia
+        con <strong>Fabric</strong>, <strong>Quilt</strong>, <strong>Forge</strong> o <strong>NeoForge</strong>.
       </p>
       <div class="row">
         <Button variant="primary" onclick={() => nav.go('create')}>Crear instancia con mods</Button>
