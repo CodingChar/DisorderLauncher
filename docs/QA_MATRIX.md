@@ -38,6 +38,8 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 - Frontend: 18 pruebas (Vitest) de la logica del editor; `svelte-check` sin errores.
 - Pruebas reales (manuales): `real_vanilla_install_launch_and_stop`, `real_fabric_install_launch_and_stop`, `real_quilt_install_launch_and_stop`, `real_fabric_with_modrinth_mod_loads_the_mod`, `real_forge_install_launch_and_stop`, `real_neoforge_install_launch_and_stop`, `real_fabric_install`, `real_quilt_install`, `real_modpack_export_and_import_use_modrinth_references`, `real_manifest_…`, y las de Modrinth (incluye `forge_mod_is_found_installed_and_read` y `neoforge_mod_is_found_installed_and_read`) en `crates/mods/tests/real_modrinth.rs`.
 
+Recorrido completo por la interfaz del ejecutable release (2026-10-18, teclas y clics reales por CDP): crear instancia Fabric 1.20.1 con icono y rendimiento «Equilibrado» → instalar y jugar (la consola recibio 50 lineas del juego y la JVM llevo las banderas de G1) → cerrar el juego → eliminar la instancia (carpeta borrada).
+
 Ultima corrida completa de las 19 pruebas reales (`cargo test --workspace -- --ignored --test-threads=1`, 2026-10-18): todas ok (Vanilla, Fabric, Quilt, Forge y NeoForge instalan y arrancan; Modrinth; modpacks; catalogo de versiones; rendimiento).
 
 ## Consumo en reposo (release, Windows 10)
