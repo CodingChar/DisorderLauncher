@@ -66,7 +66,7 @@ Java ≥ 9 aceptado para versiones de Java 8 · runtimes gestionados redescargad
 - ⬜ **Empaquetado NSIS** fallo en este equipo (`os error 32` en la carpeta de herramientas de Tauri); solo MSI verificado.
 
 ### Mejoras conocidas
-- ⬜ Redirecciones: el hash protege la integridad pero no se restringe el host final tras un redirect.
+- ✅ Redirecciones: tras seguir un redirect se vuelve a exigir https y host permitido (`download-manager`); el hash sigue protegiendo la integridad.
 - ⬜ Mods de Forge/NeoForge: no se administran desde el launcher (solo Fabric/Quilt); hay que copiarlos a la carpeta.
 - ⬜ Skins locales: se guardan y previsualizan; verlas dentro del juego exige un mod compatible.
 - 🟡 Editor de skins: alternativa de teclado hecha (flechas mueven el cursor, Mayús salta 8, Intro/Espacio pintan; probada solo por compilacion, falta revisarla a mano).

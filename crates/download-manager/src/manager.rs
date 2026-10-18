@@ -29,12 +29,7 @@ impl DownloadManager {
     }
 
     fn check_host(&self, url: &str) -> Result<(), DownloadError> {
-        let Some(allowed) = &self.allowed_host_suffixes else { return Ok(()) };
-        let host = url::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_lowercase));
-        let permitted = host
-            .as_deref()
-            .is_some_and(|h| allowed.iter().any(|suffix| h == suffix || h.ends_with(&format!(".{suffix}"))));
-        if permitted { Ok(()) } else { Err(DownloadError::UntrustedHost(url.chars().take(80).collect())) }
+        check_host_in(self.allowed_host_suffixes.as_deref(), url)
     }
 
     pub async fn download_all<F>(
@@ -70,6 +65,7 @@ impl DownloadManager {
             }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let http = self.http.clone();
+            let allowed = self.allowed_host_suffixes.clone();
             let completed = completed.clone();
             let bytes_downloaded = bytes_downloaded.clone();
             let progress = progress.clone();
@@ -95,7 +91,7 @@ impl DownloadManager {
                 }
 
                 let result =
-                    download_with_retry(&http, &task, MAX_RETRIES, &bytes_downloaded).await;
+                    download_with_retry(&http, allowed.as_deref(), &task, MAX_RETRIES, &bytes_downloaded).await;
 
                 match result {
                     Ok(()) => {}
@@ -152,8 +148,27 @@ fn should_skip(task: &DownloadTask) -> bool {
     false
 }
 
+/// Comprueba el host contra la lista de permitidos (si la hay). Se usa con la URL pedida y con la URL final tras redirecciones.
+fn check_host_in(allowed: Option<&[String]>, url: &str) -> Result<(), DownloadError> {
+    let Some(allowed) = allowed else { return Ok(()) };
+    let host = url::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_lowercase));
+    let permitted = host
+        .as_deref()
+        .is_some_and(|h| allowed.iter().any(|suffix| h == suffix || h.ends_with(&format!(".{suffix}"))));
+    if permitted { Ok(()) } else { Err(DownloadError::UntrustedHost(url.chars().take(80).collect())) }
+}
+
+/// La URL final (tras redirecciones) debe seguir siendo https y, si hay lista, de un host permitido.
+fn check_final_url(allowed: Option<&[String]>, final_url: &url::Url) -> Result<(), DownloadError> {
+    if final_url.scheme() != "https" {
+        return Err(DownloadError::InsecureUrl(final_url.as_str().chars().take(80).collect()));
+    }
+    check_host_in(allowed, final_url.as_str())
+}
+
 async fn download_with_retry(
     http: &reqwest::Client,
+    allowed: Option<&[String]>,
     task: &DownloadTask,
     max_retries: u32,
     bytes_counter: &AtomicU64,
@@ -170,11 +185,11 @@ async fn download_with_retry(
             tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
         }
 
-        match download_single(http, task, bytes_counter).await {
+        match download_single(http, allowed, task, bytes_counter).await {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_error = e.to_string();
-                if matches!(e, DownloadError::HashMismatch { .. } | DownloadError::InsecureUrl(_))
+                if matches!(e, DownloadError::HashMismatch { .. } | DownloadError::InsecureUrl(_) | DownloadError::UntrustedHost(_))
                 {
                     return Err(e);
                 }
@@ -190,6 +205,7 @@ async fn download_with_retry(
 
 async fn download_single(
     http: &reqwest::Client,
+    allowed: Option<&[String]>,
     task: &DownloadTask,
     bytes_counter: &AtomicU64,
 ) -> Result<(), DownloadError> {
@@ -199,6 +215,8 @@ async fn download_single(
 
     let part_path = part_path(&task.dest);
     let response = http.get(&task.url).send().await?.error_for_status()?;
+    // Una redireccion no puede sacar la descarga de los hosts de confianza ni degradarla a http.
+    check_final_url(allowed, response.url())?;
     let bytes = response.bytes().await?;
 
     bytes_counter.fetch_add(bytes.len() as u64, Ordering::Relaxed);
@@ -242,6 +260,18 @@ fn hex_sha1(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn final_url_after_redirect_is_rechecked() {
+        let allowed = vec!["mojang.com".to_string()];
+        let ok = url::Url::parse("https://piston-data.mojang.com/x").unwrap();
+        assert!(check_final_url(Some(&allowed), &ok).is_ok());
+        let evil = url::Url::parse("https://evil.example.com/x").unwrap();
+        assert!(matches!(check_final_url(Some(&allowed), &evil), Err(DownloadError::UntrustedHost(_))));
+        let plain = url::Url::parse("http://piston-data.mojang.com/x").unwrap();
+        assert!(matches!(check_final_url(Some(&allowed), &plain), Err(DownloadError::InsecureUrl(_))));
+        assert!(check_final_url(None, &evil).is_ok());
+    }
 
     #[test]
     fn host_allowlist_accepts_subdomains_but_not_lookalikes() {
