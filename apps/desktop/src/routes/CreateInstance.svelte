@@ -17,6 +17,10 @@
   let error = $state<string | null>(null)
   let busy = $state(false)
   let importing = $state(false)
+  let memoryMode = $state<'auto' | 'fixed'>('auto')
+  let maxGb = $state('4')
+  let javaMode = $state<'auto' | 'path'>('auto')
+  let javaPath = $state('')
 
   const loaderOptions = [
     { value: 'vanilla', label: 'Minecraft original (sin mods)' },
@@ -52,10 +56,26 @@
 
   async function create() {
     if (busy) return
+    const gb = Number(maxGb.replace(',', '.'))
+    if (memoryMode === 'fixed' && (!Number.isFinite(gb) || gb < 0.5 || gb > 64)) {
+      error = 'Escribe una cantidad de memoria entre 0,5 y 64 GB.'
+      return
+    }
+    if (javaMode === 'path' && javaPath.trim().length === 0) {
+      error = 'Indica la carpeta de Java o elige «Automático».'
+      return
+    }
     busy = true
     error = null
     try {
-      await instances.create(name, version, loader)
+      const instance = await instances.create(name, version, loader)
+      // Los ajustes avanzados solo se guardan si se cambiaron; lo normal es dejarlos en automatico.
+      if (memoryMode === 'fixed' || javaMode === 'path') {
+        await instances.update(instance.id, {
+          ...(memoryMode === 'fixed' ? { memory: { mode: 'fixed' as const, minMb: 512, maxMb: Math.round(gb * 1024) } } : {}),
+          ...(javaMode === 'path' ? { java: { mode: 'path' as const, path: javaPath.trim() } } : {}),
+        })
+      }
       nav.go('home')
     } catch (e) {
       error = (e as Error).message
@@ -94,6 +114,29 @@
       {:else}
         <Select label="Versión de Minecraft" bind:value={version} {options} />
       {/if}
+
+      <details class="settings-block advanced">
+        <summary>Opciones avanzadas</summary>
+        <p class="subtle">Puedes dejarlas como están: no hace falta tocar nada para jugar. Cámbialas solo si sabes lo que necesita tu instancia.</p>
+
+        <fieldset class="group">
+          <legend>Memoria (RAM)</legend>
+          <label class="check-row"><input type="radio" bind:group={memoryMode} value="auto" /> Automática (recomendado)</label>
+          <label class="check-row"><input type="radio" bind:group={memoryMode} value="fixed" /> Elegir cantidad</label>
+          {#if memoryMode === 'fixed'}
+            <Input label="Máximo en GB" bind:value={maxGb} maxlength={5} hint="Más memoria no siempre es mejor. 4 GB suele bastar." />
+          {/if}
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>Java</legend>
+          <label class="check-row"><input type="radio" bind:group={javaMode} value="auto" /> Automático (recomendado)</label>
+          <label class="check-row"><input type="radio" bind:group={javaMode} value="path" /> Usar mi propio Java</label>
+          {#if javaMode === 'path'}
+            <Input label="Carpeta de Java" bind:value={javaPath} placeholder="C:\Program Files\Java\jdk-21" hint="La carpeta que contiene «bin»." />
+          {/if}
+        </fieldset>
+      </details>
 
       {#if error}
         <p class="form-error" role="alert">{error}</p>

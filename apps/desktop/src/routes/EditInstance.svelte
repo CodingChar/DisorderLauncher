@@ -199,21 +199,4 @@
     gap: 20px;
     max-width: 800px;
   }
-
-  .group {
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    padding: 12px 16px 16px;
-    margin: 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .group legend {
-    padding: 0 6px;
-    font-size: 11px;
-    color: var(--text-secondary);
-  }
 </style>
