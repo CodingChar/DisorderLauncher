@@ -46,6 +46,46 @@ export function boxParts(model: SkinModel): BoxPart[] {
   ]
 }
 
+/** Grupos de partes para trabajar de una en una (selector «Parte del cuerpo»). */
+export type BodyGroup = 'all' | 'head' | 'body' | 'arms' | 'legs'
+
+export const BODY_GROUPS: { id: BodyGroup; label: string }[] = [
+  { id: 'all', label: 'Todo' },
+  { id: 'head', label: 'Cabeza' },
+  { id: 'body', label: 'Cuerpo' },
+  { id: 'arms', label: 'Brazos' },
+  { id: 'legs', label: 'Piernas' },
+]
+
+const GROUP_OF: Record<string, BodyGroup> = {
+  head: 'head', hat: 'head',
+  body: 'body', jacket: 'body',
+  rightArm: 'arms', leftArm: 'arms', rightSleeve: 'arms', leftSleeve: 'arms',
+  rightLeg: 'legs', leftLeg: 'legs', rightPants: 'legs', leftPants: 'legs',
+}
+
+/** Nombre en español de cada pieza, tal como se ve en el personaje (derecha = la suya, no la de la pantalla). */
+export const PART_LABEL: Record<string, string> = {
+  head: 'Cabeza', hat: 'Sombrero',
+  body: 'Cuerpo', jacket: 'Chaqueta',
+  rightArm: 'Brazo der.', leftArm: 'Brazo izq.', rightSleeve: 'Manga der.', leftSleeve: 'Manga izq.',
+  rightLeg: 'Pierna der.', leftLeg: 'Pierna izq.', rightPants: 'Pantalón der.', leftPants: 'Pantalón izq.',
+}
+
+export const groupOf = (partName: string): BodyGroup => GROUP_OF[partName] ?? 'all'
+
+/** Pixeles de las piezas de la capa que pertenecen al grupo (`all` = toda la capa). */
+export function groupMask(model: SkinModel, layer: Layer, group: BodyGroup): Uint8Array {
+  if (group === 'all') return layerMask(model, layer)
+  const mask = new Uint8Array(SIZE * SIZE)
+  for (const part of boxParts(model).filter((p) => p.layer === layer && groupOf(p.name) === group)) {
+    for (const r of Object.values(faceRects(part))) {
+      for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) mask[y * SIZE + x] = 1
+    }
+  }
+  return mask
+}
+
 /** Las seis caras de una pieza en la textura (disposicion estandar de Minecraft). */
 export function faceRects(p: BoxPart): Record<FaceName, Rect> {
   return {

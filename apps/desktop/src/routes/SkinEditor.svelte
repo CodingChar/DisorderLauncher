@@ -10,8 +10,14 @@
   import {
     History,
     SIZE,
+    BODY_GROUPS,
+    PART_LABEL,
     blankSkin,
+    boxParts,
     faceMaskAt,
+    faceRects,
+    groupMask,
+    groupOf,
     floodFill,
     getPixel,
     hexToRgba,
@@ -21,6 +27,7 @@
     rgbaToHex,
     setPixel,
     upgradeLegacy,
+    type BodyGroup,
     type Layer,
     type Pixels,
     type Rgba,
@@ -55,11 +62,12 @@
   let tool = $state<Tool>('pencil')
   let color = $state('#c0392b')
   let layer = $state<Layer>('base')
+  let group = $state<BodyGroup>('all')
   let showBase = $state(true)
   let showOverlay = $state(true)
   let mirror = $state(false)
   let grid = $state(true)
-  let zoom = $state(7)
+  let zoom = $state(9)
 
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
@@ -77,7 +85,7 @@
 
   const baseMask = $derived(layerMask(model, 'base'))
   const overlayMask = $derived(layerMask(model, 'overlay'))
-  const activeMask = $derived(layer === 'base' ? baseMask : overlayMask)
+  const activeMask = $derived(groupMask(model, layer, group))
 
   onMount(async () => {
     try {
@@ -137,6 +145,7 @@
     void showBase
     void showOverlay
     void layer
+    void group
     void model
     void cursor
     void canvasFocused
@@ -168,6 +177,7 @@
         }
       }
     }
+    drawPartGuides(ctx, z)
     if (canvasFocused) {
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 2
@@ -189,6 +199,64 @@
       ctx.stroke()
     }
   })
+
+  /** Color de la guia de cada grupo; se repite en la leyenda de debajo del lienzo. */
+  const GUIDE_COLOR: Record<BodyGroup, string> = { all: '#ffffff', head: '#5aa9ff', body: '#5fd38a', arms: '#ffb04a', legs: '#c58bff' }
+
+  /** Recuadros con el nombre de cada parte del cuerpo de la capa activa, para saber que se pinta. */
+  function drawPartGuides(ctx: CanvasRenderingContext2D, z: number) {
+    ctx.save()
+    for (const part of boxParts(model).filter((p) => p.layer === layer)) {
+      const g = groupOf(part.name)
+      const focused = group === 'all' || group === g
+      const faces = faceRects(part)
+      ctx.globalAlpha = focused ? 1 : 0.35
+      // Division entre caras.
+      ctx.strokeStyle = 'rgba(255,255,255,0.28)'
+      ctx.lineWidth = 1
+      for (const r of Object.values(faces)) ctx.strokeRect(r.x * z + 0.5, r.y * z + 0.5, r.w * z - 1, r.h * z - 1)
+      // Contorno de la pieza completa, del color de su grupo.
+      const x0 = part.u * z
+      const y0 = part.v * z
+      const w = (2 * part.d + 2 * part.w) * z
+      const h = (part.d + part.h) * z
+      ctx.strokeStyle = GUIDE_COLOR[g]
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.rect(x0 + 1, y0 + 1, w - 2, h - 2)
+      ctx.stroke()
+      // Nombre sobre la cara frontal (en dos lineas si no cabe) y «frente» para orientarse.
+      const front = faces.front
+      const label = PART_LABEL[part.name] ?? part.name
+      const lines = label.includes(' ') ? label.split(' ') : [label]
+      const fontPx = Math.max(8, Math.min(12, Math.round(z * 1.3)))
+      ctx.font = `700 ${fontPx}px system-ui, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const cx = (front.x + front.w / 2) * z
+      const cy = (front.y + front.h / 2) * z
+      lines.forEach((line, i) => {
+        const y = cy + (i - (lines.length - 1) / 2) * (fontPx + 1)
+        ctx.lineWidth = 3
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)'
+        ctx.strokeText(line, cx, y)
+        ctx.fillStyle = GUIDE_COLOR[g]
+        ctx.fillText(line, cx, y)
+      })
+    }
+    ctx.restore()
+  }
+
+  /** Al elegir una parte, el cursor del teclado salta a su cara frontal. */
+  function focusGroup(next: BodyGroup) {
+    group = next
+    if (next === 'all') return
+    const part = boxParts(model).find((p) => p.layer === layer && groupOf(p.name) === next)
+    if (part) {
+      const f = faceRects(part).front
+      cursor = [f.x + Math.floor(f.w / 2), f.y + Math.floor(f.h / 2)]
+    }
+  }
 
   function pixelAt(e: PointerEvent): [number, number] | null {
     if (!canvas) return null
@@ -401,6 +469,12 @@
 
       <div class="options">
         <fieldset>
+          <legend>Parte del cuerpo</legend>
+          {#each BODY_GROUPS as g (g.id)}
+            <label><input type="radio" name="body-group" checked={group === g.id} onchange={() => focusGroup(g.id)} /> {g.label}</label>
+          {/each}
+        </fieldset>
+        <fieldset>
           <legend>Capa</legend>
           <label><input type="radio" bind:group={layer} value="base" /> Base</label>
           <label><input type="radio" bind:group={layer} value="overlay" /> Exterior (sombrero, chaqueta…)</label>
@@ -416,6 +490,15 @@
           <label><input type="checkbox" bind:checked={grid} /> Cuadrícula</label>
         </fieldset>
       </div>
+
+      <p class="guide-help">
+        Cada recuadro de color es una parte del cuerpo y dentro está dibujada su cara frontal. Elige una <strong>parte del cuerpo</strong> para trabajar solo en ella: lo demás se oscurece y no se pinta.
+      </p>
+      <ul class="legend" aria-label="Colores de las partes">
+        {#each BODY_GROUPS.filter((g) => g.id !== 'all') as g (g.id)}
+          <li><span class="chip" style:background={GUIDE_COLOR[g.id]}></span>{g.label}</li>
+        {/each}
+      </ul>
 
       <div class="canvas-wrap" style:--zoom="{zoom}">
         <canvas
@@ -563,6 +646,36 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--r-sm);
     background: var(--surface-alt);
+  }
+
+  .guide-help {
+    margin: 0 0 8px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+  }
+
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chip {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border-strong);
   }
 
   .options {

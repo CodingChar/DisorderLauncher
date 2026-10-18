@@ -8,6 +8,8 @@ import {
   faceRects,
   floodFill,
   getPixel,
+  groupMask,
+  groupOf,
   hexToRgba,
   layerMask,
   linePoints,
@@ -200,5 +202,27 @@ describe('skins antiguas y color', () => {
   it('convierte hex <-> rgba', () => {
     expect(hexToRgba('#ff8000')).toEqual([255, 128, 0, 255])
     expect(rgbaToHex([255, 128, 0, 255])).toBe('#ff8000')
+  })
+})
+
+describe('partes del cuerpo', () => {
+  it('agrupa cada pieza con su version exterior', () => {
+    expect(groupOf('head')).toBe('head')
+    expect(groupOf('hat')).toBe('head')
+    expect(groupOf('leftSleeve')).toBe('arms')
+    expect(groupOf('rightPants')).toBe('legs')
+    expect(groupOf('jacket')).toBe('body')
+  })
+
+  it('la mascara de un grupo cubre solo sus piezas y los grupos juntos dan la capa completa', () => {
+    const count = (m: Uint8Array) => m.reduce((n, v) => n + v, 0)
+    const head = groupMask('classic', 'base', 'head')
+    // Cabeza 8x8x8: 2*(8*8)+2*(8*8)+2*(8*8) = 6 caras de 64 px.
+    expect(count(head)).toBe(6 * 64)
+    expect(head[8 * SIZE + 8]).toBe(1) // cara frontal de la cabeza
+    expect(head[20 * SIZE + 20]).toBe(0) // cuerpo
+    const sum = (['head', 'body', 'arms', 'legs'] as const).reduce((n, g) => n + count(groupMask('classic', 'base', g)), 0)
+    expect(sum).toBe(count(layerMask('classic', 'base')))
+    expect(count(groupMask('classic', 'base', 'all'))).toBe(count(layerMask('classic', 'base')))
   })
 })
