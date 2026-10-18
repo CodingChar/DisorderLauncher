@@ -20,11 +20,13 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 | Vanilla (install/launch/repair) | ✅ | ✅ 1.0 | Allowlist Mojang verificada con descarga real |
 | Java gestionado (Adoptium) | ✅ checksum, seleccion | ✅ Java 8 | |
 | Fabric / Quilt | ✅ | ✅ Fabric 1.14.4 y Quilt 1.14.4 arrancan en el juego; Fabric + Fabric API instalada desde Modrinth: el juego carga el mod | |
-| NeoForge / Forge | ✅ versiones, URLs, checksum, ids | ✅ Forge 1.14.4 (Java 8) y NeoForge 1.21.1 (Java 21): el juego carga el loader | Via instalador oficial (ADR-002); mods administrados solo en Fabric/Quilt |
-| Mods + Modrinth | ✅ resolver, locales, updates | ✅ busqueda, instalacion, actualizar, volver atras | |
+| NeoForge / Forge | ✅ versiones, URLs, checksum, ids | ✅ Forge 1.14.4 (Java 8) y NeoForge 1.21.1 (Java 21): el juego carga el loader | Via instalador oficial (ADR-002); mods administrados tambien en Forge/NeoForge (lectura de `mods.toml`, solo jars sinteticos) |
+| Mods + Modrinth | ✅ resolver, locales, updates, lectura de Forge/NeoForge | ✅ (Fabric) busqueda, instalacion, actualizar, volver atras; ⚠️ Forge/NeoForge sin prueba real | |
 | Modpacks `.mrpack` | ✅ import/export/rollback | ✅ export+import con referencias Modrinth | |
-| Temas | ✅ validacion y almacen | 🖐 aplicacion en UI | |
-| Skins + editor | ✅ backend, 18 tests de logica del editor | 🖐 editor, 3D, biblioteca | Skin local no se ve en el juego sin mod |
+| Temas | ✅ validacion y almacen (incluye el tema azul oscuro) | 🖐 aplicacion en UI (negro y azul) | |
+| Skins + editor | ✅ backend, 18 tests de logica del editor | 🖐 editor, 3D, biblioteca; ⚠️ teclado del lienzo sin probar a mano | Skin local no se ve en el juego sin mod |
+| Interfaz reformada (maqueta) | ✅ `svelte-check`, build | 🖐 todas las vistas en navegador (820x560 y 1100x720, negro y azul); ⚠️ consola real del juego sin ver en ventana nativa | Ver `docs/UI_MIGRATION.md` |
+| Descargas con redireccion | ✅ revalida https y host | — | |
 | Recuperacion de datos | ✅ migracion, cuarentena | — | |
 
 ## Pruebas
@@ -43,7 +45,8 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 
 ## Accesibilidad
 
-Auditada en navegador: objetivos ≥ 40 px (radios con etiqueta de 40 px), campos con etiqueta, un `<main>`/`<h1>`, foco movido al titulo al navegar, `aria-live` en estados, dialogos modales nativos, `prefers-reduced-motion`. Limitacion: el lienzo del editor requiere puntero.
+Auditada en navegador: objetivos ≥ 40 px (radios con etiqueta de 40 px), campos con etiqueta, un `<main>`/`<h1>`, foco movido al titulo al navegar, `aria-live` en estados, dialogos modales nativos, `prefers-reduced-motion`. El lienzo del editor tambien se maneja con teclado (flechas + Intro/Espacio); falta revisarlo con un lector de pantalla.
+Tras la reforma visual no se repitio la auditoria completa (contrastes, tamaños): hay etiquetas de 9-10 px heredadas de la maqueta que conviene revisar contra AA.
 
 ## Pendiente de verificar antes de publicar
 
