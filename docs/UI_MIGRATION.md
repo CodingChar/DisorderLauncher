@@ -83,4 +83,4 @@ Leyenda: ✅ hecho · 🟡 en curso · ⬜ pendiente. El que avance una fase act
 - Icono de instancia elegible (maqueta): requiere cambio de contrato; ver «Decisiones».
 - `Mods` y `SkinEditor` solo recibieron el aspecto por los componentes compartidos y la cabecera; no se rediseño su disposicion interna.
 - Fuentes Space Grotesk e IBM Plex Sans incluidas en `apps/desktop/public/fonts` (woff2 latin, licencia OFL, via @font-face en `app.css`); verificado en la ventana nativa bajo la CSP: se cargan sin errores.
-- `typography.scale` y `density` de los temas siguen sin aplicarse (ya constaba en `PROGRESS.md`).
+- `typography.scale` x `density.uiScale` de los temas se aplican como `zoom` del documento (`theme.ts`, con prueba). `density.compact` sigue sin aplicarse.

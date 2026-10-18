@@ -4,7 +4,7 @@ import type { ThemeEntry } from './types'
 const VARS = [
   '--bg', '--surface', '--surface-alt', '--surface-raised', '--text-primary', '--text-secondary',
   '--border', '--border-strong', '--action', '--action-text',
-  '--r-sm', '--r-md', '--r-lg', '--r-xl', '--font-display', '--font-body', '--shadow', '--shadow-soft',
+  '--r-sm', '--r-md', '--r-lg', '--r-xl', '--font-display', '--font-body', '--shadow', '--shadow-soft', 'zoom',
 ]
 
 /**
@@ -41,6 +41,11 @@ export function applyThemeObject(theme: ThemeEntry) {
   const rgb = dark ? '0, 0, 0' : '10, 10, 10'
   set('--shadow', `0 12px 30px rgba(${rgb}, ${alpha.toFixed(3)})`)
   set('--shadow-soft', `0 4px 14px rgba(${rgb}, ${(alpha * 0.75).toFixed(3)})`)
+
+  // Tamano de texto del tema x escala de interfaz: Rust ya valido ambos (0.8-1.4).
+  const zoom = theme.typography.scale * theme.density.uiScale
+  if (zoom === 1) root.style.removeProperty('zoom')
+  else root.style.setProperty('zoom', zoom.toFixed(3))
 
   root.dataset.theme = theme.mode
   root.dataset.animations = theme.effects.animations ? 'on' : 'off'
