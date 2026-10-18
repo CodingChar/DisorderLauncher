@@ -451,7 +451,7 @@ impl Launcher {
 
     /// Descriptor de la version: del disco si ya esta instalada, si no de Mojang
     /// (verificando su SHA-1 contra el manifiesto) y se persiste.
-    async fn resolve_descriptor(&self, version_id: &str) -> Result<VersionDescriptor, LauncherError> {
+    pub(crate) async fn resolve_descriptor(&self, version_id: &str) -> Result<VersionDescriptor, LauncherError> {
         let path = self.paths.version_descriptor(version_id);
         if let Ok(cached) = minecraft_meta::load_cached_version_descriptor(&path).await {
             return Ok(cached);
@@ -646,7 +646,7 @@ impl Launcher {
         self.emit_state(id, LaunchState::PreparingJava);
         let java = self.select_java(instance, &descriptor).await?;
 
-        self.sync_profile_skin(instance, &account).await;
+        self.sync_profile_skin(instance, &descriptor, &account).await;
 
         let overlay = self.prepare_loader(instance, &data_dir, &java).await?;
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
@@ -674,7 +674,18 @@ impl Launcher {
     /// Lleva la skin del perfil Offline Gaming al juego (pack de texturas de la instancia).
     /// Con un perfil sin skin, o de otro proveedor (Microsoft usa su skin oficial), retira el pack
     /// que haya dejado un perfil anterior. Un fallo aqui no impide jugar: solo se registra.
-    async fn sync_profile_skin(&self, instance: &Instance, account: &identity_api::AccountRecord) {
+    async fn sync_profile_skin(
+        &self,
+        instance: &Instance,
+        descriptor: &VersionDescriptor,
+        account: &identity_api::AccountRecord,
+    ) {
+        // La epoca la marca la version de Minecraft de base: un perfil de OptiFine o Forge se comporta como ella.
+        let base = descriptor.inherits_from.as_deref().unwrap_or(&instance.minecraft_version);
+        let target = crate::skin_pack::SkinTarget::resolve(
+            &[base, &instance.minecraft_version, &descriptor.id],
+            descriptor.release_time.as_deref(),
+        );
         let skin = match &account.provider_data {
             identity_api::ProviderAccountData::Local(local) => match &local.skin_id {
                 Some(id) => match (self.skin_library.get(id).await, self.skin_library.read_png(id).await) {
@@ -688,7 +699,7 @@ impl Launcher {
             },
             _ => None,
         };
-        if let Err(e) = crate::skin_pack::sync(&instance.game_dir, &instance.minecraft_version, skin).await {
+        if let Err(e) = crate::skin_pack::sync(&instance.game_dir, target, skin).await {
             tracing::warn!(error = %e, "no se pudo aplicar la skin del perfil al juego");
         }
     }

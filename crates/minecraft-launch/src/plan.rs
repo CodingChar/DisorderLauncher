@@ -257,8 +257,19 @@ fn build_classpath(
                 return;
             }
         }
-        let Some(resolved) = resolve_library(lib) else { return };
-        let path = libraries_dir.join(&resolved.path);
+        let relative = match resolve_library(lib) {
+            Some(resolved) => resolved.path,
+            // Libreria sin datos de descarga (OptiFine, Forge instalado a mano...): el launcher oficial la
+            // busca por sus coordenadas Maven dentro de `libraries/`.
+            None if lib.downloads.is_none() && lib.url.is_none() && lib.natives.is_none() => {
+                match minecraft_meta::maven_path(&lib.name) {
+                    Some(path) => path,
+                    None => return,
+                }
+            }
+            None => return,
+        };
+        let path = libraries_dir.join(&relative);
         if !classpath.contains(&path) {
             classpath.push(path);
         }

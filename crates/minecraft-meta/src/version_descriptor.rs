@@ -24,6 +24,13 @@ pub struct VersionDescriptor {
     pub java_version: Option<JavaVersionInfo>,
     #[serde(default)]
     pub logging: Option<HashMap<String, LoggingConfig>>,
+    /// Fecha de publicacion (ISO 8601). En una version personalizada es la de la version base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release_time: Option<String>,
+    /// Version sobre la que se apoya un perfil (OptiFine, Forge...). Tras importarlo ya viene fusionado;
+    /// se conserva para saber de que version de Minecraft se trata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherits_from: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

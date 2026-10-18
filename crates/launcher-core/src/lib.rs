@@ -1,5 +1,6 @@
 mod error;
 mod events;
+mod external_versions;
 mod launcher;
 mod memory;
 mod modpack_ops;
@@ -16,6 +17,7 @@ mod version_catalog;
 
 pub use error::*;
 pub use events::*;
+pub use external_versions::{default_minecraft_dir, display_version, ExternalKind, ExternalScan, ExternalVersion, CUSTOM_PREFIX};
 pub use launcher::*;
 pub use memory::*;
 pub use modpack_ops::*;

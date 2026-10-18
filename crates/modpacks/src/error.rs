@@ -16,6 +16,8 @@ pub enum ModpackError {
     Http(#[from] reqwest::Error),
     #[error("el archivo no es un modpack de Modrinth valido")]
     NotAModpack,
+    #[error("el archivo es un modpack de {0}, no de Modrinth")]
+    OtherLauncher(String),
     #[error("formato de modpack no soportado: {0}")]
     UnsupportedFormat(String),
     #[error("el modpack contiene una ruta insegura: {0}")]

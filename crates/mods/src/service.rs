@@ -123,6 +123,46 @@ impl ModsService {
         Ok(installed)
     }
 
+    /// Registra como mods de Modrinth los archivos ya presentes en la instancia que Modrinth reconoce
+    /// por su hash (p. ej. tras importar un modpack). Asi pueden actualizarse y volver atras como
+    /// los instalados desde el launcher. `files` son (nombre en `mods/`, SHA-1). Devuelve cuantos se
+    /// registraron; lo que Modrinth no conoce se deja como mod local.
+    pub async fn register_known(&self, manager: &ModManager, files: &[(String, String)]) -> Result<usize, ModError> {
+        let present: Vec<&(String, String)> = files
+            .iter()
+            .filter(|(name, _)| validate_file_name(name).is_ok() && manager.mods_dir().join(name).is_file())
+            .collect();
+        let hashes: Vec<String> = present.iter().map(|(_, sha1)| sha1.to_lowercase()).collect();
+        let known = self.client.versions_by_sha1(&hashes).await?;
+        let projects: Vec<String> = {
+            let mut ids: Vec<String> = known.values().map(|v| v.project_id.clone()).collect();
+            ids.sort();
+            ids.dedup();
+            ids
+        };
+        let titles = self.client.project_titles(&projects).await.unwrap_or_default();
+
+        let mut registered = 0;
+        for (name, sha1) in present {
+            let Some(version) = known.get(&sha1.to_lowercase()) else { continue };
+            manager
+                .record(LockedMod {
+                    file: name.clone(),
+                    project_id: version.project_id.clone(),
+                    version_id: version.id.clone(),
+                    version_number: version.version_number.clone(),
+                    title: titles.get(&version.project_id).cloned().unwrap_or_else(|| version.name.clone()),
+                    sha1: sha1.to_lowercase(),
+                    installed_at: Utc::now(),
+                    dependency_of: None,
+                    previous: None,
+                })
+                .await?;
+            registered += 1;
+        }
+        Ok(registered)
+    }
+
     /// Mods instalados desde Modrinth que tienen una version mas nueva compatible.
     pub async fn check_updates(
         &self,

@@ -77,44 +77,80 @@ fn is_ancient(v: &str) -> bool {
     ["rd-", "c0.", "inf-", "in-", "a1.", "b1."].iter().any(|p| v.starts_with(p))
 }
 
-fn scheme(version: &str) -> Scheme {
-    if is_ancient(version) {
-        return Scheme::TexturePack;
+/// Que espera el juego de una skin: donde va el pack, como se activa y que formato de textura lee.
+/// Es la unica pieza que cambia al aparecer una epoca nueva del juego.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SkinTarget {
+    scheme: Scheme,
+    layout: SkinLayout,
+    pack_format: u32,
+}
+
+/// Primera fecha (AAAA-MM-DD) de cada epoca. Solo se usa cuando el id de la version no se reconoce.
+const RESOURCE_PACKS_SINCE: &str = "2013-06-13"; // snapshot 13w24a
+const MODERN_LAYOUT_SINCE: &str = "2014-09-02"; // 1.8
+const FILE_PREFIX_SINCE: &str = "2018-07-18"; // 1.13
+
+impl SkinTarget {
+    /// Epoca de una version. `ids` son los identificadores a probar en orden (la version base primero:
+    /// un perfil de OptiFine o Forge se comporta como la version de Minecraft sobre la que se apoya) y
+    /// `release_time` la fecha de publicacion de esa version base. Lo desconocido se trata como la
+    /// version mas reciente, que es la que mejor representa a las que aun no existen.
+    pub(crate) fn resolve(ids: &[&str], release_time: Option<&str>) -> Self {
+        let (scheme, layout) = ids
+            .iter()
+            .find_map(|id| classify_id(id))
+            .or_else(|| release_time.and_then(classify_date))
+            .unwrap_or((Scheme::ResourcePackFile, SkinLayout::Modern));
+        let pack_format = ids.iter().find_map(|id| pack_format(id)).unwrap_or(34);
+        Self { scheme, layout, pack_format }
     }
-    if let Some((minor, _)) = parse_release(version) {
-        return match minor {
+}
+
+fn classify_id(v: &str) -> Option<(Scheme, SkinLayout)> {
+    if is_ancient(v) {
+        return Some((Scheme::TexturePack, SkinLayout::Legacy));
+    }
+    if let Some((minor, _)) = parse_release(v) {
+        let scheme = match minor {
             ..=5 => Scheme::TexturePack,
             6..=12 => Scheme::ResourcePack,
             _ => Scheme::ResourcePackFile,
         };
+        let layout = if minor < 8 { SkinLayout::Legacy } else { SkinLayout::Modern };
+        return Some((scheme, layout));
     }
-    match parse_snapshot(version) {
+    let (year, week) = parse_snapshot(v)?;
+    let scheme = match (year, week) {
         // 13w24a es el primer snapshot con resource packs; 17w43a, el primero con `file/`.
-        Some((year, week)) if (year, week) < (13, 24) => Scheme::TexturePack,
-        Some((year, week)) if (year, week) < (17, 43) => Scheme::ResourcePack,
+        (..=12, _) | (13, ..=23) => Scheme::TexturePack,
+        (13..=17, _) if (year, week) < (17, 43) => Scheme::ResourcePack,
         _ => Scheme::ResourcePackFile,
-    }
-}
-
-/// Textura que espera el modelo del jugador: 64x32 hasta 1.7 y 64x64 desde 1.8.
-fn layout(version: &str) -> SkinLayout {
-    if is_ancient(version) {
-        return SkinLayout::Legacy;
-    }
-    if let Some((minor, _)) = parse_release(version) {
-        return if minor < 8 { SkinLayout::Legacy } else { SkinLayout::Modern };
-    }
-    match parse_snapshot(version) {
-        Some((year, _)) if year <= 13 => SkinLayout::Legacy,
-        _ => SkinLayout::Modern,
-    }
-}
-
-fn pack_format(version: &str) -> u32 {
-    let Some((minor, patch)) = parse_release(version) else {
-        return 34;
     };
-    match (minor, patch) {
+    let layout = if (year, week) < (14, 4) { SkinLayout::Legacy } else { SkinLayout::Modern };
+    Some((scheme, layout))
+}
+
+fn classify_date(release_time: &str) -> Option<(Scheme, SkinLayout)> {
+    let day = release_time.get(..10)?;
+    if !day.as_bytes().iter().all(|b| b.is_ascii_digit() || *b == b'-') {
+        return None;
+    }
+    let scheme = if day < RESOURCE_PACKS_SINCE {
+        Scheme::TexturePack
+    } else if day < FILE_PREFIX_SINCE {
+        Scheme::ResourcePack
+    } else {
+        Scheme::ResourcePackFile
+    };
+    let layout = if day < MODERN_LAYOUT_SINCE { SkinLayout::Legacy } else { SkinLayout::Modern };
+    Some((scheme, layout))
+}
+
+/// `pack_format` de un resource pack para esa version. Es informativo: `supported_formats` evita el aviso.
+fn pack_format(version: &str) -> Option<u32> {
+    let (minor, patch) = parse_release(version)?;
+    Some(match (minor, patch) {
         (..=8, _) => 1,
         (9..=10, _) => 2,
         (11..=12, _) => 3,
@@ -132,7 +168,7 @@ fn pack_format(version: &str) -> u32 {
         (20, _) => 32,
         (21, 0..=1) => 34,
         _ => 34,
-    }
+    })
 }
 
 /// Texturas que sustituye en un resource pack: las clasicas (hasta 1.20.1) y las de la carpeta
@@ -158,10 +194,10 @@ fn zip_error(e: zip::result::ZipError) -> std::io::Error {
     std::io::Error::other(e)
 }
 
-fn build_pack(png: &[u8], version: &str, scheme: Scheme) -> std::io::Result<Vec<u8>> {
+fn build_pack(png: &[u8], target: SkinTarget) -> std::io::Result<Vec<u8>> {
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default();
-    match scheme {
+    match target.scheme {
         Scheme::TexturePack => {
             zip.start_file("pack.txt", options).map_err(zip_error)?;
             zip.write_all(PACK_DESCRIPTION.as_bytes())?;
@@ -173,7 +209,7 @@ fn build_pack(png: &[u8], version: &str, scheme: Scheme) -> std::io::Result<Vec<
             // versiones nuevas; las antiguas ignoran la clave.
             let mcmeta = format!(
                 "{{\"pack\":{{\"pack_format\":{},\"supported_formats\":{{\"min_inclusive\":1,\"max_inclusive\":999}},\"description\":\"{PACK_DESCRIPTION}\"}}}}",
-                pack_format(version)
+                target.pack_format
             );
             zip.start_file("pack.mcmeta", options).map_err(zip_error)?;
             zip.write_all(mcmeta.as_bytes())?;
@@ -287,10 +323,10 @@ async fn remove_stale(game_dir: &Path, keep: Scheme) {
 /// Deja la instancia con la skin del perfil (`Some`) o sin pack de skin (`None`).
 pub(crate) async fn sync(
     game_dir: &Path,
-    minecraft_version: &str,
+    target: SkinTarget,
     skin: Option<ProfileSkin>,
 ) -> std::io::Result<()> {
-    let scheme = scheme(minecraft_version);
+    let scheme = target.scheme;
     let pack_path = pack_dir(game_dir, scheme).join(PACK_FILE);
     let options_path = game_dir.join("options.txt");
     let entry = match scheme {
@@ -304,7 +340,7 @@ pub(crate) async fn sync(
 
     match skin {
         Some(skin) => {
-            let png = match adapt_png(&skin.png, skin.model, layout(minecraft_version)) {
+            let png = match adapt_png(&skin.png, skin.model, target.layout) {
                 Ok(png) => png,
                 Err(e) => {
                     // La biblioteca ya valido el PNG al guardarlo; si falla aqui se prefiere la
@@ -333,7 +369,7 @@ pub(crate) async fn sync(
                     updated
                 }
             };
-            write_atomic(&pack_path, &build_pack(&png, minecraft_version, scheme)?).await?;
+            write_atomic(&pack_path, &build_pack(&png, target)?).await?;
             write_if_changed(&options_path, &current, updated).await?;
         }
         None => {
@@ -365,6 +401,10 @@ mod tests {
             }
         }
         skins::encode_rgba(&rgba, 64, height).unwrap()
+    }
+
+    fn target(version: &str) -> SkinTarget {
+        SkinTarget::resolve(&[version], None)
     }
 
     fn profile(height: u32) -> Option<ProfileSkin> {
@@ -406,12 +446,33 @@ mod tests {
             ("24w14a", Scheme::ResourcePackFile, SkinLayout::Modern),
         ];
         for (version, expected_scheme, expected_layout) in cases {
-            assert_eq!(scheme(version), expected_scheme, "{version}");
-            assert_eq!(layout(version), expected_layout, "{version}");
+            let t = target(version);
+            assert_eq!((t.scheme, t.layout), (expected_scheme, expected_layout), "{version}");
         }
-        assert_eq!(pack_format("1.12.2"), 3);
-        assert_eq!(pack_format("1.20.1"), 15);
-        assert_eq!(pack_format("1.21.1"), 34);
+        assert_eq!(target("1.12.2").pack_format, 3);
+        assert_eq!(target("1.20.1").pack_format, 15);
+        assert_eq!(target("1.21.1").pack_format, 34);
+    }
+
+    #[test]
+    fn custom_profiles_follow_their_base_version_and_unknown_ids_the_release_date() {
+        // OptiFine / Forge: el id propio no dice la epoca, la version base si.
+        let optifine_17 = SkinTarget::resolve(&["1.7.10", "1.7.10_HD_U_E7"], Some("2014-06-26T00:00:00+00:00"));
+        assert_eq!((optifine_17.scheme, optifine_17.layout), (Scheme::ResourcePack, SkinLayout::Legacy));
+        let fabric_old = SkinTarget::resolve(&["1.16.5", "fabric-loader-0.15.0-1.16.5"], None);
+        assert_eq!((fabric_old.scheme, fabric_old.layout), (Scheme::ResourcePackFile, SkinLayout::Modern));
+        // Id irreconocible: manda la fecha.
+        let by_date = |d: &str| {
+            let t = SkinTarget::resolve(&["rareza"], Some(d));
+            (t.scheme, t.layout)
+        };
+        assert_eq!(by_date("2012-01-01T00:00:00+00:00"), (Scheme::TexturePack, SkinLayout::Legacy));
+        assert_eq!(by_date("2013-12-01T00:00:00+00:00"), (Scheme::ResourcePack, SkinLayout::Legacy));
+        assert_eq!(by_date("2016-01-01T00:00:00+00:00"), (Scheme::ResourcePack, SkinLayout::Modern));
+        assert_eq!(by_date("2020-01-01T00:00:00+00:00"), (Scheme::ResourcePackFile, SkinLayout::Modern));
+        // Ni id ni fecha (versiones futuras, p. ej. 26.1): la epoca mas reciente.
+        let future = SkinTarget::resolve(&["26.1"], None);
+        assert_eq!((future.scheme, future.layout), (Scheme::ResourcePackFile, SkinLayout::Modern));
     }
 
     #[test]
@@ -463,7 +524,7 @@ mod tests {
     #[tokio::test]
     async fn resource_pack_is_written_enabled_and_then_removed() {
         let dir = tempfile::tempdir().unwrap();
-        sync(dir.path(), "1.12.2", profile(64)).await.unwrap();
+        sync(dir.path(), target("1.12.2"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
             "resourcePacks:[\"DisorderLauncher-skin.zip\"]\n"
@@ -476,7 +537,7 @@ mod tests {
         assert_eq!(size(&read_entry(&pack, "assets/minecraft/textures/entity/steve.png")), (64, 64));
         assert_eq!(size(&read_entry(&pack, "assets/minecraft/textures/entity/alex.png")), (64, 64));
 
-        sync(dir.path(), "1.12.2", None).await.unwrap();
+        sync(dir.path(), target("1.12.2"), None).await.unwrap();
         assert!(!pack.exists());
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
@@ -488,7 +549,7 @@ mod tests {
     #[tokio::test]
     async fn pre_1_8_gets_a_64x32_texture() {
         let dir = tempfile::tempdir().unwrap();
-        sync(dir.path(), "1.7.3", profile(64)).await.unwrap();
+        sync(dir.path(), target("1.7.3"), profile(64)).await.unwrap();
         let pack = dir.path().join("resourcepacks").join(PACK_FILE);
         let steve = read_entry(&pack, "assets/minecraft/textures/entity/steve.png");
         assert_eq!(size(&steve), (64, 32));
@@ -500,7 +561,7 @@ mod tests {
     #[tokio::test]
     async fn a_legacy_skin_is_upgraded_for_1_8_and_later() {
         let dir = tempfile::tempdir().unwrap();
-        sync(dir.path(), "1.20.1", profile(32)).await.unwrap();
+        sync(dir.path(), target("1.20.1"), profile(32)).await.unwrap();
         let pack = dir.path().join("resourcepacks").join(PACK_FILE);
         let steve = read_entry(&pack, "assets/minecraft/textures/entity/player/wide/steve.png");
         assert_eq!(size(&steve), (64, 64));
@@ -514,7 +575,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("resourcepacks")).unwrap();
         std::fs::write(dir.path().join("resourcepacks").join(PACK_FILE), "viejo").unwrap();
 
-        sync(dir.path(), "b1.7.3", profile(64)).await.unwrap();
+        sync(dir.path(), target("b1.7.3"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
             "music:1.0\nskin:DisorderLauncher-skin.zip\n"
@@ -524,7 +585,7 @@ mod tests {
         assert_eq!(size(&read_entry(&pack, "mob/char.png")), (64, 32));
         assert!(!String::from_utf8(read_entry(&pack, "pack.txt")).unwrap().is_empty());
 
-        sync(dir.path(), "b1.7.3", None).await.unwrap();
+        sync(dir.path(), target("b1.7.3"), None).await.unwrap();
         assert!(!pack.exists());
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
@@ -536,7 +597,7 @@ mod tests {
     async fn a_texture_pack_chosen_by_the_player_is_left_alone() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("options.txt"), "skin:Faithful.zip\n").unwrap();
-        sync(dir.path(), "1.0", profile(64)).await.unwrap();
+        sync(dir.path(), target("1.0"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
             "skin:Faithful.zip\n"
@@ -547,7 +608,7 @@ mod tests {
     #[tokio::test]
     async fn modern_versions_start_with_vanilla_and_the_file_prefix() {
         let dir = tempfile::tempdir().unwrap();
-        sync(dir.path(), "1.21.1", profile(64)).await.unwrap();
+        sync(dir.path(), target("1.21.1"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
             "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\n"
@@ -562,14 +623,14 @@ mod tests {
             "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\n",
         )
         .unwrap();
-        sync(dir.path(), "1.21.1", None).await.unwrap();
+        sync(dir.path(), target("1.21.1"), None).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
             "resourcePacks:[\"vanilla\"]\n"
         );
         // Sin options.txt no se crea nada.
         let empty = tempfile::tempdir().unwrap();
-        sync(empty.path(), "1.21.1", None).await.unwrap();
+        sync(empty.path(), target("1.21.1"), None).await.unwrap();
         assert!(!empty.path().join("options.txt").exists());
     }
 
@@ -577,7 +638,7 @@ mod tests {
     async fn an_unreadable_skin_is_used_as_is_instead_of_failing_the_launch() {
         let dir = tempfile::tempdir().unwrap();
         let broken = Some(ProfileSkin { png: vec![1, 2, 3], model: SkinModel::Classic });
-        sync(dir.path(), "1.12.2", broken).await.unwrap();
+        sync(dir.path(), target("1.12.2"), broken).await.unwrap();
         let pack = dir.path().join("resourcepacks").join(PACK_FILE);
         assert_eq!(read_entry(&pack, "assets/minecraft/textures/entity/steve.png"), vec![1, 2, 3]);
     }

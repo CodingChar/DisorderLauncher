@@ -92,6 +92,9 @@ impl ModpackIndex {
 pub fn read_index(mrpack: &Path) -> Result<ModpackIndex, ModpackError> {
     let file = std::fs::File::open(mrpack)?;
     let mut zip = zip::ZipArchive::new(file).map_err(|_| ModpackError::NotAModpack)?;
+    if zip.by_name(INDEX_FILE).is_err() {
+        return Err(foreign_format(&mut zip));
+    }
     let entry = zip.by_name(INDEX_FILE).map_err(|_| ModpackError::NotAModpack)?;
     if entry.size() > MAX_INDEX_BYTES {
         return Err(ModpackError::TooLarge);
@@ -99,6 +102,24 @@ pub fn read_index(mrpack: &Path) -> Result<ModpackIndex, ModpackError> {
     let mut data = Vec::new();
     entry.take(MAX_INDEX_BYTES).read_to_end(&mut data)?;
     parse_index(&data)
+}
+
+/// Reconoce modpacks de otros launchers para poder explicarle a la persona que ese formato no es el de Modrinth.
+fn foreign_format(zip: &mut zip::ZipArchive<std::fs::File>) -> ModpackError {
+    let has = |zip: &mut zip::ZipArchive<std::fs::File>, name: &str| zip.by_name(name).is_ok();
+    if has(zip, "manifest.json") {
+        let mut text = String::new();
+        if let Ok(entry) = zip.by_name("manifest.json") {
+            let _ = entry.take(MAX_INDEX_BYTES).read_to_string(&mut text);
+        }
+        if text.contains("minecraftModpack") {
+            return ModpackError::OtherLauncher("CurseForge".into());
+        }
+    }
+    if has(zip, "mmc-pack.json") || has(zip, "instance.cfg") {
+        return ModpackError::OtherLauncher("MultiMC o Prism".into());
+    }
+    ModpackError::NotAModpack
 }
 
 pub fn parse_index(json: &[u8]) -> Result<ModpackIndex, ModpackError> {

@@ -109,6 +109,61 @@ pub async fn instances_repair(
   state.launcher.repair_instance(&id).await.map_err(user_message)
 }
 
+/// Carpeta de Minecraft a usar: la habitual (`None`) o la ultima elegida con el selector.
+fn external_dir(state: &AppState, dir: Option<String>) -> Result<Option<std::path::PathBuf>, String> {
+  let Some(dir) = dir.filter(|d| !d.is_empty()) else { return Ok(None) };
+  let requested = std::path::PathBuf::from(dir);
+  let picked = state.picked_minecraft_dir.lock().unwrap_or_else(|p| p.into_inner()).clone();
+  if picked.as_ref() == Some(&requested) || launcher_core::default_minecraft_dir().as_ref() == Some(&requested) {
+    Ok(Some(requested))
+  } else {
+    Err("Elige la carpeta de Minecraft con el boton «Buscar en otra carpeta».".to_string())
+  }
+}
+
+/// Versiones personalizadas (OptiFine, Forge puestos a mano...) de una carpeta de Minecraft.
+#[tauri::command]
+pub async fn external_versions_scan(
+  state: State<'_, AppState>,
+  dir: Option<String>,
+) -> Result<launcher_core::ExternalScan, String> {
+  let dir = external_dir(&state, dir)?;
+  state.launcher.external_versions_scan(dir.as_deref()).await.map_err(user_message)
+}
+
+/// Selector de carpeta; devuelve el resultado de revisarla. `None` si se cancela.
+#[tauri::command]
+pub async fn external_versions_pick_dir(
+  app: tauri::AppHandle,
+  state: State<'_, AppState>,
+) -> Result<Option<launcher_core::ExternalScan>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let Some(folder) = app.dialog().file().blocking_pick_folder() else { return Ok(None) };
+  let path = folder.into_path().map_err(|_| "No se pudo leer la carpeta elegida.".to_string())?;
+  *state.picked_minecraft_dir.lock().unwrap_or_else(|p| p.into_inner()) = Some(path.clone());
+  state.launcher.external_versions_scan(Some(&path)).await.map(Some).map_err(user_message)
+}
+
+/// Crea una instancia con una version personalizada de la carpeta indicada.
+#[tauri::command]
+pub async fn instances_create_custom(
+  state: State<'_, AppState>,
+  name: String,
+  dir: Option<String>,
+  version: String,
+  copy_data: Option<bool>,
+) -> Result<Instance, String> {
+  let root = match external_dir(&state, dir)? {
+    Some(dir) => dir,
+    None => launcher_core::default_minecraft_dir().ok_or_else(|| "No se encontro la carpeta de Minecraft.".to_string())?,
+  };
+  state
+    .launcher
+    .instances_create_custom(&name, &root, &version, copy_data.unwrap_or(false))
+    .await
+    .map_err(user_message)
+}
+
 /// Por defecto solo versiones estables; `include_all` agrega snapshots y antiguas.
 #[tauri::command]
 pub async fn minecraft_list_versions(

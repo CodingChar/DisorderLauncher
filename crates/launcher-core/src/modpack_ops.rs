@@ -22,6 +22,9 @@ impl From<ModpackError> for LauncherError {
             ModpackError::NotAModpack | ModpackError::UnsupportedFormat(_) => {
                 Self::InvalidInput("Ese archivo no es un modpack valido (.mrpack).".into())
             }
+            ModpackError::OtherLauncher(name) => Self::InvalidInput(format!(
+                "Ese archivo es un modpack de {name}. Este launcher usa el formato .mrpack de Modrinth: busca el mismo modpack en Modrinth o exporta uno en ese formato."
+            )),
             ModpackError::UnsupportedLoader(name) => {
                 Self::InvalidInput(format!("Este modpack necesita {name}, que aun no esta disponible."))
             }
@@ -112,7 +115,33 @@ impl Launcher {
         )
         .await?;
         modpacks::apply_overrides(mrpack, &instance.game_dir).await?;
+        self.register_pack_mods(instance, index).await;
         Ok(())
+    }
+
+    /// Registra los mods del modpack como mods de Modrinth (por su hash) para que se puedan actualizar.
+    /// Es opcional: sin red o si Modrinth no responde, los mods quedan como locales y todo sigue igual.
+    async fn register_pack_mods(&self, instance: &Instance, index: &modpacks::ModpackIndex) {
+        let files: Vec<(String, String)> = index
+            .client_files()
+            .filter_map(|f| {
+                let name = f.path.strip_prefix("mods/")?;
+                (!name.contains('/') && name.ends_with(".jar")).then(|| (name.to_string(), f.hashes.sha1.clone()))
+            })
+            .collect();
+        if files.is_empty() {
+            return;
+        }
+        let manager = mods::ModManager::new(&instance.game_dir);
+        let registered = tokio::time::timeout(
+            std::time::Duration::from_secs(20),
+            self.mods_service.register_known(&manager, &files),
+        )
+        .await;
+        match registered {
+            Ok(Ok(count)) => tracing::info!(count, "mods del modpack registrados como mods de Modrinth"),
+            _ => tracing::warn!("no se pudieron registrar los mods del modpack; quedan como locales"),
+        }
     }
 
     /// Exporta una instancia como `.mrpack`. No incluye mundos, logs ni datos de cuentas.
@@ -129,11 +158,13 @@ impl Launcher {
             .as_deref()
             .map(|version| (instance.loader, version))
             .filter(|(kind, _)| *kind != LoaderKind::Vanilla);
+        // Una version personalizada (OptiFine...) se exporta con la version de Minecraft en la que se apoya.
+        let minecraft_version = self.base_minecraft_version(&instance).await;
         let input = ExportInput {
             name: &instance.name,
             version_id: "1.0.0",
             summary: None,
-            minecraft_version: &instance.minecraft_version,
+            minecraft_version: &minecraft_version,
             loader,
             game_dir: &instance.game_dir,
         };

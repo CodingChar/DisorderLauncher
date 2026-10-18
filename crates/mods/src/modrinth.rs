@@ -187,6 +187,45 @@ impl ModrinthClient {
             .await?)
     }
 
+    /// Versiones de Modrinth que corresponden a archivos ya descargados, por su SHA-1.
+    /// Los archivos que Modrinth no conoce simplemente no aparecen en el resultado.
+    pub async fn versions_by_sha1(&self, hashes: &[String]) -> Result<std::collections::HashMap<String, ModVersion>, ModError> {
+        if hashes.is_empty() {
+            return Ok(Default::default());
+        }
+        Ok(self
+            .http
+            .post(format!("{}/version_files", self.base_url))
+            .json(&serde_json::json!({ "hashes": hashes, "algorithm": "sha1" }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
+    }
+
+    /// Titulos de varios proyectos de una vez.
+    pub async fn project_titles(&self, ids: &[String]) -> Result<std::collections::HashMap<String, String>, ModError> {
+        #[derive(Deserialize)]
+        struct Project {
+            id: String,
+            title: String,
+        }
+        if ids.is_empty() || ids.iter().any(|id| validate_project_ref(id).is_err()) {
+            return Ok(Default::default());
+        }
+        let projects: Vec<Project> = self
+            .http
+            .get(format!("{}/projects", self.base_url))
+            .query(&[("ids", serde_json::json!(ids).to_string())])
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(projects.into_iter().map(|p| (p.id, p.title)).collect())
+    }
+
     pub async fn project_title(&self, project: &str) -> Result<String, ModError> {
         validate_project_ref(project)?;
         let info: ProjectInfo = self

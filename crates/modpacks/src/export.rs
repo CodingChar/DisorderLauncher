@@ -149,6 +149,33 @@ fn walk(root: &Path, relative: &Path, skip: &HashSet<String>, out: &mut Vec<Stri
     Ok(())
 }
 
+/// Quita de `options.txt` las referencias al pack de skin del launcher (que no viaja en el paquete).
+fn without_generated_skin_pack(options: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    for line in options.lines() {
+        if let Some(rest) = line.strip_prefix("resourcePacks:") {
+            if let Ok(packs) = serde_json::from_str::<Vec<String>>(rest) {
+                let kept: Vec<String> = packs
+                    .into_iter()
+                    .filter(|p| p != GENERATED_SKIN_PACK && p.strip_prefix("file/") != Some(GENERATED_SKIN_PACK))
+                    .collect();
+                out.push(format!("resourcePacks:{}", serde_json::to_string(&kept).unwrap_or_else(|_| "[]".into())));
+                continue;
+            }
+        }
+        if line.strip_prefix("skin:").is_some_and(|v| v.trim() == GENERATED_SKIN_PACK) {
+            out.push("skin:Default".to_string());
+            continue;
+        }
+        out.push(line.to_string());
+    }
+    let mut text = out.join("\n");
+    if !text.is_empty() {
+        text.push('\n');
+    }
+    text
+}
+
 fn write_package(dest: &Path, index: &ModpackIndex, game_dir: &Path, bundled: &[String]) -> Result<(), ModpackError> {
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
@@ -162,8 +189,13 @@ fn write_package(dest: &Path, index: &ModpackIndex, game_dir: &Path, bundled: &[
 
     for rel in bundled {
         zip.start_file(format!("overrides/{rel}"), options)?;
-        let mut source = std::fs::File::open(game_dir.join(rel))?;
-        std::io::copy(&mut source, &mut zip)?;
+        if rel == "options.txt" {
+            let text = std::fs::read_to_string(game_dir.join(rel)).unwrap_or_default();
+            zip.write_all(without_generated_skin_pack(&text).as_bytes())?;
+        } else {
+            let mut source = std::fs::File::open(game_dir.join(rel))?;
+            std::io::copy(&mut source, &mut zip)?;
+        }
     }
     zip.finish()?;
     std::fs::rename(&part, dest)?;
@@ -191,6 +223,16 @@ mod tests {
             std::fs::write(p, data).unwrap();
         }
         dir
+    }
+
+    #[test]
+    fn options_lose_the_generated_skin_pack_but_keep_everything_else() {
+        let options = "fov:1\nresourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\",\"file/mio.zip\"]\nskin:DisorderLauncher-skin.zip\n";
+        assert_eq!(
+            without_generated_skin_pack(options),
+            "fov:1\nresourcePacks:[\"vanilla\",\"file/mio.zip\"]\nskin:Default\n"
+        );
+        assert_eq!(without_generated_skin_pack("skin:Faithful.zip\n"), "skin:Faithful.zip\n");
     }
 
     #[test]
