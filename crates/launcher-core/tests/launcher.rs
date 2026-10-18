@@ -226,7 +226,7 @@ async fn launch_reports_offline_failure_and_can_be_retried() {
 async fn launch_and_stop_of_unknown_instance_fail_cleanly() {
     let (_d, launcher, _) = launcher();
     assert!(matches!(launcher.launch("inst_nope").await, Err(LauncherError::InstanceNotFound)));
-    assert!(matches!(launcher.stop("inst_nope"), Err(LauncherError::InstanceNotFound)));
+    assert!(launcher.stop("inst_nope").is_ok(), "detener algo que no corre es inofensivo");
     assert!(matches!(launcher.launch("../x").await, Err(LauncherError::InstanceNotFound)));
 }
 

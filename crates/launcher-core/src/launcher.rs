@@ -564,7 +564,8 @@ impl Launcher {
                 Ok(())
             }
             Some(None) => Err(LauncherError::NotYetRunning),
-            None => Err(LauncherError::InstanceNotFound),
+            // Ya no corre (p. ej. se cerro justo antes de pulsar «Cerrar juego»): no hay nada que detener.
+            None => Ok(()),
         }
     }
 
