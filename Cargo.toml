@@ -44,7 +44,7 @@ chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
 directories = "6"
 keyring = "3"
-zip = "2"
+zip = "9"
 tempfile = "3"
 url = "2"
 md-5 = "0.10"

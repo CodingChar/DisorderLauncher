@@ -77,7 +77,7 @@ pub fn extract_zip_prefixed(
         // `enclosed_name` rechaza rutas absolutas y componentes `..`.
         let relative = entry
             .enclosed_name()
-            .ok_or_else(|| ArchiveError::UnsafeEntry(entry.name().to_string()))?;
+            .ok_or_else(|| ArchiveError::UnsafeEntry(entry.name().map(|n| n.into_owned()).unwrap_or_else(|_| "?".into())))?;
 
         let name = relative.to_string_lossy().replace('\\', "/");
         let Some(name) = name.strip_prefix(prefix).map(str::to_string) else { continue };
@@ -180,8 +180,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let zip_path = dir.path().join("evil.zip");
         build_zip(&zip_path, &[("/abs.txt", b"pwn")]);
-        let err = extract_zip(&zip_path, &dir.path().join("out"), &ExtractOptions::default()).unwrap_err();
-        assert!(matches!(err, ArchiveError::UnsafeEntry(_)));
+        let dest = dir.path().join("out");
+        // Segun la version de `zip`, una ruta absoluta se rechaza o se normaliza a relativa; en ambos
+        // casos nada puede escribirse fuera del destino.
+        match extract_zip(&zip_path, &dest, &ExtractOptions::default()) {
+            Err(e) => assert!(matches!(e, ArchiveError::UnsafeEntry(_))),
+            Ok(_) => assert!(dest.join("abs.txt").is_file(), "debe quedar dentro del destino"),
+        }
+        assert!(!dir.path().join("abs.txt").exists());
+        assert!(!Path::new("/abs.txt").exists());
     }
 
     #[test]
