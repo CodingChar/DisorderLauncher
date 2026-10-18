@@ -47,11 +47,14 @@ struct Index {
 /// `<root>/index.json` + `<root>/assets/<id>.png`. El PNG nunca va dentro de un JSON de cuenta.
 pub struct SkinLibrary {
     root: PathBuf,
+    /// Serializa los cambios al indice: dos guardados a la vez (p. ej. doble clic en «Guardar») leian el
+    /// mismo indice y el ultimo en escribir borraba la skin del otro.
+    write_lock: tokio::sync::Mutex<()>,
 }
 
 impl SkinLibrary {
     pub fn new(root: impl AsRef<Path>) -> Self {
-        Self { root: root.as_ref().to_path_buf() }
+        Self { root: root.as_ref().to_path_buf(), write_lock: tokio::sync::Mutex::new(()) }
     }
 
     fn index_path(&self) -> PathBuf {
@@ -162,6 +165,7 @@ impl SkinLibrary {
             created_at: now,
             updated_at: now,
         };
+        let _guard = self.write_lock.lock().await;
         let mut index = self.load().await;
         index.skins.push(asset.clone());
         self.save(index).await?;
@@ -171,6 +175,7 @@ impl SkinLibrary {
     /// Reemplaza los pixeles de una skin existente (editor). Conserva id y nombre.
     pub async fn replace_pixels(&self, id: &str, bytes: &[u8]) -> Result<SkinAsset, SkinError> {
         let checked = check_skin_png(bytes)?;
+        let _guard = self.write_lock.lock().await;
         let mut index = self.load().await;
         let entry = index.skins.iter_mut().find(|s| s.id == id).ok_or(SkinError::NotFound)?;
 
@@ -197,6 +202,7 @@ impl SkinLibrary {
     }
 
     async fn update(&self, id: &str, change: impl FnOnce(&mut SkinAsset)) -> Result<SkinAsset, SkinError> {
+        let _guard = self.write_lock.lock().await;
         let mut index = self.load().await;
         let entry = index.skins.iter_mut().find(|s| s.id == id).ok_or(SkinError::NotFound)?;
         change(entry);
@@ -207,6 +213,7 @@ impl SkinLibrary {
     }
 
     pub async fn remove(&self, id: &str) -> Result<(), SkinError> {
+        let _guard = self.write_lock.lock().await;
         let mut index = self.load().await;
         let before = index.skins.len();
         index.skins.retain(|s| s.id != id);
@@ -263,6 +270,24 @@ mod tests {
             }
         }
         encode_rgba(&rgba, 64, 64).unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn simultaneous_imports_never_lose_a_skin() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = std::sync::Arc::new(SkinLibrary::new(dir.path()));
+        let bytes = png(false);
+        let tasks: Vec<_> = (0..20)
+            .map(|i| {
+                let lib = lib.clone();
+                let bytes = bytes.clone();
+                tokio::spawn(async move { lib.import(&bytes, &format!("Skin {i}"), None).await.unwrap() })
+            })
+            .collect();
+        for t in tasks {
+            t.await.unwrap();
+        }
+        assert_eq!(lib.list().await.len(), 20);
     }
 
     #[tokio::test]
