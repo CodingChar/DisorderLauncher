@@ -46,7 +46,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 ## Accesibilidad
 
 Auditada en navegador: objetivos ≥ 40 px (radios con etiqueta de 40 px), campos con etiqueta, un `<main>`/`<h1>`, foco movido al titulo al navegar, `aria-live` en estados, dialogos modales nativos, `prefers-reduced-motion`. El lienzo del editor tambien se maneja con teclado (flechas + Intro/Espacio); falta revisarlo con un lector de pantalla.
-Tras la reforma visual no se repitio la auditoria completa (contrastes, tamaños): las etiquetas de 8-9 px heredadas de la maqueta se subieron a 10 px (solo se mantiene el 9 px de la marca «LAUNCHER»); los contrastes de los tres temas se calcularon a ojo, no con herramienta.
+Tras la reforma visual no se repitio la auditoria completa (contrastes, tamaños): las etiquetas de 8-9 px heredadas de la maqueta se subieron a 10 px (solo se mantiene el 9 px de la marca «LAUNCHER»); los contrastes de los tres temas se midieron con la formula WCAG (2026-10-17): texto y estados ≥ 4,5:1 en todos; se oscurecieron `border-strong` (negro 2,18→3,2:1; claro 2,53→3,7:1) y `text-secondary` del claro (→ 4,8:1 sobre superficies elevadas). Falta revisar con un lector de pantalla.
 
 ## Pendiente de verificar antes de publicar
 

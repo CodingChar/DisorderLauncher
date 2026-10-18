@@ -28,7 +28,7 @@ Texto:
   "textPrimary": "#F0F0EA",
   "textSecondary": "#A0A09A",
   "border": "#2D2D2D",
-  "borderStrong": "#4D4D4D",
+  "borderStrong": "#666666",
   "action": "#F3F3ED",
   "actionText": "#0C0C0C"
 }
@@ -43,9 +43,9 @@ Texto:
   "surfaceAlt": "#DFDFDB",
   "surfaceRaised": "#CFCFCA",
   "textPrimary": "#0A0A0A",
-  "textSecondary": "#62625E",
+  "textSecondary": "#55554F",
   "border": "#C8C8C2",
-  "borderStrong": "#9E9E98",
+  "borderStrong": "#80807A",
   "action": "#101010",
   "actionText": "#F4F4EF"
 }

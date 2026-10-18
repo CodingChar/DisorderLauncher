@@ -11,7 +11,7 @@
     "textPrimary": "#F0F0EA",
     "textSecondary": "#A0A09A",
     "border": "#2D2D2D",
-    "borderStrong": "#4D4D4D",
+    "borderStrong": "#666666",
     "action": "#F3F3ED",
     "actionText": "#0C0C0C"
   },

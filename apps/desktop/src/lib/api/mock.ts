@@ -27,12 +27,12 @@ let msLoginPending = false
 const msExpired = new Set<string>()
 let mockThemes: any[] = [
   { builtin: true, schemaVersion: 1, id: 'disorderlaucher.default.dark', name: 'Default Dark', mode: 'dark',
-    colors: { background: '#0C0C0C', surface: '#141414', surfaceAlt: '#1D1D1D', surfaceRaised: '#252525', textPrimary: '#F0F0EA', textSecondary: '#A0A09A', border: '#2D2D2D', borderStrong: '#4D4D4D', action: '#F3F3ED', actionText: '#0C0C0C' },
+    colors: { background: '#0C0C0C', surface: '#141414', surfaceAlt: '#1D1D1D', surfaceRaised: '#252525', textPrimary: '#F0F0EA', textSecondary: '#A0A09A', border: '#2D2D2D', borderStrong: '#666666', action: '#F3F3ED', actionText: '#0C0C0C' },
     typography: { displayFamily: 'Space Grotesk', bodyFamily: 'IBM Plex Sans', scale: 1 },
     shape: { inputRadius: 7, buttonRadius: 8, cardRadius: 13, heroRadius: 18 },
     density: { uiScale: 1, compact: false }, effects: { shadowStrength: 0.2, animations: true } },
   { builtin: true, schemaVersion: 1, id: 'disorderlaucher.default.light', name: 'Default Light', mode: 'light',
-    colors: { background: '#ECECE8', surface: '#F8F8F5', surfaceAlt: '#DFDFDB', surfaceRaised: '#CFCFCA', textPrimary: '#0A0A0A', textSecondary: '#62625E', border: '#C8C8C2', borderStrong: '#9E9E98', action: '#101010', actionText: '#F4F4EF' },
+    colors: { background: '#ECECE8', surface: '#F8F8F5', surfaceAlt: '#DFDFDB', surfaceRaised: '#CFCFCA', textPrimary: '#0A0A0A', textSecondary: '#55554F', border: '#C8C8C2', borderStrong: '#80807A', action: '#101010', actionText: '#F4F4EF' },
     typography: { displayFamily: 'Space Grotesk', bodyFamily: 'IBM Plex Sans', scale: 1 },
     shape: { inputRadius: 7, buttonRadius: 8, cardRadius: 13, heroRadius: 18 },
     density: { uiScale: 1, compact: false }, effects: { shadowStrength: 0.2, animations: true } },

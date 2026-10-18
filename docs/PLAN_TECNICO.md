@@ -150,7 +150,7 @@ tempfile = "3"
   --text-primary: #F0F0EA;
   --text-secondary: #A0A09A;
   --border: #2D2D2D;
-  --border-strong: #4D4D4D;
+  --border-strong: #666666;
   --action: #F3F3ED;
   --action-text: #0C0C0C;
   --r-xl: 26px;
@@ -164,9 +164,9 @@ tempfile = "3"
   --surface-alt: #DFDFDB;
   --surface-raised: #CFCFCA;
   --text-primary: #0A0A0A;
-  --text-secondary: #62625E;
+  --text-secondary: #55554F;
   --border: #C8C8C2;
-  --border-strong: #9E9E98;
+  --border-strong: #80807A;
   --action: #101010;
   --action-text: #F4F4EF;
 }
