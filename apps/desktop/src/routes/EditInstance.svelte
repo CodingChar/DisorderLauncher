@@ -10,7 +10,7 @@
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
   import { sessions } from '../lib/stores/sessions.svelte'
-  import { versions } from '../lib/stores/versions.svelte'
+  import VersionPicker from '../lib/components/VersionPicker.svelte'
 
   const instance = $derived(instances.selected)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
@@ -30,7 +30,6 @@
   let confirmDelete = $state(false)
 
   onMount(() => {
-    if (versions.list.length === 0) versions.load()
     if (!instance) return
     name = instance.name
     version = instance.minecraftVersion
@@ -45,12 +44,6 @@
     }
   })
 
-  // La version actual siempre debe poder elegirse, aunque el catalogo no este disponible.
-  const versionOptions = $derived.by(() => {
-    const ids = new Set(versions.list.map((v) => v.id))
-    if (version) ids.add(version)
-    return [...ids].map((id) => ({ value: id, label: id }))
-  })
   const profileOptions = $derived(accounts.list.map((a) => ({ value: a.id, label: a.label })))
 
   async function save() {
@@ -139,7 +132,7 @@
         }}
       >
         <Input label="Nombre" bind:value={name} maxlength={64} />
-        <Select label="Versión de Minecraft" bind:value={version} options={versionOptions} disabled={busy} />
+        <VersionPicker loader={instance.loader} bind:value={version} disabled={busy} autoSelect={false} />
         <Select label="Perfil que juega" bind:value={profileId} options={profileOptions} disabled={busy} />
 
         <fieldset class="group">

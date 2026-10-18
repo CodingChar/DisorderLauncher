@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import Button from '../lib/components/Button.svelte'
   import PageHeading from '../lib/components/PageHeading.svelte'
   import Card from '../lib/components/Card.svelte'
   import Input from '../lib/components/Input.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
   import Select from '../lib/components/Select.svelte'
+  import VersionPicker from '../lib/components/VersionPicker.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
-  import { versions } from '../lib/stores/versions.svelte'
   import type { LoaderKind } from '../lib/types'
 
   let name = $state('Mi mundo')
@@ -29,16 +28,6 @@
     { value: 'forge', label: 'Forge (mods de Forge)' },
     { value: 'neoforge', label: 'NeoForge (mods recientes, desde 1.20.2)' },
   ]
-  const options = $derived(versions.list.map((v) => ({ value: v.id, label: v.id })))
-
-  onMount(() => {
-    if (versions.list.length === 0) versions.load()
-  })
-
-  // Preselecciona la version estable mas reciente cuando llega el catalogo.
-  $effect(() => {
-    if (!version && versions.list.length > 0) version = versions.list[0].id
-  })
 
   async function importPack() {
     if (importing) return
@@ -99,21 +88,7 @@
       <Input label="Nombre" bind:value={name} maxlength={64} />
       <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
 
-      {#if versions.loading}
-        <p class="subtle">Buscando versiones de Minecraft…</p>
-      {:else if versions.error}
-        <div class="note-block" role="alert">
-          <p class="form-error">{versions.error}</p>
-          <Button onclick={() => versions.load()}>Reintentar</Button>
-        </div>
-      {:else if options.length === 0}
-        <div class="note-block">
-          <p class="subtle">No hay versiones disponibles por ahora. Comprueba tu conexión a internet.</p>
-          <Button onclick={() => versions.load()}>Buscar de nuevo</Button>
-        </div>
-      {:else}
-        <Select label="Versión de Minecraft" bind:value={version} {options} />
-      {/if}
+      <VersionPicker {loader} bind:value={version} disabled={busy} />
 
       <details class="settings-block advanced">
         <summary>Opciones avanzadas</summary>
@@ -173,12 +148,6 @@
     max-width: 800px;
   }
 
-  .note-block {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
 
   .pack-actions {
     margin-top: 16px;

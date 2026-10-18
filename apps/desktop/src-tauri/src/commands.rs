@@ -122,6 +122,15 @@ pub async fn minecraft_list_versions(
     .map_err(user_message)
 }
 
+/// Versiones de Minecraft que admite un tipo de instancia (con red; sin ella, cache o lo ya instalado).
+#[tauri::command]
+pub async fn minecraft_version_catalog(
+  state: State<'_, AppState>,
+  loader: instance_manager::LoaderKind,
+) -> Result<launcher_core::VersionCatalog, String> {
+  state.launcher.version_catalog(loader).await.map_err(user_message)
+}
+
 #[tauri::command]
 pub async fn settings_get(state: State<'_, AppState>) -> Result<launcher_core::SettingsSnapshot, String> {
   Ok(state.launcher.settings_snapshot())

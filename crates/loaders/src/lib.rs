@@ -45,6 +45,10 @@ pub struct InstalledLoader {
 pub trait LoaderProvider: Send + Sync {
     fn kind(&self) -> LoaderKind;
 
+    /// Versiones de Minecraft sobre las que existe este loader (las que se pueden elegir al crear
+    /// una instancia de este tipo). Necesita red.
+    async fn game_versions(&self) -> Result<Vec<String>, LoaderError>;
+
     /// Versiones del loader compatibles con `minecraft_version`, la mas reciente primero.
     async fn versions(&self, minecraft_version: &str) -> Result<Vec<LoaderVersion>, LoaderError>;
 

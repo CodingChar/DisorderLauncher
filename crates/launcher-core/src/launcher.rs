@@ -288,7 +288,12 @@ impl Launcher {
             LoaderKind::Vanilla => None,
             kind => match loader_version {
                 Some(v) => Some(v),
-                None => Some(self.latest_stable_loader(kind, version).await?.version),
+                None => Some(match self.latest_stable_loader(kind, version).await {
+                    Ok(v) => v.version,
+                    // Sin red: se usa el loader que ya esta instalado para esa version.
+                    Err(e) => crate::version_catalog::installed_loader_version(&self.paths().minecraft_dir(), kind, version)
+                        .ok_or(e)?,
+                }),
             },
         };
 
@@ -387,6 +392,11 @@ impl Launcher {
     }
 
     async fn load_manifest(&self) -> Result<VersionManifest, LauncherError> {
+        Ok(self.load_manifest_with_source().await?.0)
+    }
+
+    /// Manifiesto y si salio del cache local (`true`) en vez de la red.
+    pub(crate) async fn load_manifest_with_source(&self) -> Result<(VersionManifest, bool), LauncherError> {
         let cache = self.paths.manifest_cache();
         let fetched = tokio::time::timeout(
             MANIFEST_TIMEOUT,
@@ -399,12 +409,12 @@ impl Launcher {
                 if let Err(e) = minecraft_meta::save_manifest_cache(&manifest, &cache).await {
                     tracing::warn!(error = %e, "no se pudo guardar el cache del manifiesto");
                 }
-                Ok(manifest)
+                Ok((manifest, false))
             }
             failure => {
                 tracing::warn!("no se pudo descargar el manifiesto, se usa el cache local");
                 match minecraft_meta::load_cached_manifest(&cache).await {
-                    Ok(manifest) => Ok(manifest),
+                    Ok(manifest) => Ok((manifest, true)),
                     Err(_) => match failure {
                         Ok(Err(e)) => Err(e.into()),
                         _ => Err(LauncherError::Offline),

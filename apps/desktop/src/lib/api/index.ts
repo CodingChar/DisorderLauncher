@@ -23,6 +23,7 @@ import type {
   Settings,
   SettingsSnapshot,
   ThemeEntry,
+  VersionCatalog,
   VersionEntry,
 } from '../types'
 
@@ -109,6 +110,7 @@ export const api = {
   startupNotices: () => call<string[]>('startup_notices'),
   settingsGet: () => call<SettingsSnapshot>('settings_get'),
   settingsUpdate: (settings: Settings) => call<SettingsSnapshot>('settings_update', { settings }),
+  versionCatalog: (loader: LoaderKind) => call<VersionCatalog>('minecraft_version_catalog', { loader }),
   listVersions: (includeAll = false) => call<VersionEntry[]>('minecraft_list_versions', { includeAll }),
 }
 

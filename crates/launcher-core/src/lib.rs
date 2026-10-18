@@ -11,6 +11,7 @@ mod settings;
 mod skin_pack;
 mod skins_ops;
 mod themes_ops;
+mod version_catalog;
 
 pub use error::*;
 pub use events::*;
@@ -22,3 +23,4 @@ pub use mods_ops::*;
 pub use paths::*;
 pub use registry::*;
 pub use settings::*;
+pub use version_catalog::{CatalogSource, VersionCatalog};

@@ -52,6 +52,22 @@ const versions: VersionEntry[] = ['1.21.4', '1.21.1', '1.20.4', '1.19.4', '1.16.
   releaseTime: '2024-01-01T00:00:00+00:00',
 }))
 
+const mockOld: VersionEntry[] = [
+  { id: '24w14a', type: 'snapshot', releaseTime: '2024-04-03T00:00:00+00:00' },
+  { id: '1.8.9', type: 'release', releaseTime: '2015-12-09T00:00:00+00:00' },
+  { id: 'b1.7.3', type: 'old_beta', releaseTime: '2011-07-08T00:00:00+00:00' },
+  { id: 'a1.2.6', type: 'old_alpha', releaseTime: '2010-12-03T00:00:00+00:00' },
+]
+
+/** Cada tipo de instancia admite versiones distintas (como en el launcher real). */
+function mockCatalog(loader: string): VersionEntry[] {
+  const all = [...versions, ...mockOld]
+  if (loader === 'vanilla') return all
+  if (loader === 'neoforge') return all.filter((v) => ['1.21.4', '1.21.1', '1.20.4'].includes(v.id))
+  if (loader === 'forge') return all.filter((v) => ['1.20.4', '1.16.5', '1.12.2', '1.8.9'].includes(v.id))
+  return all.filter((v) => v.type !== 'old_beta' && v.type !== 'old_alpha' && v.id !== '1.8.9')
+}
+
 async function simulateLaunch(instanceId: string) {
   const state = (s: Record<string, unknown>) => emit('launch://state', { instanceId: instanceId, ...s })
   state({ state: 'preparing' })
@@ -390,6 +406,8 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
     case 'settings_update':
       settings = { ...args.settings }
       return { settings, dataDir: 'C:\Users\Demo\AppData\Roaming\DisorderLauncher' }
+    case 'minecraft_version_catalog':
+      return { versions: mockCatalog(String(args.loader)), source: 'online' }
     case 'minecraft_list_versions':
       return versions
     default:

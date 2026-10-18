@@ -836,3 +836,54 @@ async fn real_quilt_install_launch_and_stop() {
 async fn real_fabric_with_modrinth_mod_loads_the_mod() {
     run_loader_e2e_with_mods(LoaderKind::Fabric, "1.14.4", &["fabric", "fabric-api"], &["P7dR8mSH"]).await;
 }
+
+/// Sin red y sin cache, el catalogo ofrece solo lo ya instalado y las instancias se crean con ello.
+#[tokio::test]
+async fn version_catalog_without_network_falls_back_to_installed_versions() {
+    let dir = tempfile::tempdir().unwrap();
+    let versions = dir.path().join("minecraft").join("versions");
+    for (id, json) in [
+        ("1.12.2", r#"{"id":"1.12.2","type":"release","releaseTime":"2017-09-18T08:39:46+00:00"}"#),
+        ("fabric-loader-0.15.0-1.12.2", r#"{"id":"fabric-loader-0.15.0-1.12.2","inheritsFrom":"1.12.2"}"#),
+    ] {
+        std::fs::create_dir_all(versions.join(id)).unwrap();
+        std::fs::write(versions.join(id).join(format!("{id}.json")), json).unwrap();
+    }
+    let launcher = Arc::new(
+        Launcher::new(LauncherPaths::new(dir.path()), Arc::new(Collector::default())).with_manifest_url("http://127.0.0.1:9/manifest.json"),
+    );
+
+    let vanilla = launcher.version_catalog(LoaderKind::Vanilla).await.unwrap();
+    assert_eq!(vanilla.source, launcher_core::CatalogSource::Installed);
+    assert_eq!(vanilla.versions.iter().map(|v| v.id.as_str()).collect::<Vec<_>>(), ["1.12.2"]);
+    assert!(launcher.version_catalog(LoaderKind::Quilt).await.unwrap().versions.is_empty());
+
+    // Crear una instancia Fabric sin red usa el loader ya instalado.
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let instance = launcher.instances_create("Sin red", "1.12.2", LoaderKind::Fabric, None).await.unwrap();
+    assert_eq!(instance.loader_version.as_deref(), Some("0.15.0"));
+}
+
+/// Cada loader solo ofrece las versiones que realmente soporta (red real). Manual.
+#[tokio::test]
+#[ignore = "requiere internet"]
+async fn real_version_catalog_is_filtered_per_loader() {
+    let dir = tempfile::tempdir().unwrap();
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(dir.path()), Arc::new(Collector::default())));
+    let ids = |c: launcher_core::VersionCatalog| c.versions.into_iter().map(|v| v.id).collect::<Vec<_>>();
+
+    let vanilla = launcher.version_catalog(LoaderKind::Vanilla).await.unwrap();
+    assert_eq!(vanilla.source, launcher_core::CatalogSource::Online);
+    let kinds: std::collections::HashSet<_> = vanilla.versions.iter().map(|v| format!("{:?}", v.version_type)).collect();
+    println!("tipos en vanilla: {kinds:?}, total {}", vanilla.versions.len());
+    assert!(kinds.contains("OldAlpha") && kinds.contains("OldBeta") && kinds.contains("Snapshot") && kinds.contains("Release"));
+
+    let vanilla_ids = ids(vanilla);
+    for kind in [LoaderKind::Fabric, LoaderKind::Quilt, LoaderKind::Forge, LoaderKind::NeoForge] {
+        let list = ids(launcher.version_catalog(kind).await.unwrap());
+        println!("{kind:?}: {} versiones, primeras {:?}", list.len(), &list[..list.len().min(4)]);
+        assert!(!list.is_empty() && list.len() < vanilla_ids.len());
+    }
+    assert!(!ids(launcher.version_catalog(LoaderKind::NeoForge).await.unwrap()).contains(&"1.12.2".to_string()));
+    assert!(ids(launcher.version_catalog(LoaderKind::Forge).await.unwrap()).contains(&"1.12.2".to_string()));
+}

@@ -124,6 +124,15 @@ pub async fn load_profile_from_disk(data_dir: &Path, profile_id: &str) -> Result
     Ok(Some(DiskProfile { profile }))
 }
 
+/// `GET /versions/game`: `[{"version": "1.20.1", "stable": true}, ...]`.
+pub fn parse_game_versions(json: &[u8]) -> Result<Vec<String>, LoaderError> {
+    #[derive(Deserialize)]
+    struct Game {
+        version: String,
+    }
+    Ok(serde_json::from_slice::<Vec<Game>>(json)?.into_iter().map(|g| g.version).collect())
+}
+
 pub fn parse_loader_versions(json: &[u8]) -> Result<Vec<LoaderVersion>, LoaderError> {
     let entries: Vec<LoaderEntry> = serde_json::from_slice(json)?;
     Ok(entries
@@ -136,6 +145,10 @@ pub fn parse_loader_versions(json: &[u8]) -> Result<Vec<LoaderVersion>, LoaderEr
 impl LoaderProvider for ProfileProvider {
     fn kind(&self) -> LoaderKind {
         self.kind
+    }
+
+    async fn game_versions(&self) -> Result<Vec<String>, LoaderError> {
+        parse_game_versions(&self.get_bytes(&format!("{}/versions/game", self.meta_url)).await?)
     }
 
     async fn versions(&self, minecraft_version: &str) -> Result<Vec<LoaderVersion>, LoaderError> {

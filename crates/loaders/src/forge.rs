@@ -90,6 +90,32 @@ pub fn parse_neoforge_versions(json: &[u8], mc: &str) -> Result<Vec<LoaderVersio
     Ok(versions)
 }
 
+/// Versiones de Minecraft con NeoForge: `21.1.172` -> `1.21.1`, `21.0.5` -> `1.21`.
+pub fn neoforge_game_versions(json: &[u8]) -> Result<Vec<String>, LoaderError> {
+    let all: NeoForgeVersions = serde_json::from_slice(json)?;
+    let mut out: Vec<String> = Vec::new();
+    for v in all.versions {
+        let mut parts = v.split(|c: char| !c.is_ascii_digit());
+        let (Some(Ok(minor)), Some(Ok(patch))) = (parts.next().map(str::parse::<u32>), parts.next().map(str::parse::<u32>)) else {
+            continue;
+        };
+        if !(20..26).contains(&minor) {
+            continue;
+        }
+        let mc = if patch == 0 { format!("1.{minor}") } else { format!("1.{minor}.{patch}") };
+        if !out.contains(&mc) {
+            out.push(mc);
+        }
+    }
+    Ok(out)
+}
+
+/// Versiones de Minecraft con Forge: las claves de `maven-metadata.json`.
+pub fn forge_game_versions(metadata: &[u8]) -> Result<Vec<String>, LoaderError> {
+    let all: HashMap<String, Vec<String>> = serde_json::from_slice(metadata)?;
+    Ok(all.into_iter().filter(|(_, v)| !v.is_empty()).map(|(k, _)| k).collect())
+}
+
 /// Clave de orden numerica (`21.1.172` > `21.1.99`); lo que no es numero cuenta como 0.
 fn numeric_key(version: &str) -> Vec<u64> {
     version
@@ -268,6 +294,13 @@ impl LoaderProvider for ForgeFamilyProvider {
         self.kind
     }
 
+    async fn game_versions(&self) -> Result<Vec<String>, LoaderError> {
+        match self.kind {
+            LoaderKind::NeoForge => neoforge_game_versions(&self.get_bytes(NEOFORGE_VERSIONS_URL).await?),
+            _ => forge_game_versions(&self.get_bytes(FORGE_METADATA_URL).await?),
+        }
+    }
+
     async fn versions(&self, minecraft_version: &str) -> Result<Vec<LoaderVersion>, LoaderError> {
         validate_component(minecraft_version)?;
         let versions = match self.kind {
@@ -434,5 +467,16 @@ mod tests {
         assert!(matches!(provider.install(&ctx("../x", "1", Some(Path::new("java")), path)).await, Err(LoaderError::InvalidComponent(_))));
         assert!(!dir.path().join("installers").exists());
         assert!(!dir.path().join("launcher_profiles.json").exists());
+    }
+
+    #[test]
+    fn game_versions_are_derived_from_each_catalog() {
+        let neo = br#"{"versions":["20.2.3-beta","20.4.1","21.0.5","21.1.172","21.1.173","19.0.1","bad"]}"#;
+        assert_eq!(neoforge_game_versions(neo).unwrap(), ["1.20.2", "1.20.4", "1.21", "1.21.1"]);
+        let forge = br#"{"1.12.2":["1.12.2-14.23.5.2860"],"1.20.1":["1.20.1-47.3.0"],"1.0":[]}"#;
+        let mut v = forge_game_versions(forge).unwrap();
+        v.sort();
+        assert_eq!(v, ["1.12.2", "1.20.1"]);
+        assert_eq!(crate::parse_game_versions(br#"[{"version":"1.21","stable":true},{"version":"24w14a","stable":false}]"#).unwrap(), ["1.21", "24w14a"]);
     }
 }

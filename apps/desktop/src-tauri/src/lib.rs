@@ -59,6 +59,7 @@ pub fn run() {
       commands::instances_stop,
       commands::instances_repair,
       commands::minecraft_list_versions,
+      commands::minecraft_version_catalog,
       commands::modpacks_import,
       commands::modpacks_export,
       commands::mods_list,

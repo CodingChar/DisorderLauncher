@@ -42,6 +42,12 @@ export interface Instance {
   updatedAt: string
 }
 
+export interface VersionCatalog {
+  versions: VersionEntry[]
+  /** `online`: recien descargada; `cached`: ultima descargada; `installed`: solo lo ya instalado. */
+  source: 'online' | 'cached' | 'installed'
+}
+
 export interface VersionEntry {
   id: string
   type: 'release' | 'snapshot' | 'old_beta' | 'old_alpha'
