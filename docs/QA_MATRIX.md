@@ -40,6 +40,8 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 
 Recorrido completo por la interfaz del ejecutable release (2026-10-18, teclas y clics reales por CDP): crear instancia Fabric 1.20.1 con icono y rendimiento «Equilibrado» → instalar y jugar (la consola recibio 50 lineas del juego y la JVM llevo las banderas de G1) → cerrar el juego → eliminar la instancia (carpeta borrada).
 
+Modo sin conexion (release con un proxy muerto para todo el trafico externo, 2026-10-18): el catalogo de versiones responde con el ultimo manifiesto guardado o con lo instalado (Forge sin lista guardada: «installed»), se crea una instancia 1.12.2 ya instalada y se lanza (proceso de Java a los 3 s) sin ninguna descarga.
+
 Ultima corrida completa de las 19 pruebas reales (`cargo test --workspace -- --ignored --test-threads=1`, 2026-10-18): todas ok (Vanilla, Fabric, Quilt, Forge y NeoForge instalan y arrancan; Modrinth; modpacks; catalogo de versiones; rendimiento).
 
 ## Consumo en reposo (release, Windows 10)
