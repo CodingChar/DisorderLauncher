@@ -203,10 +203,10 @@
 
     <div class="console-output" role="log" aria-label="Salida del juego">
       {#if visible.length}
-        {#each visible as line, i (i)}
+        {#each visible as line (line.id)}
           {@const kind = levelOf(line.text)}
           <div class="log-line" class:warning={kind === 'WARN'} class:error={kind === 'ERROR'}>
-            <span>{String(i + 1).padStart(2, '0')}</span>
+            <span>{String(line.id).padStart(2, '0')}</span>
             <code>{line.text}</code>
           </div>
         {/each}

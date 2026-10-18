@@ -22,6 +22,8 @@ export interface Session {
 }
 
 export interface LogLine {
+  /** Numero de linea de la sesion (estable aunque se recorten las mas antiguas). */
+  id: number
   stream: 'stdout' | 'stderr'
   text: string
 }
@@ -35,7 +37,11 @@ const BUSY: SessionPhase[] = ['preparing', 'installing', 'preparingJava', 'start
 class SessionsStore {
   byInstance = $state<Record<string, Session>>({})
   /** Salida reciente del juego por instancia (ya sin secretos). */
-  logs = $state<Record<string, LogLine[]>>({})
+  logs = $state.raw<Record<string, LogLine[]>>({})
+  /** Lineas recibidas que aun no se pasaron a `logs`: se vuelcan una vez por fotograma. */
+  private pending = new Map<string, LogLine[]>()
+  private nextLineId = 1
+  private flushTimer: number | null = null
   private started = false
   /** Instancias que el usuario pidio cerrar: su salida no es un fallo. */
   private stopping = new Set<string>()
@@ -49,6 +55,7 @@ class SessionsStore {
   }
 
   clearLog(id: string) {
+    this.pending.delete(id)
     this.logs = { ...this.logs, [id]: [] }
   }
 
@@ -132,10 +139,25 @@ class SessionsStore {
     this.set(id, { ...prev, phase, progress: { phase: e.phase, completed: e.completed, total: e.total } })
   }
 
-  private appendLog(id: string, line: LogLine) {
-    const current = this.logs[id] ?? []
-    const next = current.length >= MAX_LOG_LINES ? [...current.slice(current.length - MAX_LOG_LINES + 1), line] : [...current, line]
-    this.logs = { ...this.logs, [id]: next }
+  /** Encola una linea de salida; la interfaz solo se actualiza una vez por fotograma aunque lleguen miles por segundo. */
+  private appendLog(id: string, line: Omit<LogLine, 'id'>) {
+    const queue = this.pending.get(id) ?? []
+    queue.push({ ...line, id: this.nextLineId++ })
+    this.pending.set(id, queue)
+    if (this.flushTimer === null) {
+      this.flushTimer = (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => this.flushLogs()) : setTimeout(() => this.flushLogs(), 16)) as unknown as number
+    }
+  }
+
+  private flushLogs() {
+    this.flushTimer = null
+    const next = { ...this.logs }
+    for (const [id, queue] of this.pending) {
+      const merged = (next[id] ?? []).concat(queue)
+      next[id] = merged.length > MAX_LOG_LINES ? merged.slice(merged.length - MAX_LOG_LINES) : merged
+    }
+    this.pending.clear()
+    this.logs = next
   }
 
   private set(id: string, session: Session) {
