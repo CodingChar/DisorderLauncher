@@ -23,7 +23,8 @@ export const fontReady: Promise<void> = image ? image.decode().catch(() => {}) :
 
 function glyphIndex(ch: string): number {
   const code = ch.codePointAt(0)!
-  if (code >= 32 && code <= 126) return code
+  if (code < 32) return 32 // saltos de linea y tabuladores dentro de una linea: un espacio
+  if (code <= 126) return code
   const i = EXTRA.indexOf(ch)
   if (i >= 0) return 128 + i
   // Sin glifo propio (Á, Ï...): se usa la letra base sin acento; si tampoco, «?».

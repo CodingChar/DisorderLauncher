@@ -4,8 +4,8 @@
 
 Lee TODOS los .md en `docs/spec/` antes de modificar codigo.
 
-**Reforma visual en curso/hecha**: antes de tocar `apps/desktop/src` lee `docs/UI_MIGRATION.md` (reglas, mapa y estado).
-La maqueta `DisorderLauncherUI/` es la referencia visual; la fuente de verdad del estilo en la app es `apps/desktop/src/app.css`.
+**Interfaz estilo Minecraft (vigente desde 2026-10-18)**: antes de tocar `apps/desktop/src` lee `docs/UI_MIGRATION_MINECRAFT.md` (reglas, componentes, mapa y verificacion).
+`docs/UI_MIGRATION.md` (reforma moderna anterior) es historico. La fuente de verdad del estilo son `apps/desktop/src/lib/mc/` y `src/mc/*.css`.
 
 ## Prioridad de autenticacion
 
@@ -40,13 +40,13 @@ Trabaja por verticales grandes. En cada sprint:
 ## UX
 
 Usuario objetivo no tecnico. No mostrar terminos internos salvo pantalla avanzada.
-Estilo: clases globales de `app.css` y tokens CSS (nada de colores fijos, fuentes remotas ni datos simulados en la app). Ver `docs/UI_MIGRATION.md`.
+Estilo: escenario en pixeles de GUI con componentes `Mc*` y texto bitmap (nada de texto HTML visible, fuentes remotas ni datos simulados en la app). Ver `docs/UI_MIGRATION_MINECRAFT.md`.
 
 ## Stack
 
 - **Core**: Rust estable + Tokio + Reqwest + Serde + thiserror + tracing.
 - **Desktop**: Tauri 2.
-- **Frontend**: Svelte + TypeScript + CSS propio tokenizado.
+- **Frontend**: Svelte + TypeScript + CSS propio (escenario Minecraft en px de GUI).
 - **Persistencia**: JSON/TOML para config, secure storage del SO para secretos.
 
 ## Seguridad — prohibido
@@ -65,7 +65,7 @@ Estilo: clases globales de `app.css` y tokens CSS (nada de colores fijos, fuente
 ```
 docs/spec/           especificacion tecnica (00-13)
 docs/adr/            decisiones arquitectonicas
-docs/UI_MIGRATION.md reforma visual (maqueta -> app): reglas y estado
+docs/UI_MIGRATION_MINECRAFT.md interfaz estilo Minecraft: reglas, componentes y estado
 DisorderLauncherUI/  maqueta visual (solo referencia, no se importa)
 docs/reference/      HTML de referencia visual
 theme_examples/      JSON de temas de ejemplo

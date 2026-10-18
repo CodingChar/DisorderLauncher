@@ -40,7 +40,7 @@
   const lineCount = $derived(scroll ? 0 : bodyHeight / 10)
   // Bloque centrado: titulo (9) + hueco + cuerpo + hueco + botones (20).
   const total = $derived(9 + 8 + bodyHeight + (bodyHeight ? 14 : 0) + 20)
-  const top = $derived(Math.max(4, (gui.H - total) >> 1))
+  const top = $derived(Math.max(14, (gui.H - total) >> 1))
   const messageY = $derived(top + 17)
   const buttonsY = $derived(top + 9 + 8 + bodyHeight + (bodyHeight ? 14 : 0))
 
@@ -88,6 +88,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div bind:this={layer} class="mc-dialog-layer" role="dialog" aria-modal="true" aria-labelledby="{uid}-title" aria-describedby={message ? `${uid}-msg` : undefined} tabindex="-1" onkeydown={trap}>
+  <div class="mc-dialog-panel" aria-hidden="true" style="left:calc(var(--cx) * 1px - 150px);top:{top - 12}px;width:300px;height:{total + 24}px"></div>
   <span id="{uid}-title" class="sr-only">{title}</span>
   {#if message}<span id="{uid}-msg" class="sr-only">{message}</span>{/if}
   <div class="mc-label" style="left:calc(var(--cx) * 1px);top:{top}px" aria-hidden="true"><BitmapText text={title} center sr={false} /></div>

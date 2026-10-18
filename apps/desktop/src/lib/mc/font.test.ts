@@ -103,6 +103,11 @@ describe('signos sin glifo', () => {
     expect(stringWidth('Ж')).toBe(stringWidth('?'))
   })
 
+  it('un salto de linea suelto ocupa como un espacio, no como «?»', () => {
+    expect(stringWidth('a\nb')).toBe(stringWidth('a b'))
+    expect(stringWidth('a\tb')).toBe(stringWidth('a b'))
+  })
+
   it('fitText sigue respetando el ancho tras sustituir', () => {
     expect(stringWidth(fitText('Un momento… un momento… un momento…', 90))).toBeLessThanOrEqual(90)
   })

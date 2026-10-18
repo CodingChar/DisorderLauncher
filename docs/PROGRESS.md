@@ -3,7 +3,11 @@
 Estado a 2026-10-17. Fuente de verdad del avance; el plan original esta en `PLAN_TECNICO.md` y `spec/13_LONG_SPRINTS.md`.
 Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqueado por algo externo · ⬜ pendiente.
 
-## Reforma visual (maqueta `DisorderLauncherUI`)
+## Interfaz estilo Minecraft (2026-10-18)
+
+✅ Migrada. Sustituye a la reforma moderna de abajo: escenario en pixeles de GUI, texto bitmap y todas las pantallas portadas sin tocar contratos IPC ni stores. Reglas, componentes y verificacion en [`UI_MIGRATION_MINECRAFT.md`](UI_MIGRATION_MINECRAFT.md): **leelo antes de tocar `apps/desktop/src`**.
+
+## Reforma visual anterior (maqueta `DisorderLauncherUI`) — reemplazada
 
 ✅ Completada el 2026-10-17. La interfaz de `apps/desktop` sustituye al diseno anterior por el de la maqueta `DisorderLauncherUI/` (barra lateral, centro de sesion con consola real, Mis instancias, Explorar, Herramientas, Perfiles, Skins, Ajustes, tema azul oscuro incluido). Reglas, mapa y pendientes en [`UI_MIGRATION.md`](UI_MIGRATION.md): **leelo antes de tocar `apps/desktop/src`**. No cambia contratos IPC ni logica de negocio.
 

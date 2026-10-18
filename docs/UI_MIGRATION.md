@@ -1,7 +1,9 @@
 # Reforma visual: maqueta `DisorderLauncherUI` → `apps/desktop`
 
-> **Si eres otro chat/agente: lee este archivo antes de tocar `apps/desktop/src`.**
-> Estado: **reforma completada** (2026-10-17). Estas reglas siguen vigentes para cualquier cambio de interfaz posterior.
+> **⚠ REEMPLAZADO el 2026-10-18 por [`UI_MIGRATION_MINECRAFT.md`](UI_MIGRATION_MINECRAFT.md)** (interfaz estilo Minecraft 1.7.10).
+> Lo de abajo es historico. Las reglas 2 y 3 (clases globales de `app.css` y tokens de tema), el sistema de componentes (`Button`, `Card`,
+> `Input`...), la barra lateral y las fuentes web **ya no existen**; `app.css` y `src/lib/components/` se eliminaron. Siguen vigentes las reglas
+> 1 (logica intacta), 4 (sin recursos remotos), 5 (texto para personas no tecnicas), 6 (nada simulado en produccion) y 8 (comprobaciones).
 
 ## Que es esto
 

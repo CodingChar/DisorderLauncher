@@ -273,6 +273,16 @@
   background: rgba(0, 0, 0, 0.6);
 }
 
+/* Panel opaco del dialogo: el texto bitmap necesita un fondo liso para leerse sobre la pantalla de debajo. */
+.mc-dialog-panel {
+  position: absolute;
+  border: 1px solid #000;
+  outline: 1px solid #505050;
+  background:
+    linear-gradient(rgba(var(--shade), 0.92), rgba(var(--shade), 0.92)),
+    var(--dirt) 0 0 / 32px 32px;
+}
+
 /* ── Visor (contenido que no es texto bitmap: 3D, lienzo de skin) ── */
 
 .mc-viewport {

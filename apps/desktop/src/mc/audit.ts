@@ -31,6 +31,8 @@ const visible = (el: Element) => {
   const r = el.getBoundingClientRect()
   return r.width > 0 && r.height > 0
 }
+// Con un dialogo abierto lo de debajo queda inerte: no se puede pulsar ni enfocar, asi que no se audita como control.
+const live = (el: Element) => !el.closest('[inert]')
 const round = (b: Box): Box => ({ l: Math.round(b.l * 10) / 10, t: Math.round(b.t * 10) / 10, r: Math.round(b.r * 10) / 10, b: Math.round(b.b * 10) / 10 })
 const inside = (a: Box, c: Box, tol: number) => a.l >= c.l - tol && a.t >= c.t - tol && a.r <= c.r + tol && a.b <= c.b + tol
 const area = (a: Box, c: Box) => Math.max(0, Math.min(a.r, c.r) - Math.max(a.l, c.l)) * Math.max(0, Math.min(a.b, c.b) - Math.max(a.t, c.t))
@@ -51,6 +53,7 @@ export function auditStage(): AuditProblem[] {
   const tol = 0.51
 
   const canvases = [...stage.querySelectorAll<HTMLCanvasElement>('.bitmap-label canvas')].filter((c) => visible(c) && !c.closest('.splash'))
+  const liveCanvases = canvases.filter(live)
 
   // 1. Texto dentro de su control.
   for (const canvas of canvases) {
@@ -76,10 +79,10 @@ export function auditStage(): AuditProblem[] {
 
   // 3. Solapes entre controles y entre textos.
   const controls = [...stage.querySelectorAll(CONTROLS)].filter(
-    (el) => visible(el) && !el.closest('.mc-list') && !(el instanceof HTMLInputElement && el.closest('.mc-field')),
+    (el) => visible(el) && live(el) && !el.closest('.mc-list') && !(el instanceof HTMLInputElement && el.closest('.mc-field')),
   )
-  const fields = [...stage.querySelectorAll('.mc-field')].filter(visible)
-  const solids = [...controls.filter((el) => !el.closest('.mc-field')), ...fields, ...stage.querySelectorAll('.mc-list')]
+  const fields = [...stage.querySelectorAll('.mc-field')].filter((el) => visible(el) && live(el))
+  const solids = [...controls.filter((el) => !el.closest('.mc-field')), ...fields, ...[...stage.querySelectorAll('.mc-list')].filter(live)]
   for (let i = 0; i < solids.length; i++) {
     for (let j = i + 1; j < solids.length; j++) {
       const a = solids[i]
@@ -88,7 +91,7 @@ export function auditStage(): AuditProblem[] {
       if (area(box(a), box(b)) > 1) add('controles-solapados', a, box(b))
     }
   }
-  const free = canvases.filter((c) => !c.closest('.mc-row'))
+  const free = liveCanvases.filter((c) => !c.closest('.mc-row'))
   for (let i = 0; i < free.length; i++) {
     for (let j = i + 1; j < free.length; j++) {
       if (free[i].closest(CONTAINERS) && free[i].closest(CONTAINERS) === free[j].closest(CONTAINERS)) continue
@@ -120,7 +123,7 @@ export function auditStage(): AuditProblem[] {
   // 6. Foco y 7. tamano de los controles.
   const seen = new Set<Element>()
   for (const el of stage.querySelectorAll(CONTROLS)) {
-    if (!visible(el) || seen.has(el) || el.closest('.mc-list') && el.getAttribute('role') !== 'listbox') continue
+    if (!visible(el) || !live(el) || seen.has(el) || (el.closest('.mc-list') && el.getAttribute('role') !== 'listbox')) continue
     seen.add(el)
     const before = document.activeElement
     ;(el as HTMLElement).focus({ preventScroll: true })

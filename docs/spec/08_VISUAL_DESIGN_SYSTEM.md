@@ -4,10 +4,18 @@
 
 Interfaz profesional, monocromática, clara e intuitiva.
 
-Referencia vigente: la maqueta `DisorderLauncherUI/` (reforma documentada en `docs/UI_MIGRATION.md`).
-Referencia historica: `reference/disorderlaucher_reference.html` (diseno anterior).
+## Modo Minecraft (vigente desde 2026-10-18)
 
-Implementacion: clases globales y tokens en `apps/desktop/src/app.css`. Sin fuentes ni recursos remotos.
+La interfaz de `apps/desktop` imita los menus de Minecraft 1.7.10: escenario en pixeles de GUI con escala entera, texto con la fuente bitmap
+original, sprites de boton y listas tipo `GuiSlot`. Reglas, componentes, mapa de pantallas y verificacion en
+[`../UI_MIGRATION_MINECRAFT.md`](../UI_MIGRATION_MINECRAFT.md). Implementacion: `apps/desktop/src/lib/mc/` y `src/mc/*.css`; sin fuentes ni recursos remotos.
+Los temas JSON solo cambian el tinte del fondo y el color de resalte del texto (ver ese documento).
+
+## Sistema anterior (historico)
+
+Lo que sigue en este documento describe el diseno moderno anterior (maqueta `DisorderLauncherUI/`, `docs/UI_MIGRATION.md`, tokens de `app.css`):
+ya no se aplica a la interfaz. Se conserva como referencia de intenciones (accesibilidad, claridad, lenguaje no tecnico), que siguen vigentes.
+Referencia historica: `reference/disorderlaucher_reference.html`.
 
 ## Tipografía
 
