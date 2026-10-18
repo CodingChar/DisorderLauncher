@@ -19,7 +19,7 @@
         "minHeight": 560,
         "resizable": true,
         "fullscreen": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-component-update --disable-sync --no-pings"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-component-update --disable-sync --no-pings --renderer-process-limit=1 --in-process-gpu --disable-breakpad"
       }
     ],
     "security": {
