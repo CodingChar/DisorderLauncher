@@ -64,13 +64,57 @@ impl SkinLibrary {
     }
 
     async fn load(&self) -> Index {
-        match tokio::fs::read_to_string(self.index_path()).await {
-            Ok(data) => serde_json::from_str::<Index>(&data).unwrap_or_else(|e| {
-                tracing::warn!(error = %e, "index de skins ilegible; se usa una biblioteca vacia");
-                Index::default()
-            }),
-            Err(_) => Index::default(),
+        let data = match tokio::fs::read_to_string(self.index_path()).await {
+            Ok(data) => data,
+            Err(_) => return Index::default(),
+        };
+        match serde_json::from_str::<Index>(&data) {
+            Ok(index) => index,
+            Err(e) => {
+                tracing::warn!(error = %e, "index de skins ilegible; se aparta y se reconstruye con los PNG guardados");
+                self.recover().await
+            }
         }
+    }
+
+    /// Aparta el indice danado (`index.json.corrupt`) y lo reconstruye con los PNG de `assets/`:
+    /// se pierden los nombres, no las skins.
+    async fn recover(&self) -> Index {
+        let _ = tokio::fs::rename(self.index_path(), self.root.join("index.json.corrupt")).await;
+        let mut index = Index { schema_version: SCHEMA_VERSION, skins: Vec::new() };
+        if let Ok(mut dir) = tokio::fs::read_dir(self.root.join("assets")).await {
+            while let Ok(Some(entry)) = dir.next_entry().await {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let Some(id) = name.strip_suffix(".png") else { continue };
+                if validate_id(id).is_err() {
+                    continue;
+                }
+                let Ok(bytes) = tokio::fs::read(entry.path()).await else { continue };
+                let Ok(checked) = check_skin_png(&bytes) else { continue };
+                let when = entry
+                    .metadata()
+                    .await
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .map(DateTime::<Utc>::from)
+                    .unwrap_or_else(Utc::now);
+                index.skins.push(SkinAsset {
+                    id: id.to_string(),
+                    name: format!("Skin recuperada {}", index.skins.len() + 1),
+                    model: checked.detected_model,
+                    source: SkinSource::Local,
+                    width: checked.width,
+                    height: checked.height,
+                    created_at: when,
+                    updated_at: when,
+                });
+            }
+        }
+        index.skins.sort_by_key(|s| s.created_at);
+        if let Err(e) = self.save(Index { schema_version: SCHEMA_VERSION, skins: index.skins.clone() }).await {
+            tracing::warn!(error = %e, "no se pudo guardar el indice reconstruido");
+        }
+        index
     }
 
     async fn save(&self, mut index: Index) -> Result<(), SkinError> {
@@ -219,6 +263,25 @@ mod tests {
             }
         }
         encode_rgba(&rgba, 64, 64).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_corrupt_index_is_set_aside_and_rebuilt_from_the_saved_pngs() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = SkinLibrary::new(dir.path());
+        let a = lib.import(&png(false), "Una", None).await.unwrap();
+        let b = lib.import(&png(true), "Otra", None).await.unwrap();
+
+        std::fs::write(dir.path().join("index.json"), "basura {").unwrap();
+        let skins = lib.list().await;
+        assert_eq!(skins.len(), 2, "no se pierde ninguna skin");
+        assert!(skins.iter().any(|s| s.id == a.id) && skins.iter().any(|s| s.id == b.id));
+        assert!(skins.iter().all(|s| s.name.starts_with("Skin recuperada")));
+        assert_eq!(skins.iter().find(|s| s.id == b.id).unwrap().model, SkinModel::Slim);
+        assert!(dir.path().join("index.json.corrupt").is_file());
+        // Ya reconstruido: se puede leer y seguir usando con normalidad.
+        assert_eq!(lib.list().await.len(), 2);
+        assert!(lib.read_png(&a.id).await.is_ok());
     }
 
     #[tokio::test]

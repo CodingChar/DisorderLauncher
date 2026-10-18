@@ -99,7 +99,8 @@ pub async fn load_settings(path: &Path) -> Settings {
             Settings::default()
         }
         Err(e) => {
-            tracing::warn!(error = %e, "settings.json ilegible; se usan valores por defecto");
+            tracing::warn!(error = %e, "settings.json ilegible; se usan valores por defecto (copia en settings.json.corrupt)");
+            let _ = tokio::fs::write(path.with_extension("json.corrupt"), &data).await;
             Settings::default()
         }
     }

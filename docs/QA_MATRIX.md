@@ -30,7 +30,7 @@ Estado a 2026-10-17. Leyenda: ✅ verificado automaticamente · 🖐 verificado 
 | Optimizacion (JVM + opciones + mods) | ✅ 4 pruebas | ✅ `performance_mods_install_by_slug`; 🖐 1.12.2 con «Equipo modesto» (SerialGC y `options.txt`) | |
 | Ventana unica | — | 🖐 segunda ejecucion no crea otro proceso | |
 | Descargas con redireccion | ✅ revalida https y host | — | |
-| Recuperacion de datos | ✅ migracion, cuarentena | — | |
+| Recuperacion de datos | ✅ migracion, cuarentena; indice de skins danado se aparta y se reconstruye con los PNG | 🖐 con `settings.json`, indice de skins y una cuenta corruptos la app arranca, aparta la cuenta (`.corrupt`) y conserva el resto | `settings.json` ilegible se copia a `.corrupt` |
 
 ## Pruebas
 
