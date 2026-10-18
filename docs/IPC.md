@@ -39,6 +39,9 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `mods_update` | `id`, `file` | `InstalledMod` (guarda la version anterior) |
 | `mods_rollback` | `id`, `file` | `void` (restaura la version anterior) |
 | `minecraft_version_catalog` | `loader` | `{ versions: VersionEntry[], source: 'online' \| 'cached' \| 'installed' }` — todas las versiones (estables, snapshots, beta y alpha) que admite ese tipo de instancia; con red filtra por lo que soporta Fabric/Quilt/Forge/NeoForge; sin red usa la ultima lista guardada o lo ya instalado |
+| `external_versions_scan` | `dir?` | `{ dir, found, versions: ExternalVersion[] }` — versiones personalizadas (OptiFine, Forge, Fabric... puestos a mano) de la carpeta `.minecraft` habitual o de la ultima elegida con el selector; solo lee |
+| `external_versions_pick_dir` | — | `ExternalScan | null` — selector de carpeta nativo; guarda la ruta elegida (el frontend no puede pasar rutas arbitrarias) |
+| `instances_create_custom` | `name`, `dir?`, `version`, `copyData?` | `Instance` — importa la version (perfil fusionado con su version base, librerias locales copiadas) como `custom-<id>` y crea la instancia; `copyData` copia mundos, mods y ajustes del origen |
 | `instances_optimize_mods` | `id` | `{ installed: string[], skipped: { name, reason }[] }` — instala los mods de rendimiento recomendados (Sodium/Embeddium, Lithium, FerriteCore, EntityCulling, ModernFix...) en instancias con mods |
 | `instances_update` (campos nuevos) | `icon?`, `optimization?` | `icon`: id de `itemIcons` (cadena vacia = el del tipo); `optimization`: `off` \| `balanced` \| `lowEnd` |
 | `skins_list` | — | `{ id, name, model: 'classic' \| 'slim', source, width, height, createdAt, updatedAt }[]` |

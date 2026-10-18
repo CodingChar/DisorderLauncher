@@ -115,6 +115,7 @@
       </div>
     {/each}
 
+    {#if accounts.microsoft.enabled || accounts.list.some((a) => a.provider === 'microsoft')}
     <div class="account-row">
       <Icon name="grid" size={30} />
       <div class="account-main">
@@ -140,6 +141,7 @@
         {/if}
       </div>
     </div>
+    {/if}
   </section>
 
   <section class="settings-panel panel">

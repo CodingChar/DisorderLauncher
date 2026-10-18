@@ -955,60 +955,6 @@ input[aria-invalid='true'] {
   gap: 5px;
 }
 
-.block {
-  position: relative;
-  width: 38px;
-  height: 39px;
-  flex-shrink: 0;
-  --top: #8B9670;
-  --left: #777159;
-  --right: #575744;
-}
-
-.block span {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 38px;
-  height: 20px;
-  background: var(--top);
-  clip-path: polygon(50% 0, 100% 25%, 50% 65%, 0 25%);
-}
-
-.block i,
-.block b {
-  position: absolute;
-  top: 5px;
-  width: 19px;
-  height: 32px;
-  background-image: repeating-conic-gradient(#0000 0 25%, #0002 0 50%);
-  background-size: 10px 10px;
-}
-
-.block i {
-  left: 0;
-  background-color: var(--left);
-  clip-path: polygon(0 0, 100% 25%, 100% 100%, 0 73%);
-}
-
-.block b {
-  right: 0;
-  background-color: var(--right);
-  clip-path: polygon(0 25%, 100% 0, 100% 73%, 0 100%);
-}
-
-.block.stone {
-  --top: #999C92;
-  --left: #757971;
-  --right: #555B53;
-}
-
-.block.sand {
-  --top: #B9AC87;
-  --left: #998B68;
-  --right: #716950;
-}
-
 .item-logo {
   flex-shrink: 0;
   image-rendering: pixelated;
@@ -1142,18 +1088,6 @@ fieldset.settings-block {
   background:
     linear-gradient(0deg, color-mix(in srgb, var(--surface-alt) 70%, transparent), transparent),
     repeating-linear-gradient(90deg, var(--surface-alt) 0 22px, var(--surface-raised) 22px 44px);
-}
-
-.explore-art .block {
-  transform: scale(2);
-}
-
-.art-1 {
-  filter: grayscale(1);
-}
-
-.art-2 {
-  filter: sepia(0.5);
 }
 
 .explore-copy {

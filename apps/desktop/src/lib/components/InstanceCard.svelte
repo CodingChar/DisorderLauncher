@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { loaderName } from '../text'
+  import { loaderName, versionLabel } from '../text'
   import type { Instance } from '../types'
   import ItemLogo from './ItemLogo.svelte'
 
@@ -32,7 +32,7 @@
   </div>
 
   <h4 title={instance.name}>{instance.name}</h4>
-  <p>Minecraft {instance.minecraftVersion}</p>
+  <p>Minecraft {versionLabel(instance.minecraftVersion)}</p>
 
   <div class="library-specs">
     <span>{memory}</span>

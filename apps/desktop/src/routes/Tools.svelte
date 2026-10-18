@@ -4,6 +4,7 @@
   import PageHeading from '../lib/components/PageHeading.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
   import { api } from '../lib/api'
+  import { FEATURES } from '../lib/features'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
   import { sessions } from '../lib/stores/sessions.svelte'
@@ -49,7 +50,7 @@
       if (created) nav.go('home')
     })
 
-  /** Herramientas que todavia no existen: se anuncian, pero nunca fingen funcionar. */
+  /** Herramientas que todavia no existen: no se muestran (ver `FEATURES`) y, si se activan, nunca fingen funcionar. */
   const soon = [
     { icon: 'archive', name: 'Copia de seguridad', description: 'Guarda tus instancias y su configuración en un archivo comprimido.' },
     { icon: 'clipboard', name: 'Informe de diagnóstico', description: 'Resume tu equipo y las últimas sesiones para pedir ayuda.' },
@@ -73,7 +74,6 @@
     <h3>Reparar instancia</h3>
     <p>Comprueba los archivos de la instancia activa y vuelve a descargar lo que falte o esté dañado.</p>
     <div class="tool-foot">
-      <span class="tiny-label">DISPONIBLE</span>
       <Button disabled={!instance || busy} onclick={repair}>Reparar</Button>
     </div>
   </section>
@@ -83,7 +83,6 @@
     <h3>Exportar modpack</h3>
     <p>Guarda la instancia activa como un archivo .mrpack para compartirla. No incluye mundos ni registros.</p>
     <div class="tool-foot">
-      <span class="tiny-label">DISPONIBLE</span>
       <Button disabled={!instance || working} onclick={exportPack}>Exportar</Button>
     </div>
   </section>
@@ -96,12 +95,11 @@
       <ProgressBar percent={instances.importPercent} label="Importando modpack" />
     {/if}
     <div class="tool-foot">
-      <span class="tiny-label">DISPONIBLE</span>
       <Button disabled={working} onclick={importPack}>Importar</Button>
     </div>
   </section>
 
-  {#each soon as tool (tool.name)}
+  {#each FEATURES.comingSoonTools ? soon : [] as tool (tool.name)}
     <section class="tool-card panel">
       <div class="tool-icon"><Icon name={tool.icon} size={22} /></div>
       <h3>{tool.name}</h3>

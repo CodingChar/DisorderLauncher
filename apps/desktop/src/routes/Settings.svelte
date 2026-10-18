@@ -4,6 +4,7 @@
   import Card from '../lib/components/Card.svelte'
   import Input from '../lib/components/Input.svelte'
   import Select from '../lib/components/Select.svelte'
+  import { FEATURES } from '../lib/features'
   import { settings } from '../lib/stores/settings.svelte'
   import type { DownloadProfile, Theme } from '../lib/types'
 
@@ -136,6 +137,7 @@
         />
       </div>
 
+      {#if FEATURES.microsoftSettings}
       <details class="settings-block advanced">
         <summary>Opciones avanzadas</summary>
         <Input
@@ -145,6 +147,7 @@
           hint="Solo si tienes tu propia aplicación registrada en Azure. Déjalo vacío para no usar Microsoft."
         />
       </details>
+      {/if}
 
       <div class="field">
         <span class="field-label">Carpeta de datos</span>

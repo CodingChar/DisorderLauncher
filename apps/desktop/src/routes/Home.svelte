@@ -5,7 +5,7 @@
   import ItemLogo from '../lib/components/ItemLogo.svelte'
   import PageHeading from '../lib/components/PageHeading.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
-  import { loaderName, phaseLabel } from '../lib/text'
+  import { loaderName, phaseLabel, versionLabel } from '../lib/text'
   import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
@@ -135,7 +135,7 @@
       <ItemLogo loader={instance.loader} icon={instance.icon} />
       <div>
         <h2>{instance.name}</h2>
-        <p>Minecraft {instance.minecraftVersion} <span>·</span> {loaderName(instance.loader)}</p>
+        <p>Minecraft {versionLabel(instance.minecraftVersion)} <span>·</span> {loaderName(instance.loader)}</p>
       </div>
       {#if session?.startedAt}<span class="session-started">Inicio: {session.startedAt}</span>{/if}
     </div>

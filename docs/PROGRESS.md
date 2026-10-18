@@ -52,6 +52,15 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqu
 
 Java ≥ 9 aceptado para versiones de Java 8 · runtimes gestionados redescargados en cada arranque · assets legacy sin materializar · `powershell Expand-Archive` con rutas interpoladas · path traversal por id de cuenta y por version de Minecraft · hashes de assets sin validar · CSP en `null` · un perfil corrupto bloqueaba todos · reglas ARM con nombre equivocado · variables de entorno graficas perdidas en Linux · panico al iniciar en `tauri dev` (dos loggers globales).
 
+## Mejoras del 2026-10-18 (segunda ronda)
+
+- ✅ **Skins por epoca** (`skin_pack.rs`, `SkinTarget`): la epoca se decide por el id, la version base de un perfil y, si el id no se reconoce, la fecha de publicacion; lo desconocido (p. ej. 26.1) se trata como la version mas reciente. Anadir una epoca nueva es anadir una fila.
+- ✅ **Versiones personalizadas** (`external_versions.rs`): «Personalizado» al crear una instancia lee la carpeta `.minecraft` (o la que se elija), lista OptiFine/Forge/Fabric/Quilt/LiteLoader puestos a mano y los importa como `custom-<id>` fusionando el perfil con su version base; las librerias locales se copian, las libreria sin datos de descarga se buscan por su ruta Maven. Opcionalmente copia mundos, mods y ajustes (el origen no se toca). Probado con un perfil real sobre 1.12.2: se instala y arranca con la skin del perfil.
+- ✅ **Modpacks**: mensaje claro para CurseForge/MultiMC/Prism; los mods del pack se registran como mods de Modrinth por hash (actualizar/volver atras funcionan tras importar); `options.txt` exportado sin referencias al pack de skin; exportar una version personalizada usa su version base.
+- ✅ **Iconos**: solo los del paquete `minecraft_iconos_emblematicos` (instancias, valores por defecto, Explorar, icono de la app y favicon).
+- ✅ **Interfaz**: se ocultan las funciones sin terminar (`lib/features.ts`).
+- ⬜ Modpacks de CurseForge (requieren clave de API), verificacion del hash SHA-512 de los archivos del pack.
+
 ## Pendientes
 
 ### Bloqueados por algo externo (no se simulan)

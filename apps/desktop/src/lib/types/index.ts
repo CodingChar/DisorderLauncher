@@ -260,3 +260,23 @@ export interface SkinAsset {
   createdAt: string
   updatedAt: string
 }
+
+/** Tipo de version instalada fuera del launcher (solo para nombrarla). */
+export type ExternalKind = 'optifine' | 'forge' | 'neoforge' | 'fabric' | 'quilt' | 'liteloader' | 'other'
+
+/** Version personalizada encontrada en una carpeta .minecraft (OptiFine, Forge puestos a mano...). */
+export interface ExternalVersion {
+  id: string
+  baseVersion: string | null
+  kind: ExternalKind
+  releaseTime: string | null
+  /** Ya se importo antes al launcher. */
+  imported: boolean
+}
+
+export interface ExternalScan {
+  dir: string
+  /** `false` si la carpeta no existe o no tiene versiones. */
+  found: boolean
+  versions: ExternalVersion[]
+}

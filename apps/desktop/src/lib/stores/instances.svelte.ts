@@ -29,6 +29,14 @@ class InstancesStore {
     return instance
   }
 
+  /** Crea una instancia con una version personalizada de una carpeta .minecraft (`dir`: `null` = la habitual). */
+  async createCustom(name: string, dir: string | null, version: string, copyData: boolean) {
+    const instance = await api.instancesCreateCustom(name, dir, version, copyData)
+    await this.load()
+    this.selectedId = instance.id
+    return instance
+  }
+
   async update(id: string, changes: InstanceChanges) {
     const instance = await api.instancesUpdate(id, changes)
     await this.load()

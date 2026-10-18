@@ -6,6 +6,7 @@ import type {
   AuthState,
   MicrosoftStatus,
   ExportSummary,
+  ExternalScan,
   Instance,
   InstanceChanges,
   InstalledMod,
@@ -77,6 +78,11 @@ export const api = {
   instancesList: () => call<Instance[]>('instances_list'),
   instancesCreate: (name: string, version: string, loader: LoaderKind = 'vanilla') =>
     call<Instance>('instances_create', { name, version, loader }),
+  externalVersionsScan: (dir: string | null = null) => call<ExternalScan>('external_versions_scan', { dir }),
+  /** Abre el selector de carpeta y devuelve lo que contiene; `null` si se cancela. */
+  externalVersionsPickDir: () => call<ExternalScan | null>('external_versions_pick_dir'),
+  instancesCreateCustom: (name: string, dir: string | null, version: string, copyData: boolean) =>
+    call<Instance>('instances_create_custom', { name, dir, version, copyData }),
   loadersSupported: () => call<LoaderKind[]>('loaders_supported'),
   instancesUpdate: (id: string, changes: InstanceChanges) => call<Instance>('instances_update', { id, changes }),
   instancesDelete: (id: string) => call<void>('instances_delete', { id }),

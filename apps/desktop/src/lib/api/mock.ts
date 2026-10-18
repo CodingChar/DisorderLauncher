@@ -1,7 +1,7 @@
 // Backend simulado SOLO para desarrollo en navegador (sin Tauri). No se incluye en
 // builds de produccion: api/index.ts lo importa de forma dinamica bajo import.meta.env.DEV.
 
-import type { AccountRecord, Instance, ProgressEvent, RepairSummary, SkinAsset, VersionEntry } from '../types'
+import type { AccountRecord, ExternalScan, Instance, ProgressEvent, RepairSummary, SkinAsset, VersionEntry } from '../types'
 
 type Handler = (payload: any) => void
 const handlers = new Map<string, Set<Handler>>()
@@ -121,6 +121,15 @@ function makeMockSkin(seed: number): string {
   r(pants, 20, 52, 4, 12)
   r(hair, 40, 8, 8, 3)
   return c.toDataURL('image/png')
+}
+
+const mockExternal: ExternalScan = {
+  dir: 'C:\\Users\\Demo\\AppData\\Roaming\\.minecraft',
+  found: true,
+  versions: [
+    { id: '1.12.2-OptiFine_HD_U_E3', baseVersion: '1.12.2', kind: 'optifine', releaseTime: '2018-01-01T00:00:00+00:00', imported: false },
+    { id: '1.7.10-Forge10.13.4.1614-1.7.10', baseVersion: '1.7.10', kind: 'forge', releaseTime: '2016-05-01T00:00:00+00:00', imported: false },
+  ],
 }
 
 export async function mockCall(cmd: string, args: Record<string, any> = {}): Promise<any> {
@@ -413,6 +422,30 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       const inst = instances.find((i) => i.id === args.id)
       if (!inst || inst.loader === 'vanilla') throw 'Esta instancia no admite mods. Crea una con Fabric, Quilt, Forge o NeoForge para añadir mods de rendimiento.'
       return { installed: ['Sodium (grafico)', 'Lithium (logica del juego)', 'FerriteCore (memoria)'], skipped: [{ name: 'ImmediatelyFast', reason: 'No hay una version compatible con esta version de Minecraft.' }] }
+    }
+    case 'external_versions_scan':
+      return mockExternal
+    case 'external_versions_pick_dir':
+      return { ...mockExternal, dir: 'D:\\Juegos\\Minecraft' }
+    case 'instances_create_custom': {
+      if (!defaultId) throw 'Primero crea un perfil para poder jugar.'
+      const now = new Date().toISOString()
+      const inst: Instance = {
+        id: `inst_${++counter}`,
+        name: args.name,
+        minecraftVersion: `custom-${args.version}`,
+        loader: 'vanilla',
+        loaderVersion: null,
+        profileId: defaultId,
+        java: { mode: 'auto' },
+        memory: { mode: 'auto' },
+        icon: null,
+        optimization: 'off',
+        createdAt: now,
+        updatedAt: now,
+      }
+      instances = [...instances, inst]
+      return inst
     }
     case 'minecraft_version_catalog':
       return { versions: mockCatalog(String(args.loader)), source: 'online' }

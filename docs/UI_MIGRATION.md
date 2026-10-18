@@ -81,7 +81,9 @@ Leyenda: ✅ hecho · 🟡 en curso · ⬜ pendiente. El que avance una fase act
 - **Ventana nativa**: verificada el 2026-10-17 con `tauri dev` y backend real: arranca bajo la CSP de desarrollo sin errores, Jugar lanza la instancia existente, la consola muestra la salida real del juego y «Cerrar juego» lo detiene. Sigue sin recorrerse a mano la creacion de perfiles/instancias nuevas.
 
 - Crear instancia ya incluye «Opciones avanzadas» (memoria y Java), igual que la maqueta.
-- Icono de instancia elegible: hecho (12 iconos propios en pixel art, `itemIcons.ts`; campo `icon` en la instancia).
+- Icono de instancia elegible: hecho. Solo se usan los PNG de `minecraft_iconos_emblematicos/` (reescalados sin suavizado a 64 px en `src/assets/instance-icons/`, catalogo en `itemIcons.ts`); cada tipo de instancia tiene uno por defecto. Los ids antiguos se convierten (`LEGACY_ICON_IDS`). El icono «diamante» del paquete llego vacio y no se incluye. El icono de la aplicacion y el favicon son el bloque de cesped del mismo paquete.
+- Funciones sin terminar: se ocultan con `lib/features.ts` (`FEATURES`), sin borrar el codigo: tarjetas «Proximamente» de Herramientas y el campo del ID de Microsoft en Ajustes. La tarjeta de Microsoft de Perfiles solo aparece si esta activado o ya hay una cuenta Microsoft.
+- Crear instancia: pestanas «Versiones oficiales» / «Personalizado» (`CustomVersionPicker`): versiones instaladas fuera del launcher.
 - `Mods` y `SkinEditor` solo recibieron el aspecto por los componentes compartidos y la cabecera; no se rediseño su disposicion interna.
 - Fuentes Space Grotesk e IBM Plex Sans incluidas en `apps/desktop/public/fonts` (woff2 latin, licencia OFL, via @font-face en `app.css`); verificado en la ventana nativa bajo la CSP: se cargan sin errores.
 - `typography.scale` x `density.uiScale` de los temas se aplican como `zoom` del documento (`theme.ts`, con prueba). `density.compact` sigue sin aplicarse.

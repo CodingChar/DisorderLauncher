@@ -10,7 +10,9 @@
   import { api } from '../lib/api'
   import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
+  import { normalizeIconId } from '../lib/itemIcons'
   import { nav } from '../lib/stores/nav.svelte'
+  import { isCustomVersion, versionLabel } from '../lib/text'
   import { sessions } from '../lib/stores/sessions.svelte'
   import VersionPicker from '../lib/components/VersionPicker.svelte'
   import type { Optimization } from '../lib/types'
@@ -39,7 +41,7 @@
     name = instance.name
     version = instance.minecraftVersion
     profileId = instance.profileId
-    icon = instance.icon ?? ''
+    icon = normalizeIconId(instance.icon)
     optimization = instance.optimization ?? 'off'
     if (instance.memory.mode === 'fixed') {
       memoryMode = 'fixed'
@@ -68,7 +70,8 @@
     try {
       await instances.update(instance.id, {
         name,
-        minecraftVersion: version,
+        // Una version personalizada se queda como esta: no se cambia por otra de la lista oficial.
+        ...(isCustomVersion(version) ? {} : { minecraftVersion: version }),
         profileId,
         icon,
         optimization,
@@ -141,7 +144,11 @@
         }}
       >
         <Input label="Nombre" bind:value={name} maxlength={64} />
-        <VersionPicker loader={instance.loader} bind:value={version} disabled={busy} autoSelect={false} />
+        {#if isCustomVersion(version)}
+          <p class="subtle">Versión personalizada: <strong>{versionLabel(version)}</strong>. Para usar otra, crea una instancia nueva.</p>
+        {:else}
+          <VersionPicker loader={instance.loader} bind:value={version} disabled={busy} autoSelect={false} />
+        {/if}
         <IconPicker bind:value={icon} loader={instance.loader} disabled={busy} />
         <Select label="Perfil que juega" bind:value={profileId} options={profileOptions} disabled={busy} />
 

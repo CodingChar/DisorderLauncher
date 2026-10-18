@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from '../lib/components/Button.svelte'
   import Icon from '../lib/components/Icon.svelte'
+  import ItemLogo from '../lib/components/ItemLogo.svelte'
   import PageHeading from '../lib/components/PageHeading.svelte'
   import ProgressBar from '../lib/components/ProgressBar.svelte'
   import { instances } from '../lib/stores/instances.svelte'
@@ -28,7 +29,7 @@
 
 <div class="explore-grid">
   <section class="explore-card panel">
-    <div class="explore-art"><div class="block grass" aria-hidden="true"><span></span><i></i><b></b></div></div>
+    <div class="explore-art"><ItemLogo loader="vanilla" icon="grass-block" size={96} /></div>
     <div class="explore-copy">
       <span class="eyebrow">SIN MODS</span>
       <h2>La esencia de Minecraft</h2>
@@ -38,7 +39,7 @@
   </section>
 
   <section class="explore-card panel">
-    <div class="explore-art art-1"><div class="block stone" aria-hidden="true"><span></span><i></i><b></b></div></div>
+    <div class="explore-art"><ItemLogo loader="fabric" icon="diamond-pickaxe" size={96} /></div>
     <div class="explore-copy">
       <span class="eyebrow">CON MODS</span>
       <h2>Un mundo a tu medida</h2>
@@ -48,7 +49,7 @@
   </section>
 
   <section class="explore-card panel">
-    <div class="explore-art art-2"><div class="block sand" aria-hidden="true"><span></span><i></i><b></b></div></div>
+    <div class="explore-art"><ItemLogo loader="vanilla" icon="crafting-table" size={96} /></div>
     <div class="explore-copy">
       <span class="eyebrow">MODPACK</span>
       <h2>Importa un modpack</h2>

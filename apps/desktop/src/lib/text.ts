@@ -21,3 +21,23 @@ const LOADER_NAMES: Record<string, string> = { vanilla: 'Original', fabric: 'Fab
 export function loaderName(loader: string): string {
   return LOADER_NAMES[loader] ?? loader
 }
+
+/** Prefijo con el que el launcher guarda las versiones importadas de una carpeta .minecraft. */
+const CUSTOM_PREFIX = 'custom-'
+
+export const isCustomVersion = (id: string): boolean => id.startsWith(CUSTOM_PREFIX)
+
+/** Version para mostrar: sin el prefijo interno de las personalizadas. */
+export const versionLabel = (id: string): string => (isCustomVersion(id) ? id.slice(CUSTOM_PREFIX.length) : id)
+
+const EXTERNAL_KIND_NAMES: Record<string, string> = {
+  optifine: 'OptiFine',
+  forge: 'Forge',
+  neoforge: 'NeoForge',
+  fabric: 'Fabric',
+  quilt: 'Quilt',
+  liteloader: 'LiteLoader',
+  other: 'Personalizada',
+}
+
+export const externalKindName = (kind: string): string => EXTERNAL_KIND_NAMES[kind] ?? 'Personalizada'

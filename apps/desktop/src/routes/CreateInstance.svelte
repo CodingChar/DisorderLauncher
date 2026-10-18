@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from '../lib/components/Button.svelte'
   import PageHeading from '../lib/components/PageHeading.svelte'
-  import Card from '../lib/components/Card.svelte'
+  import CustomVersionPicker from '../lib/components/CustomVersionPicker.svelte'
   import IconPicker from '../lib/components/IconPicker.svelte'
   import Input from '../lib/components/Input.svelte'
   import PerformanceOptions from '../lib/components/PerformanceOptions.svelte'
@@ -14,6 +14,11 @@
 
   let name = $state('Mi mundo')
   let version = $state('')
+  // «Oficial»: la lista de Mojang. «Personalizado»: versiones instaladas fuera del launcher (OptiFine, Forge...).
+  let source = $state<'official' | 'custom'>('official')
+  let customVersion = $state('')
+  let customDir = $state<string | null>(null)
+  let copyData = $state(false)
   let loader = $state<LoaderKind>(nav.createLoader)
   let error = $state<string | null>(null)
   let busy = $state(false)
@@ -61,7 +66,10 @@
     busy = true
     error = null
     try {
-      const instance = await instances.create(name, version, loader)
+      const instance =
+        source === 'custom'
+          ? await instances.createCustom(name, customDir, customVersion, copyData)
+          : await instances.create(name, version, loader)
       // Los ajustes avanzados solo se guardan si se cambiaron; lo normal es dejarlos en automatico.
       if (memoryMode === 'fixed' || javaMode === 'path' || icon || optimization !== 'off') {
         await instances.update(instance.id, {
@@ -92,10 +100,26 @@
       }}
     >
       <Input label="Nombre" bind:value={name} maxlength={64} />
-      <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
-      <IconPicker bind:value={icon} {loader} disabled={busy} />
+      <div class="source-tabs" role="tablist" aria-label="Origen de la versión">
+        <button type="button" role="tab" class="secondary" class:active={source === 'official'} aria-selected={source === 'official'} disabled={busy} onclick={() => (source = 'official')}>
+          Versiones oficiales
+        </button>
+        <button type="button" role="tab" class="secondary" class:active={source === 'custom'} aria-selected={source === 'custom'} disabled={busy} onclick={() => (source = 'custom')}>
+          Personalizado
+        </button>
+      </div>
 
-      <VersionPicker {loader} bind:value={version} disabled={busy} />
+      {#if source === 'official'}
+        <Select label="Tipo de instancia" bind:value={loader} options={loaderOptions} />
+        <IconPicker bind:value={icon} {loader} disabled={busy} />
+        <VersionPicker {loader} bind:value={version} disabled={busy} />
+      {:else}
+        <p class="subtle">
+          ¿Instalaste OptiFine, Forge u otra versión con el launcher de Minecraft? Elígela aquí y se usará en una instancia nueva.
+        </p>
+        <IconPicker bind:value={icon} loader="vanilla" disabled={busy} />
+        <CustomVersionPicker bind:value={customVersion} bind:dir={customDir} bind:copyData disabled={busy} />
+      {/if}
 
       <details class="settings-block advanced">
         <summary>Opciones avanzadas</summary>
@@ -127,7 +151,7 @@
       {/if}
 
       <div class="form-actions">
-        <Button variant="primary" type="submit" disabled={busy || !version || name.trim().length === 0}>
+        <Button variant="primary" type="submit" disabled={busy || (source === 'custom' ? !customVersion : !version) || name.trim().length === 0}>
           {busy ? 'Creando…' : 'Crear instancia'}
         </Button>
         <Button variant="ghost" onclick={() => nav.go('instances')}>Cancelar</Button>
@@ -157,6 +181,18 @@
     max-width: 800px;
   }
 
+
+  .source-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .source-tabs button.active {
+    border-color: var(--action);
+    box-shadow: 0 0 0 1px var(--action);
+    background: var(--surface-raised);
+  }
 
   .pack-actions {
     margin-top: 16px;

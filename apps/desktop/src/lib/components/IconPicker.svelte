@@ -17,11 +17,11 @@
   <legend>Icono de la instancia</legend>
   <div class="icon-grid" role="radiogroup" aria-label="Icono de la instancia">
     <button type="button" class="icon-option" class:selected={value === ''} role="radio" aria-checked={value === ''} aria-label="Icono del tipo de instancia" title="Por defecto" onclick={() => (value = '')}>
-      <ItemLogo {loader} size={28} />
+      <ItemLogo {loader} size={32} />
     </button>
     {#each ITEM_ICONS as icon (icon.id)}
       <button type="button" class="icon-option" class:selected={value === icon.id} role="radio" aria-checked={value === icon.id} aria-label={icon.label} title={icon.label} onclick={() => (value = icon.id)}>
-        <ItemLogo {loader} icon={icon.id} size={28} />
+        <ItemLogo {loader} icon={icon.id} size={32} />
       </button>
     {/each}
   </div>
