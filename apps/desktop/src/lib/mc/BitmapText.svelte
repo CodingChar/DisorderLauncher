@@ -25,8 +25,9 @@
   $effect(() => {
     if (!canvas || !fontStatus.ready) return
     const image = renderText(shown, color)
-    canvas.width = image.width
-    canvas.height = image.height
+    // Cambiar width/height recrea el buffer: un hover que solo cambia el color no lo necesita.
+    if (canvas.width !== image.width) canvas.width = image.width
+    if (canvas.height !== image.height) canvas.height = image.height
     const ctx = canvas.getContext('2d')!
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(image, 0, 0)

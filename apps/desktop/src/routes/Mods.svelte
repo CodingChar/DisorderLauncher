@@ -34,8 +34,8 @@
   let hitId = $state<string | null>(null)
 
   onMount(() => {
-    mods.reset()
-    if (instance) mods.load(instance.id)
+    if (instance) mods.open(instance.id)
+    else mods.reset()
   })
   onDestroy(() => mods.reset())
 

@@ -42,7 +42,7 @@ impl DownloadManager {
         F: Fn(DownloadProgress) + Send + Sync + 'static,
     {
         let total = tasks.len();
-        let semaphore = Arc::new(Semaphore::new(concurrency));
+        let semaphore = Arc::new(Semaphore::new(concurrency.max(1)));
         let completed = Arc::new(AtomicUsize::new(0));
         let bytes_downloaded = Arc::new(AtomicU64::new(0));
         let bytes_total: u64 = tasks.iter().filter_map(|t| t.size).sum();
@@ -61,6 +61,13 @@ impl DownloadManager {
                     error: e.to_string(),
                 });
                 completed.fetch_add(1, Ordering::Relaxed);
+                progress(DownloadProgress {
+                    completed: completed.load(Ordering::Relaxed),
+                    total,
+                    bytes_downloaded: bytes_downloaded.load(Ordering::Relaxed),
+                    bytes_total,
+                    current_file: task.dest.display().to_string(),
+                });
                 continue;
             }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -140,8 +147,12 @@ fn should_skip(task: &DownloadTask) -> bool {
         return false;
     }
     if let Some(expected_sha1) = &task.sha1 {
-        if let Ok(data) = std::fs::read(&task.dest) {
-            let actual = hex_sha1(&data);
+        if let Ok(mut file) = std::fs::File::open(&task.dest) {
+            let mut hasher = Sha1::new();
+            if std::io::copy(&mut file, &mut hasher).is_err() {
+                return false;
+            }
+            let actual = format!("{:x}", hasher.finalize());
             return actual == *expected_sha1;
         }
     }
@@ -213,44 +224,64 @@ async fn download_single(
         fs::create_dir_all(parent).await?;
     }
 
-    let part_path = part_path(&task.dest);
     let response = http.get(&task.url).send().await?.error_for_status()?;
     // Una redireccion no puede sacar la descarga de los hosts de confianza ni degradarla a http.
     check_final_url(allowed, response.url())?;
-    let bytes = response.bytes().await?;
-
-    bytes_counter.fetch_add(bytes.len() as u64, Ordering::Relaxed);
-
-    let mut file = fs::File::create(&part_path).await?;
-    file.write_all(&bytes).await?;
-    file.flush().await?;
-    drop(file);
-
-    if let Some(expected) = &task.sha1 {
-        let actual = hex_sha1(&bytes);
-        if actual != *expected {
-            let _ = fs::remove_file(&part_path).await;
-            return Err(DownloadError::HashMismatch {
-                path: task.dest.display().to_string(),
-                expected: expected.clone(),
-                actual,
-            });
-        }
-    }
-
-    fs::rename(&part_path, &task.dest).await?;
-    Ok(())
+    save_response(response, task, bytes_counter).await
 }
 
-fn part_path(dest: &Path) -> std::path::PathBuf {
+async fn save_response(
+    response: reqwest::Response,
+    task: &DownloadTask,
+    bytes_counter: &AtomicU64,
+) -> Result<(), DownloadError> {
+    // Dos instancias pueden instalar el mismo asset a la vez: cada descarga
+    // necesita su propio temporal, que tambien se elimina al cancelar la tarea.
+    let part_path = part_path(&task.dest)?;
+    let result = async {
+        let mut response = response;
+        let mut file = fs::File::create(&part_path).await?;
+        let mut hasher = Sha1::new();
+        while let Some(chunk) = response.chunk().await? {
+            file.write_all(&chunk).await?;
+            hasher.update(&chunk);
+            bytes_counter.fetch_add(chunk.len() as u64, Ordering::Relaxed);
+        }
+        file.flush().await?;
+        drop(file);
+
+        if let Some(expected) = &task.sha1 {
+            let actual = format!("{:x}", hasher.finalize());
+            if actual != *expected {
+                return Err(DownloadError::HashMismatch {
+                    path: task.dest.display().to_string(),
+                    expected: expected.clone(),
+                    actual,
+                });
+            }
+        }
+        fs::rename(&part_path, &task.dest).await?;
+        Ok(())
+    }.await;
+    if result.is_err() {
+        let _ = fs::remove_file(&part_path).await;
+    }
+    result
+}
+
+fn part_path(dest: &Path) -> std::io::Result<tempfile::TempPath> {
     let mut name = dest
         .file_name()
         .unwrap_or_default()
         .to_os_string();
-    name.push(".part");
-    dest.with_file_name(name)
+    name.push(".part-");
+    tempfile::Builder::new()
+        .prefix(&name)
+        .tempfile_in(dest.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new(".")))
+        .map(|file| file.into_temp_path())
 }
 
+#[cfg(test)]
 fn hex_sha1(data: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(data);
@@ -260,6 +291,66 @@ fn hex_sha1(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Solo el transporte del fixture usa HTTP local. La entrada de produccion
+    // sigue exigiendo HTTPS y comprueba el destino antes de escribir.
+    async fn response(body: &[u8], declared_length: usize) -> reqwest::Response {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let body = body.to_vec();
+        tokio::spawn(async move {
+            use tokio::io::AsyncBufReadExt;
+            let (mut stream, _) = listener.accept().await.unwrap();
+            {
+                let mut reader = tokio::io::BufReader::new(&mut stream);
+                let mut header = String::new();
+                loop {
+                    header.clear();
+                    let amount = reader.read_line(&mut header).await.unwrap();
+                    if amount == 0 || header == "\r\n" { break; }
+                }
+            }
+            stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Length: {declared_length}\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
+            for chunk in body.chunks(8192) {
+                stream.write_all(chunk).await.unwrap();
+            }
+        });
+        reqwest::Client::new().get(format!("http://{address}/file")).send().await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn streams_and_verifies_before_replacing_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let body = vec![42; 1024 * 1024];
+        let task = DownloadTask {
+            url: "https://example.com/file".into(), dest: dir.path().join("file.jar"),
+            sha1: Some(hex_sha1(&body)), size: Some(body.len() as u64),
+        };
+        std::fs::write(&task.dest, b"old file").unwrap();
+        let count = AtomicU64::new(0);
+        save_response(response(&body, body.len()).await, &task, &count).await.unwrap();
+        assert_eq!(std::fs::read(&task.dest).unwrap(), body);
+        assert_eq!(count.load(Ordering::Relaxed), body.len() as u64);
+        assert!(should_skip(&task));
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[tokio::test]
+    async fn invalid_or_interrupted_download_preserves_existing_file_and_removes_temp() {
+        let dir = tempfile::tempdir().unwrap();
+        let task = DownloadTask {
+            url: "https://example.com/file".into(), dest: dir.path().join("file.jar"),
+            sha1: Some(hex_sha1(b"expected")), size: None,
+        };
+        std::fs::write(&task.dest, b"old file").unwrap();
+        for length in [3, 100] {
+            let result = save_response(response(b"bad", length).await, &task, &AtomicU64::new(0)).await;
+            assert!(result.is_err());
+            if length == 3 { assert!(matches!(result, Err(DownloadError::HashMismatch { .. }))); }
+            assert_eq!(std::fs::read(&task.dest).unwrap(), b"old file");
+            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        }
+    }
 
     #[test]
     fn final_url_after_redirect_is_rechecked() {
@@ -293,9 +384,17 @@ mod tests {
     }
 
     #[test]
-    fn part_path_appends_extension() {
-        let dest = std::path::PathBuf::from("/tmp/libs/some.jar");
-        let part = part_path(&dest);
-        assert_eq!(part, std::path::PathBuf::from("/tmp/libs/some.jar.part"));
+    fn concurrent_downloads_use_distinct_temporary_files_and_clean_up() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("some.jar");
+        let first = part_path(&dest).unwrap();
+        let second = part_path(&dest).unwrap();
+        assert_ne!(first.to_path_buf(), second.to_path_buf());
+        assert_eq!(first.parent(), Some(dir.path()));
+        let path = first.to_path_buf();
+        assert!(path.exists());
+        drop(first);
+        assert!(!path.exists());
+        assert!(second.exists());
     }
 }

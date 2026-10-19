@@ -54,9 +54,11 @@ function buildCells(text: string) {
 }
 
 const gray = (v: number) => `rgb(${v},${v},${v})`;
+const grid = buildCells(LOGO_TEXT);
+const rasters = new Map<number, HTMLCanvasElement>();
 
 export function drawLogo(logo: HTMLCanvasElement, state: { width: number; scale: number }): { width: number; height: number } {
-  const { cells, cols, rows } = buildCells(LOGO_TEXT);
+  const { cells, cols, rows } = grid;
   const has = (x: number, y: number) => cells.has(`${x},${y}`);
   const scale = state.scale;
 
@@ -74,6 +76,13 @@ export function drawLogo(logo: HTMLCanvasElement, state: { width: number; scale:
 
   const ctx = logo.getContext("2d")!;
   ctx.imageSmoothingEnabled = false;
+  const fit = Math.min(1, (state.width * 0.8) / (w / scale));
+  const size = { width: (w / scale) * fit, height: (h / scale) * fit };
+  const cached = rasters.get(c);
+  if (cached) {
+    ctx.drawImage(cached, 0, 0);
+    return size;
+  }
   ctx.clearRect(0, 0, w, h);
   const list = [...cells].map((k) => k.split(",").map(Number) as [number, number]);
 
@@ -112,7 +121,12 @@ export function drawLogo(logo: HTMLCanvasElement, state: { width: number; scale:
     }
   }
 
-  const fit = Math.min(1, (state.width * 0.8) / (w / scale));
-  return { width: (w / scale) * fit, height: (h / scale) * fit };
+  const snapshot = document.createElement('canvas');
+  snapshot.width = w;
+  snapshot.height = h;
+  snapshot.getContext('2d')!.drawImage(logo, 0, 0);
+  if (rasters.size >= 4) rasters.delete(rasters.keys().next().value!);
+  rasters.set(c, snapshot);
+  return size;
 }
 

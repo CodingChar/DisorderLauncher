@@ -41,6 +41,8 @@
     selectable?: boolean
     /** Mantiene el final a la vista mientras lleguen filas, salvo que la persona suba. */
     followEnd?: boolean
+    /** Solicita solo los recursos de las filas visibles (p. ej. miniaturas). */
+    onvisible?: (items: T[]) => void
   }
 
   let {
@@ -61,6 +63,7 @@
     ariaLabel,
     selectable = true,
     followEnd = false,
+    onvisible,
   }: Props = $props()
 
   const uid = $props.id()
@@ -82,6 +85,13 @@
       out.push({ item, index: i, id: getId(item), spec: row(item) })
     }
     return out
+  })
+
+  $effect(() => {
+    const callback = onvisible
+    if (!callback) return
+    const rows = items.slice(range.first, range.last + 1)
+    untrack(() => callback(rows))
   })
 
   function setScroll(next: number) {

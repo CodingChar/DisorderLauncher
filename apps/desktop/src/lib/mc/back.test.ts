@@ -22,6 +22,7 @@ describe('navegacion', () => {
     expect(backTarget('edit', 'instances')).toBe('instances')
     expect(backTarget('instances', 'home')).toBe('menu')
     expect(backTarget('skinEditor', null)).toBe('skins')
+    expect(backTarget('skins', 'skinEditor')).toBe('menu')
   })
 })
 

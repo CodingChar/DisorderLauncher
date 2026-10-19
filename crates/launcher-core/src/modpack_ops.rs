@@ -146,6 +146,7 @@ impl Launcher {
 
     /// Exporta una instancia como `.mrpack`. No incluye mundos, logs ni datos de cuentas.
     pub async fn modpack_export(&self, instance_id: &str, dest: &Path) -> Result<ExportSummary, LauncherError> {
+        let _turn = self.mods_guard(instance_id).await;
         self.ensure_idle(instance_id)?;
         let instance = self
             .instances

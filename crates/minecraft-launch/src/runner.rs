@@ -33,13 +33,22 @@ pub enum LaunchEvent {
 }
 
 /// Descripcion de un proceso a lanzar: ejecutable y argv, sin shell de por medio.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RunSpec {
     pub program: PathBuf,
     pub args: Vec<String>,
     pub working_directory: PathBuf,
     pub environment: HashMap<String, String>,
     pub secrets: Vec<String>,
+}
+
+impl std::fmt::Debug for RunSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RunSpec")
+            .field("program", &self.program)
+            .field("working_directory", &self.working_directory)
+            .finish_non_exhaustive()
+    }
 }
 
 impl RunSpec {
@@ -232,6 +241,22 @@ async fn pump_lines<R>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn run_spec_debug_hides_arguments_environment_and_secrets() {
+        let spec = RunSpec {
+            program: "java".into(),
+            args: vec!["--accessToken".into(), "argument-token".into()],
+            working_directory: "game".into(),
+            environment: HashMap::from([("TOKEN".into(), "environment-token".into())]),
+            secrets: vec!["secret-token".into()],
+        };
+        let debug = format!("{spec:?}");
+        for hidden in ["argument-token", "environment-token", "secret-token", "--accessToken"] {
+            assert!(!debug.contains(hidden));
+        }
+        assert!(debug.contains("java"));
+    }
 
     // Solo para tests: un programa del sistema que imprime en stdout/stderr y sale.
     fn shell_spec(script: &str, secrets: Vec<String>) -> RunSpec {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { pushBack } from '../lib/mc/back'
   import McButton from '../lib/mc/McButton.svelte'
   import McCycle from '../lib/mc/McCycle.svelte'
@@ -64,6 +64,10 @@
 
   const selected = $derived(skins.list.find((s) => s.id === selectedId) ?? null)
   const selectedSrc = $derived(selected ? (skins.previews[selected.id] ?? '') : '')
+  $effect(() => {
+    const id = selected?.id
+    if (id) untrack(() => { void skins.ensurePreview(id) })
+  })
   const inUse = $derived(!!selected && profileSkinId === selected.id)
 
   async function run(action: () => Promise<string | void>) {
@@ -166,6 +170,8 @@
     <McButton y={108} label="Eliminar..." disabled={busy} onclick={() => (toRemove = selected)} />
     {#if error}
       <McText text={error} x={-155} y={134} w={310} align="center" color="#ff5555" maxLines={2} role="alert" />
+    {:else if skins.error}
+      <McText text={skins.error} x={-155} y={gui.H - 76} w={310} color="#ff5555" maxLines={2} role="alert" />
     {:else if notice}
       <McText text={notice} x={-155} y={134} w={310} align="center" color="#55ff55" maxLines={2} role="status" />
     {/if}
@@ -210,6 +216,7 @@
       items={skins.list}
       getId={(s) => s.id}
       {row}
+      onvisible={(visible) => { void skins.ensurePreviews(visible.map((skin) => skin.id)) }}
       bind:selectedId
       onactivate={(s) => !busy && profile && use(s)}
       x={-155}
@@ -231,6 +238,8 @@
 
     {#if error}
       <McText text={error} x={-155} y={gui.H - 76} w={310} color="#ff5555" maxLines={2} role="alert" />
+    {:else if skins.error}
+      <McText text={skins.error} x={-155} y={gui.H - 76} w={310} color="#ff5555" maxLines={2} role="alert" />
     {:else if notice}
       <McText text={notice} x={-155} y={gui.H - 76} w={310} color="#55ff55" maxLines={2} role="status" />
     {/if}
@@ -238,9 +247,9 @@
     <McButton anchor="bottom" x={-150} y={-52} w={72} label="Usar" ariaLabel="Usar esta skin en el perfil" disabled={busy || !profile || !selected || inUse} onclick={() => selected && use(selected)} />
     <McButton anchor="bottom" x={-74} y={-52} w={72} label="Editar" disabled={busy || !selected} onclick={() => selected && openEditor(selected.id)} />
     <McButton anchor="bottom" x={2} y={-52} w={72} label="Importar..." ariaLabel="Importar skin" disabled={busy} onclick={importSkin} />
-    <McButton anchor="bottom" x={78} y={-52} w={72} label="Nueva" ariaLabel="Crear skin nueva" disabled={busy} onclick={() => openEditor(null)} />
+    <McButton anchor="bottom" x={78} y={-52} w={72} label="Crear..." ariaLabel="Crear skin nueva" disabled={busy} onclick={() => openEditor(null)} />
     <McButton anchor="bottom" x={-150} y={-28} w={72} label="Más..." ariaLabel="Más opciones de la skin" disabled={busy || !selected} onclick={() => (sub = 'more')} />
     <McButton anchor="bottom" x={-74} y={-28} w={72} label="Sin skin" ariaLabel="Quitar skin del perfil" disabled={busy || !profileSkinId} onclick={unassign} />
-    <McButton anchor="bottom" x={2} y={-28} w={148} label="Atrás" ariaLabel="Volver a Perfiles" onclick={() => nav.go('accounts')} />
+    <McButton anchor="bottom" x={2} y={-28} w={148} label="Atrás" ariaLabel="Volver al menú" onclick={() => nav.go('menu')} />
   </McScreen>
 {/if}

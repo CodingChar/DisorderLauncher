@@ -737,6 +737,14 @@ async fn editor_save_creates_and_updates_skins_with_validation() {
     assert_eq!((updated.id.as_str(), updated.name.as_str(), updated.model), (created.id.as_str(), "Dibujo v2", skins::SkinModel::Classic));
     assert_eq!(launcher.skins_list().await.len(), 1);
 
+    let before = launcher.skins_read(&created.id).await.unwrap();
+    for invalid_name in ["  ", "nombre\nincorrecto", &"x".repeat(49)] {
+        assert!(matches!(launcher.skins_save(Some(&created.id), invalid_name, &png, skins::SkinModel::Slim).await, Err(LauncherError::InvalidInput(_))));
+        assert_eq!(launcher.skins_read(&created.id).await.unwrap(), before, "un nombre rechazado no sustituye los pixeles");
+        let asset = launcher.skins_list().await.pop().unwrap();
+        assert_eq!((asset.name.as_str(), asset.model), ("Dibujo v2", skins::SkinModel::Classic));
+    }
+
     assert!(matches!(launcher.skins_save(None, "x", b"no es png", skins::SkinModel::Classic).await, Err(LauncherError::InvalidInput(_))));
     assert!(matches!(launcher.skins_save(Some("skin_00000000000000000000000000000000"), "x", &png, skins::SkinModel::Classic).await, Err(LauncherError::InvalidInput(_))));
 }

@@ -1,0 +1,304 @@
+{
+  "timings": [
+    {
+      "pass": 0,
+      "view": "instances",
+      "ms": 50.3,
+      "canvases": 22
+    },
+    {
+      "pass": 0,
+      "view": "explore",
+      "ms": 42.9,
+      "canvases": 11
+    },
+    {
+      "pass": 0,
+      "view": "tools",
+      "ms": 50.2,
+      "canvases": 13
+    },
+    {
+      "pass": 0,
+      "view": "accounts",
+      "ms": 40,
+      "canvases": 9
+    },
+    {
+      "pass": 0,
+      "view": "settings",
+      "ms": 42.5,
+      "canvases": 12
+    },
+    {
+      "pass": 0,
+      "view": "create",
+      "ms": 47.6,
+      "canvases": 14
+    },
+    {
+      "pass": 0,
+      "view": "edit",
+      "ms": 49.8,
+      "canvases": 12
+    },
+    {
+      "pass": 0,
+      "view": "skins",
+      "ms": 58.6,
+      "canvases": 15
+    },
+    {
+      "pass": 0,
+      "view": "mods",
+      "ms": 47.8,
+      "canvases": 12
+    },
+    {
+      "pass": 0,
+      "view": "skinEditor",
+      "ms": 99.8,
+      "canvases": 19
+    },
+    {
+      "pass": 1,
+      "view": "instances",
+      "ms": 33.6,
+      "canvases": 22
+    },
+    {
+      "pass": 1,
+      "view": "explore",
+      "ms": 24.1,
+      "canvases": 11
+    },
+    {
+      "pass": 1,
+      "view": "tools",
+      "ms": 40.3,
+      "canvases": 13
+    },
+    {
+      "pass": 1,
+      "view": "accounts",
+      "ms": 25.7,
+      "canvases": 9
+    },
+    {
+      "pass": 1,
+      "view": "settings",
+      "ms": 33.4,
+      "canvases": 12
+    },
+    {
+      "pass": 1,
+      "view": "create",
+      "ms": 42.4,
+      "canvases": 14
+    },
+    {
+      "pass": 1,
+      "view": "edit",
+      "ms": 34.8,
+      "canvases": 12
+    },
+    {
+      "pass": 1,
+      "view": "skins",
+      "ms": 73.3,
+      "canvases": 15
+    },
+    {
+      "pass": 1,
+      "view": "mods",
+      "ms": 44.4,
+      "canvases": 7
+    },
+    {
+      "pass": 1,
+      "view": "skinEditor",
+      "ms": 82.2,
+      "canvases": 19
+    },
+    {
+      "pass": 2,
+      "view": "instances",
+      "ms": 56.1,
+      "canvases": 22
+    },
+    {
+      "pass": 2,
+      "view": "explore",
+      "ms": 30.5,
+      "canvases": 11
+    },
+    {
+      "pass": 2,
+      "view": "tools",
+      "ms": 31.5,
+      "canvases": 13
+    },
+    {
+      "pass": 2,
+      "view": "accounts",
+      "ms": 34.2,
+      "canvases": 9
+    },
+    {
+      "pass": 2,
+      "view": "settings",
+      "ms": 24.4,
+      "canvases": 12
+    },
+    {
+      "pass": 2,
+      "view": "create",
+      "ms": 28.9,
+      "canvases": 14
+    },
+    {
+      "pass": 2,
+      "view": "edit",
+      "ms": 29,
+      "canvases": 12
+    },
+    {
+      "pass": 2,
+      "view": "skins",
+      "ms": 47,
+      "canvases": 15
+    },
+    {
+      "pass": 2,
+      "view": "mods",
+      "ms": 34,
+      "canvases": 7
+    },
+    {
+      "pass": 2,
+      "view": "skinEditor",
+      "ms": 65,
+      "canvases": 19
+    }
+  ],
+  "glyphs": [
+    {
+      "text": "Nueva instancia",
+      "color": "#ffffff",
+      "width": 79,
+      "height": 9,
+      "hash": 652147845
+    },
+    {
+      "text": "Nueva instancia",
+      "color": "#ffffa0",
+      "width": 79,
+      "height": 9,
+      "hash": 198570981
+    },
+    {
+      "text": "Nueva instancia",
+      "color": "#a0a0a0",
+      "width": 79,
+      "height": 9,
+      "hash": 1455315621
+    },
+    {
+      "text": "Nueva instancia",
+      "color": "#ff5555",
+      "width": 79,
+      "height": 9,
+      "hash": 3487583973
+    },
+    {
+      "text": "¡Hola! ñ Á 😀",
+      "color": "#ffffff",
+      "width": 56,
+      "height": 9,
+      "hash": 161011217
+    },
+    {
+      "text": "¡Hola! ñ Á 😀",
+      "color": "#ffffa0",
+      "width": 56,
+      "height": 9,
+      "hash": 1721234994
+    },
+    {
+      "text": "¡Hola! ñ Á 😀",
+      "color": "#a0a0a0",
+      "width": 56,
+      "height": 9,
+      "hash": 4202910776
+    },
+    {
+      "text": "¡Hola! ñ Á 😀",
+      "color": "#ff5555",
+      "width": 56,
+      "height": 9,
+      "hash": 3953942585
+    },
+    {
+      "text": "iiii WWW 123",
+      "color": "#ffffff",
+      "width": 53,
+      "height": 9,
+      "hash": 2546079533
+    },
+    {
+      "text": "iiii WWW 123",
+      "color": "#ffffa0",
+      "width": 53,
+      "height": 9,
+      "hash": 2164057101
+    },
+    {
+      "text": "iiii WWW 123",
+      "color": "#a0a0a0",
+      "width": 53,
+      "height": 9,
+      "hash": 1371817405
+    },
+    {
+      "text": "iiii WWW 123",
+      "color": "#ff5555",
+      "width": 53,
+      "height": 9,
+      "hash": 1210707725
+    },
+    {
+      "text": "",
+      "color": "#ffffff",
+      "width": 1,
+      "height": 9,
+      "hash": 400696213
+    },
+    {
+      "text": "",
+      "color": "#ffffa0",
+      "width": 1,
+      "height": 9,
+      "hash": 400696213
+    },
+    {
+      "text": "",
+      "color": "#a0a0a0",
+      "width": 1,
+      "height": 9,
+      "hash": 400696213
+    },
+    {
+      "text": "",
+      "color": "#ff5555",
+      "width": 1,
+      "height": 9,
+      "hash": 400696213
+    }
+  ],
+  "logo": {
+    "width": 958,
+    "height": 78,
+    "hash": 1990345576
+  },
+  "instances": 5
+}

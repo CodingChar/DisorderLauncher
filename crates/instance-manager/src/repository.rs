@@ -4,7 +4,9 @@ use crate::{
     Instance, InstanceError, InstanceUpdate, JavaSelection, MemoryPolicy, NewInstance, Optimization,
 };
 use chrono::Utc;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Weak};
 use tokio::fs;
 
 const ID_PREFIX: &str = "inst_";
@@ -24,11 +26,29 @@ pub trait InstanceRepository: Send + Sync {
 /// Persistencia en `<root>/<id>/instance.json` + `game/` + `logs/` (spec 06).
 pub struct FileInstanceRepository {
     root: PathBuf,
+    mutations: Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>,
 }
 
 impl FileInstanceRepository {
     pub fn new(root: impl AsRef<Path>) -> Self {
-        Self { root: root.as_ref().to_path_buf() }
+        Self { root: root.as_ref().to_path_buf(), mutations: Mutex::new(HashMap::new()) }
+    }
+
+    async fn mutation_guard(&self, id: &str) -> Result<tokio::sync::OwnedMutexGuard<()>, InstanceError> {
+        validate_id(id)?;
+        let lock = {
+            let mut locks = self.mutations.lock().unwrap_or_else(|p| p.into_inner());
+            locks.retain(|_, lock| lock.strong_count() > 0);
+            match locks.get(id).and_then(Weak::upgrade) {
+                Some(lock) => lock,
+                None => {
+                    let lock = Arc::new(tokio::sync::Mutex::new(()));
+                    locks.insert(id.to_string(), Arc::downgrade(&lock));
+                    lock
+                }
+            }
+        };
+        Ok(lock.lock_owned().await)
     }
 
     pub fn instance_dir(&self, id: &str) -> Result<PathBuf, InstanceError> {
@@ -135,6 +155,7 @@ impl InstanceRepository for FileInstanceRepository {
     }
 
     async fn update(&self, id: &str, changes: InstanceUpdate) -> Result<Instance, InstanceError> {
+        let _guard = self.mutation_guard(id).await?;
         let mut instance = self
             .read(id)
             .await?
@@ -169,6 +190,7 @@ impl InstanceRepository for FileInstanceRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<(), InstanceError> {
+        let _guard = self.mutation_guard(id).await?;
         let dir = self.instance_dir(id)?;
         match fs::remove_dir_all(&dir).await {
             Ok(()) => Ok(()),
@@ -178,6 +200,7 @@ impl InstanceRepository for FileInstanceRepository {
     }
 
     async fn duplicate(&self, id: &str) -> Result<Instance, InstanceError> {
+        let _guard = self.mutation_guard(id).await?;
         let source = self
             .read(id)
             .await?
@@ -401,6 +424,37 @@ mod tests {
         let (_d, repo) = repo();
         let err = repo.update("inst_abc", InstanceUpdate::default()).await.unwrap_err();
         assert!(matches!(err, InstanceError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn concurrent_updates_preserve_both_changes() {
+        let (_d, repo) = repo();
+        let instance = repo.create(new_instance("A")).await.unwrap();
+        let (name, memory) = tokio::join!(
+            repo.update(&instance.id, InstanceUpdate { name: Some("B".into()), ..Default::default() }),
+            repo.update(&instance.id, InstanceUpdate {
+                memory: Some(MemoryPolicy::Fixed { min_mb: 512, max_mb: 2048 }),
+                ..Default::default()
+            }),
+        );
+        name.unwrap();
+        memory.unwrap();
+        let loaded = repo.get(&instance.id).await.unwrap().unwrap();
+        assert_eq!(loaded.name, "B");
+        assert_eq!(loaded.memory, MemoryPolicy::Fixed { min_mb: 512, max_mb: 2048 });
+    }
+
+    #[tokio::test]
+    async fn mutation_of_another_instance_does_not_wait_for_a_busy_instance() {
+        let (_d, repo) = repo();
+        let first = repo.create(new_instance("A")).await.unwrap();
+        let second = repo.create(new_instance("B")).await.unwrap();
+        let _busy = repo.mutation_guard(&first.id).await.unwrap();
+        let updated = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            repo.update(&second.id, InstanceUpdate { name: Some("C".into()), ..Default::default() }),
+        ).await.expect("unrelated instances must not block each other").unwrap();
+        assert_eq!(updated.name, "C");
     }
 
     #[tokio::test]

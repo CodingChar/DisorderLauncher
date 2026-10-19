@@ -112,9 +112,9 @@ export function layerMask(model: SkinModel, layer: Layer): Uint8Array {
 }
 
 /** Mascara de la cara (de la capa indicada) que contiene el pixel; vacia si no cae en ninguna. */
-export function faceMaskAt(model: SkinModel, layer: Layer, x: number, y: number): Uint8Array {
+export function faceMaskAt(model: SkinModel, layer: Layer, x: number, y: number, group: BodyGroup = 'all'): Uint8Array {
   const mask = new Uint8Array(SIZE * SIZE)
-  for (const part of boxParts(model).filter((p) => p.layer === layer)) {
+  for (const part of boxParts(model).filter((p) => p.layer === layer && (group === 'all' || groupOf(p.name) === group))) {
     for (const r of Object.values(faceRects(part))) {
       if (!inRect(r, x, y)) continue
       for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) mask[j * SIZE + i] = 1
@@ -247,6 +247,13 @@ export class History {
   private redoStack: Pixels[] = []
 
   constructor(private readonly limit = 60) {}
+
+  /** Una accion sin cambios no consume historial ni elimina los pasos de rehacer. */
+  record(before: Pixels, after: Pixels): boolean {
+    if (before.length === after.length && before.every((value, i) => value === after[i])) return false
+    this.push(before)
+    return true
+  }
 
   /** Guardar el estado *anterior* a un cambio. */
   push(before: Pixels) {

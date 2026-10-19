@@ -1,6 +1,7 @@
 import { filterVersions, pickDefault, showFlags, type ShowLevel } from './versionPicker'
 import { versions } from './stores/versions.svelte'
 import type { LoaderKind } from './types'
+import { untrack } from 'svelte'
 
 /**
  * Estado del selector de version de Minecraft para una pantalla. Debe crearse al inicializar el componente
@@ -17,7 +18,8 @@ export function useVersionPicker(options: {
   let level = $state<ShowLevel>('release')
 
   $effect(() => {
-    versions.load(options.loader())
+    const loader = options.loader()
+    untrack(() => { void versions.load(loader) })
   })
 
   const flags = $derived(showFlags(level))
@@ -40,6 +42,6 @@ export function useVersionPicker(options: {
     get entries() {
       return entries
     },
-    reload: () => versions.load(options.loader()),
+    reload: () => versions.load(options.loader(), true),
   }
 }

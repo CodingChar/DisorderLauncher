@@ -120,6 +120,20 @@ describe('relleno', () => {
 })
 
 describe('relleno por cara', () => {
+  it('respeta la parte seleccionada en ambas capas y modelos', () => {
+    for (const model of ['classic', 'slim'] as const) {
+      for (const layer of ['base', 'overlay'] as const) {
+        for (const part of boxParts(model).filter((p) => p.layer === layer)) {
+          const face = faceRects(part).front
+          const img = blank()
+          const mask = faceMaskAt(model, layer, face.x, face.y, groupOf(part.name))
+          expect(floodFill(img, face.x, face.y, RED, mask)).toBe(face.w * face.h)
+          const wrongGroup = groupOf(part.name) === 'head' ? 'body' : 'head'
+          expect(floodFill(blank(), face.x, face.y, RED, faceMaskAt(model, layer, face.x, face.y, wrongGroup))).toBe(0)
+        }
+      }
+    }
+  })
   it('la mascara de una cara cubre solo ese rectangulo', () => {
     const mask = faceMaskAt('classic', 'base', 10, 10) // frente de la cabeza (8,8,8,8)
     expect(mask.reduce((a, b) => a + b, 0)).toBe(64)
@@ -154,6 +168,21 @@ describe('linea', () => {
 })
 
 describe('historial', () => {
+  it('un relleno o trazo sin cambios conserva rehacer y no agrega pasos', () => {
+    const history = new History()
+    const original = blankSkin('classic')
+    const painted = new Uint8ClampedArray(original)
+    setPixel(painted, 8, 8, RED)
+    expect(history.record(original, painted)).toBe(true)
+    const undone = history.undo(painted)!
+    expect(history.record(undone, new Uint8ClampedArray(undone))).toBe(false)
+    expect(history.canUndo).toBe(false)
+    expect(history.canRedo).toBe(true)
+    expect(history.redo(undone)).toEqual(painted)
+    // Las instantaneas no comparten memoria con el documento mutable.
+    original.fill(0)
+    expect(history.undo(painted)).toEqual(blankSkin('classic'))
+  })
   it('deshace y rehace, y un cambio nuevo descarta el futuro', () => {
     const h = new History()
     const a = blank()

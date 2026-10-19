@@ -58,7 +58,7 @@ pub struct Launcher {
     settings: Mutex<Settings>,
     pub(crate) theme_store: themes::ThemeStore,
     pub(crate) skin_library: skins::SkinLibrary,
-    /// Un candado por instancia para los cambios de mods (el archivo de registro se lee, cambia y guarda entero).
+    /// Serializa cambios de instancia y la reserva de un lanzamiento/reparacion.
     mods_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
     running: Mutex<HashMap<String, Option<GameKiller>>>,
@@ -316,7 +316,7 @@ impl Launcher {
             .await?)
     }
 
-    /// Espera el turno para cambiar los mods de una instancia (una operacion a la vez por instancia).
+    /// Barrera compartida por cambios de instancia, mods y reservas de lanzamiento.
     pub(crate) async fn mods_guard(&self, instance_id: &str) -> tokio::sync::OwnedMutexGuard<()> {
         let lock = self
             .mods_locks
@@ -362,6 +362,7 @@ impl Launcher {
         id: &str,
         changes: InstanceUpdate,
     ) -> Result<Instance, LauncherError> {
+        let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
         if let Some(profile_id) = &changes.profile_id {
             self.accounts
@@ -380,11 +381,13 @@ impl Launcher {
     }
 
     pub async fn instances_delete(&self, id: &str) -> Result<(), LauncherError> {
+        let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
         Ok(self.instances.delete(id).await?)
     }
 
     pub async fn instances_duplicate(&self, id: &str) -> Result<Instance, LauncherError> {
+        let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
         Ok(self.instances.duplicate(id).await?)
     }
@@ -500,6 +503,7 @@ impl Launcher {
     /// Inicia la instancia en segundo plano. Devuelve en cuanto se acepta la
     /// peticion; el avance y los errores llegan por `LauncherEvents`.
     pub async fn launch(self: &Arc<Self>, instance_id: &str) -> Result<(), LauncherError> {
+        let _turn = self.mods_guard(instance_id).await;
         let instance = self
             .instances
             .get(instance_id)
@@ -528,6 +532,7 @@ impl Launcher {
     /// Verifica la instalacion de una instancia y redescarga lo que falte o este danado.
     /// No se puede reparar mientras el juego corre o se prepara.
     pub async fn repair_instance(&self, instance_id: &str) -> Result<RepairSummary, LauncherError> {
+        let turn = self.mods_guard(instance_id).await;
         let instance = self
             .instances
             .get(instance_id)
@@ -541,6 +546,7 @@ impl Launcher {
             }
             running.insert(instance.id.clone(), None);
         }
+        drop(turn);
         let result = self.repair_inner(&instance).await;
         self.running_guard().remove(&instance.id);
         result
@@ -932,5 +938,40 @@ async fn write_log(log: &mut Option<tokio::fs::File>, line: &str) {
     if let Some(file) = log {
         let _ = file.write_all(line.as_bytes()).await;
         let _ = file.write_all(b"\n").await;
+    }
+}
+
+#[cfg(test)]
+mod concurrency_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn queued_mod_mutation_rechecks_running_state_after_acquiring_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let launcher = Launcher::new(LauncherPaths::new(dir.path()), Arc::new(crate::NoopEvents));
+        let turn = launcher.mods_guard("inst_test").await;
+        let mutation = launcher.mods_remove("inst_test", "mod.jar");
+        tokio::pin!(mutation);
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut mutation).await.is_err());
+        launcher.running_guard().insert("inst_test".into(), None);
+        drop(turn);
+        assert!(matches!(mutation.await, Err(LauncherError::AlreadyRunning)));
+    }
+
+    #[tokio::test]
+    async fn launch_waits_for_instance_mutations_before_reserving() {
+        let dir = tempfile::tempdir().unwrap();
+        let launcher = Arc::new(Launcher::new(LauncherPaths::new(dir.path()), Arc::new(crate::NoopEvents)));
+        let instance = launcher.instances.create(NewInstance {
+            name: "A".into(), minecraft_version: "1.21".into(), loader: LoaderKind::Vanilla,
+            loader_version: None, profile_id: "acc_local_test".into(),
+        }).await.unwrap();
+        let turn = launcher.mods_guard(&instance.id).await;
+        let launch = launcher.launch(&instance.id);
+        tokio::pin!(launch);
+        assert!(tokio::time::timeout(Duration::from_millis(20), &mut launch).await.is_err());
+        launcher.running_guard().insert(instance.id.clone(), None);
+        drop(turn);
+        assert!(matches!(launch.await, Err(LauncherError::AlreadyRunning)));
     }
 }

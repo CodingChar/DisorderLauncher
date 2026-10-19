@@ -1,44 +1,31 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { animateVisible } from './animation'
 
   let panorama = $state<HTMLDivElement>()
   let cube = $state<HTMLDivElement>()
 
-  const distance = () => Math.round(Math.max(innerWidth, innerHeight) / 2 / 0.81)
+  let distance = 800
 
   function place(ticks: number) {
     if (!cube) return
     const pitch = Math.sin(ticks / 400) * 25 + 20
-    cube.style.transform = `translateZ(${distance()}px) rotateX(${-pitch}deg) rotateY(${-ticks * 0.1}deg)`
+    cube.style.transform = `translateZ(${distance}px) rotateX(${-pitch}deg) rotateY(${-ticks * 0.1}deg)`
   }
 
   onMount(() => {
-    const motion = matchMedia('(prefers-reduced-motion: reduce)')
-    let raf = 0
-    const frame = (now: number) => {
-      place(now / 50)
-      raf = requestAnimationFrame(frame)
-    }
     const resize = () => {
-      if (panorama) panorama.style.perspective = `${distance()}px`
+      distance = Math.round(Math.max(innerWidth, innerHeight) / 2 / 0.81)
+      if (panorama) panorama.style.perspective = `${distance}px`
       place(0)
     }
-    // Sin animacion si la persona la desactivo; en pausa con la ventana oculta o minimizada (0 % de CPU).
-    const sync = () => {
-      cancelAnimationFrame(raf)
-      if (!motion.matches && !document.hidden) raf = requestAnimationFrame(frame)
-      else place(0)
-    }
     resize()
-    sync()
+    // El fondo gira lentamente: 30 Hz bastan, sin seguir los 120/144/240 Hz del monitor.
+    const stopAnimation = animateVisible((now, still) => place(still ? 0 : now / 50), 30)
     addEventListener('resize', resize, { passive: true })
-    document.addEventListener('visibilitychange', sync)
-    motion.addEventListener('change', sync)
     return () => {
-      cancelAnimationFrame(raf)
+      stopAnimation()
       removeEventListener('resize', resize)
-      document.removeEventListener('visibilitychange', sync)
-      motion.removeEventListener('change', sync)
     }
   })
 </script>

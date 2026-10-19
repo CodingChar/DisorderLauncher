@@ -43,7 +43,7 @@
       case 'starting':
         return 'Iniciando Minecraft…'
       case 'running':
-        return 'Minecraft está abierto'
+        return session.message ?? 'Minecraft está abierto'
       case 'repairing':
         return session.progress ? phaseLabel[session.progress.phase] : 'Comprobando archivos…'
       case 'exited':
@@ -110,9 +110,10 @@
   ]
 
   const lines = $derived(instance ? sessions.logOf(instance.id) : [])
+  const query = $derived(filter.toLowerCase())
   const visible = $derived(
-    lines.filter((line) => {
-      if (filter && !line.text.toLowerCase().includes(filter.toLowerCase())) return false
+    !query && level === 'all' ? lines : lines.filter((line) => {
+      if (query && !line.text.toLowerCase().includes(query)) return false
       if (level === 'all') return true
       return levelOf(line.text) === level
     }),

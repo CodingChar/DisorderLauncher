@@ -14,6 +14,7 @@
   import { sessions } from './lib/stores/sessions.svelte'
   import { settings } from './lib/stores/settings.svelte'
   import { HELP_TEXT } from './lib/helpText'
+  import { loadSkinEditor, prepareScreen, warmNavigation } from './lib/navigationWarmup'
   import AccountPicker from './routes/AccountPicker.svelte'
   import CreateInstance from './routes/CreateInstance.svelte'
   import EditInstance from './routes/EditInstance.svelte'
@@ -23,7 +24,6 @@
   import MainMenu from './routes/MainMenu.svelte'
   import Mods from './routes/Mods.svelte'
   import Settings from './routes/Settings.svelte'
-  import SkinEditor from './routes/SkinEditor.svelte'
   import Skins from './routes/Skins.svelte'
   import Tools from './routes/Tools.svelte'
   import Welcome from './routes/Welcome.svelte'
@@ -31,7 +31,7 @@
   let notices = $state<string[]>([])
   let helpOpen = $state(false)
   let online = $state(typeof navigator === 'undefined' ? true : navigator.onLine)
-  let themeError = $state<string | null>(null)
+  let tourRequested = $state(false)
 
   const needsProfile = $derived(accounts.loaded && !accounts.loadError && accounts.list.length === 0)
   const showPanorama = $derived(accounts.loaded && !accounts.loadError && (needsProfile || nav.view === 'menu'))
@@ -54,6 +54,9 @@
   }
 
   onMount(() => {
+    let alive = true
+    let cancelWarmup = () => {}
+    const stopPreparation = nav.setPreparation(prepareScreen)
     const goOnline = () => (online = true)
     const goOffline = () => (online = false)
     window.addEventListener('online', goOnline)
@@ -62,10 +65,14 @@
     ;(async () => {
       // Suscripciones y lecturas iniciales a la vez: ninguna depende de otra y el arranque tarda lo de la mas lenta.
       await Promise.all([sessions.init(), accounts.listen(), settings.load(), accounts.load(), instances.load(), accounts.loadMicrosoft()])
+      if (alive) cancelWarmup = warmNavigation()
       notices = await api.startupNotices().catch(() => [])
     })()
 
     return () => {
+      alive = false
+      cancelWarmup()
+      stopPreparation()
       window.removeEventListener('online', goOnline)
       window.removeEventListener('offline', goOffline)
     }
@@ -87,7 +94,7 @@
   {:else if needsProfile}
     <Welcome />
   {:else if nav.view === 'menu'}
-    <MainMenu {online} {themeError} onhelp={() => (helpOpen = true)} />
+    <MainMenu {online} {tourRequested} tourAllowed={!helpOpen && notices.length === 0} ontourend={() => (tourRequested = false)} onhelp={() => (helpOpen = true)} />
   {:else if nav.view === 'home'}
     <Home />
   {:else if nav.view === 'instances'}
@@ -105,7 +112,16 @@
   {:else if nav.view === 'skins'}
     <Skins />
   {:else if nav.view === 'skinEditor'}
-    <SkinEditor />
+    {#await loadSkinEditor()}
+      <McScreen title="Editor de skins"><McLabel center y={110} color="#a0a0a0" text="Cargando editor..." /></McScreen>
+    {:then { default: SkinEditor }}
+      <SkinEditor />
+    {:catch}
+      <McScreen title="Editor de skins">
+        <McText text="No se pudo abrir el editor. Vuelve a intentarlo." x={-150} y={90} w={300} align="center" color="#ff5555" role="alert" />
+        <McButton label="Volver" anchor="bottom" y={-28} onclick={() => nav.go('skins')} />
+      </McScreen>
+    {/await}
   {:else if nav.view === 'settings'}
     <Settings />
   {:else}
@@ -113,7 +129,7 @@
   {/if}
 
   {#if helpOpen}
-    <McDialog title="Ayuda y soporte" message={HELP_TEXT} scroll buttons={[{ label: 'Hecho', onclick: () => (helpOpen = false) }]} onclose={() => (helpOpen = false)} />
+    <McDialog title="Ayuda y soporte" message={HELP_TEXT} scroll buttons={[{ label: 'Ver tutorial', onclick: () => { helpOpen = false; nav.go('menu'); tourRequested = true } }, { label: 'Hecho', onclick: () => (helpOpen = false) }]} onclose={() => (helpOpen = false)} />
   {/if}
   {#if notices.length > 0 && !helpOpen}
     <McDialog title="Aviso" message={notices.join('\n')} scroll buttons={[{ label: 'Entendido', onclick: () => (notices = []) }]} onclose={() => (notices = [])} />

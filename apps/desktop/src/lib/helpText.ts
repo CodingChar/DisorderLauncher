@@ -2,6 +2,6 @@
 export const HELP_TEXT = [
   'Bienvenido a DisorderLauncher.',
   'En Mis instancias creas y configuras tus mundos. Al pulsar Jugar se abre el centro de sesión: ahí ves cómo avanza la preparación y lo que escribe el juego.',
-  'En Perfiles y skins eliges con qué nombre juegas y guardas y editas el aspecto de tu personaje.',
+  'En Perfiles eliges con qué nombre juegas. En el menú, abre Skins debajo de tu personaje para crear, importar y asignar su aspecto.',
   'Puedes jugar sin conexión siempre que la versión ya esté descargada. Si algo falla, usa Reparar en el centro de sesión o en Herramientas.',
 ].join('\n\n')

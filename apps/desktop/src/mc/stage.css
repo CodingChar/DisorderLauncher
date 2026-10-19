@@ -112,6 +112,7 @@ button {
   height: 1026px;
   background-size: 100% 100%;
   background-repeat: no-repeat;
+  backface-visibility: hidden;
 }
 
 .pano-0 { background-image: var(--pano-0); transform: translateZ(-512px); }
@@ -194,7 +195,6 @@ button {
   left: 0;
   top: 0;
   pointer-events: none;
-  will-change: transform;
 }
 
 /* ── Texto bitmap ── */

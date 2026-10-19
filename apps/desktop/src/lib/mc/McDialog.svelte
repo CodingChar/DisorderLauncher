@@ -15,6 +15,8 @@
 
   interface Props {
     title: string
+    topAligned?: boolean
+    highlight?: { x: number; y: number; w: number; h: number }
     message?: string
     buttons: DialogButton[]
     /** Esc (u otra salida sin elegir). */
@@ -25,7 +27,7 @@
     scroll?: boolean
   }
 
-  let { title, message = '', buttons, onclose, cancelIndex = buttons.length - 1, scroll = false }: Props = $props()
+  let { topAligned = false, highlight, title, message = '', buttons, onclose, cancelIndex = buttons.length - 1, scroll = false }: Props = $props()
 
   const gui = useGui()
   const uid = $props.id()
@@ -40,7 +42,7 @@
   const lineCount = $derived(scroll ? 0 : bodyHeight / 10)
   // Bloque centrado: titulo (9) + hueco + cuerpo + hueco + botones (20).
   const total = $derived(9 + 8 + bodyHeight + (bodyHeight ? 14 : 0) + 20)
-  const top = $derived(Math.max(14, (gui.H - total) >> 1))
+  const top = $derived(topAligned ? 16 : Math.max(14, (gui.H - total) >> 1))
   const messageY = $derived(top + 17)
   const buttonsY = $derived(top + 9 + 8 + bodyHeight + (bodyHeight ? 14 : 0))
 
@@ -76,6 +78,12 @@
 
   // Tab circula solo entre los botones del dialogo.
   function trap(event: KeyboardEvent) {
+    if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      onclose()
+      return
+    }
     if (event.key !== 'Tab' || !layer) return
     const list = [...layer.querySelectorAll<HTMLElement>('button:not(:disabled), [role="listbox"]')]
     if (list.length === 0) return
@@ -87,7 +95,10 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div bind:this={layer} class="mc-dialog-layer" role="dialog" aria-modal="true" aria-labelledby="{uid}-title" aria-describedby={message ? `${uid}-msg` : undefined} tabindex="-1" onkeydown={trap}>
+<div bind:this={layer} class="mc-dialog-layer" style:background={highlight ? 'transparent' : undefined} role="dialog" aria-modal="true" aria-labelledby="{uid}-title" aria-describedby={message ? `${uid}-msg` : undefined} tabindex="-1" onkeydown={trap}>
+  {#if highlight}
+    <div aria-hidden="true" style="position:absolute;pointer-events:none;left:calc(var(--cx) * 1px + {highlight.x - 2}px);top:{highlight.y - 2}px;width:{highlight.w + 4}px;height:{highlight.h + 4}px;border:2px solid #ffff55;box-shadow:0 0 0 1000px rgba(0,0,0,.6);box-sizing:border-box"></div>
+  {/if}
   <div class="mc-dialog-panel" aria-hidden="true" style="left:calc(var(--cx) * 1px - 150px);top:{top - 12}px;width:300px;height:{total + 24}px"></div>
   <span id="{uid}-title" class="sr-only">{title}</span>
   {#if message}<span id="{uid}-msg" class="sr-only">{message}</span>{/if}

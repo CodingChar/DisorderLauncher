@@ -67,8 +67,6 @@
   function onFocus() {
     focused = true
     caret = true
-    // El texto se escribe siempre al final, como en los campos de Minecraft.
-    setTimeout(() => input?.setSelectionRange(input.value.length, input.value.length))
   }
 
   const text = $derived(type === 'password' ? '*'.repeat([...value].length) : String(value ?? ''))

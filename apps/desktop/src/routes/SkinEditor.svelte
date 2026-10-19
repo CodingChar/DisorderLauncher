@@ -50,7 +50,8 @@
 
   const gui = useGui()
 
-  let sub = $state<'main' | 'options'>('main')
+  let sub = $state<'main' | 'options' | 'setup'>(skins.editingId ? 'main' : 'setup')
+  let help = $state(false)
 
   // ---- Estado del documento ----------------------------------------------------------------
   let skinId = $state<string | null>(skins.editingId)
@@ -69,8 +70,12 @@
     return history.canRedo
   })
   let version = $state(0) // sube con cada cambio de pixeles para redibujar
-  let dirty = $state(false)
+  let pixelDirty = $state(false)
+  let savedName = $state('Mi skin')
+  let savedModel = $state<SkinModel>('classic')
+  const dirty = $derived(pixelDirty || name !== savedName || model !== savedModel)
   let loading = $state(true)
+  let loadFailed = $state(false)
 
   // ---- Herramientas --------------------------------------------------------------------------
   let tool = $state<Tool>('pencil')
@@ -96,6 +101,7 @@
   let cursorNote = $state('')
   let canvasFocused = $state(false)
   let painting = false
+  let strokeBefore: Pixels | null = null
   let lastPoint: [number, number] | null = null
 
   const baseMask = $derived(layerMask(model, 'base'))
@@ -104,7 +110,7 @@
 
   // El lienzo ocupa `zoom` px de GUI por texel (entero): 2 a 240 de alto, 3 con mas altura.
   const RIGHT_W = 164
-  const zoom = $derived(Math.max(1, Math.min(3, Math.floor((gui.H - 84) / 64), Math.floor((gui.W - 16 - 8 - RIGHT_W) / 64))))
+  const zoom = $derived(Math.max(1, Math.min(3, Math.floor((gui.H - 108) / 64), Math.floor((gui.W - 16 - 8 - RIGHT_W) / 64))))
   const canvasSize = $derived(SIZE * zoom)
   // El buffer interno mide w*s x h*s para dibujar a resolucion nativa; `tz` = px de buffer por texel.
   const bufferSize = $derived(Math.max(SIZE, Math.round(canvasSize * gui.s)))
@@ -125,8 +131,11 @@
       } else {
         img = blankSkin(model)
       }
+      savedName = name
+      savedModel = model
     } catch (e) {
       error = (e as Error).message
+      loadFailed = true
       img = blankSkin(model)
     } finally {
       loading = false
@@ -136,13 +145,17 @@
   })
 
   // Esc y el boton «Volver» comparten el mismo manejo de cambios sin guardar.
-  $effect(() => pushBack(sub === 'options' ? () => (sub = 'main') : back))
+  $effect(() => pushBack(sub === 'setup' ? leave : sub === 'options' ? () => (sub = 'main') : back))
 
   /** Decodifica el PNG de la skin. Las antiguas 64x32 se convierten a 64x64. */
   function loadSkin(url: string): Promise<Pixels> {
     return new Promise((resolve, reject) => {
       const image = new Image()
       image.onload = () => {
+        if (image.width !== SIZE || ![32, SIZE].includes(image.height)) {
+          reject(new Error('La skin debe medir 64×64 o 64×32 píxeles.'))
+          return
+        }
         const c = document.createElement('canvas')
         c.width = image.width
         c.height = image.height
@@ -257,8 +270,7 @@
   /** Al elegir una parte, el cursor del teclado salta a su cara frontal. */
   function focusGroup(next: BodyGroup) {
     group = next
-    if (next === 'all') return
-    const part = boxParts(model).find((p) => p.layer === layer && groupOf(p.name) === next)
+    const part = boxParts(model).find((p) => p.layer === layer && groupOf(p.name) === (next === 'all' ? 'head' : next))
     if (part) {
       const f = faceRects(part).front
       cursor = [f.x + Math.floor(f.w / 2), f.y + Math.floor(f.h / 2)]
@@ -295,6 +307,7 @@
 
   /** Aplica la herramienta activa en un pixel; el trazo de lapiz/borrador queda abierto hasta `endStroke`. */
   function beginAt(p: [number, number]) {
+    if (loading || loadFailed) return
     if (tool === 'picker') {
       const [r, g, b, a] = getPixel(img, p[0], p[1])
       if (a > 0) color = rgbaToHex([r, g, b, a])
@@ -302,8 +315,8 @@
       return
     }
 
-    history.push(img)
-    historyVersion++
+    endStroke()
+    const before = new Uint8ClampedArray(img)
     if (tool === 'fill') {
       const targets: [number, number][] = [p]
       if (mirror) {
@@ -312,15 +325,13 @@
       }
       let changed = 0
       // El relleno se limita a la cara pulsada: es la unidad natural de pintura de una skin.
-      for (const [x, y] of targets) changed += floodFill(img, x, y, hexToRgba(color), faceMaskAt(model, layer, x, y))
-      if (changed === 0) {
-        history.undo(img)
-        historyVersion++
-      } else markChanged()
+      for (const [x, y] of targets) changed += floodFill(img, x, y, hexToRgba(color), faceMaskAt(model, layer, x, y, group))
+      if (changed > 0 && history.record(before, img)) markChanged()
       return
     }
 
     painting = true
+    strokeBefore = before
     lastPoint = null
     stroke(p)
   }
@@ -348,7 +359,6 @@
     for (const [x, y] of points) paint(x, y, rgba)
     lastPoint = p
     version++
-    dirty = true
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -361,17 +371,20 @@
     if (!painting) return
     painting = false
     lastPoint = null
-    refreshPreview()
+    if (strokeBefore && history.record(strokeBefore, img)) markChanged()
+    strokeBefore = null
   }
 
   function markChanged() {
     historyVersion++
     version++
-    dirty = true
+    pixelDirty = true
     refreshPreview()
   }
 
   function undo() {
+    if (loading || loadFailed) return
+    endStroke()
     const previous = history.undo(img)
     if (previous) {
       img = previous
@@ -380,6 +393,8 @@
   }
 
   function redo() {
+    if (loading || loadFailed) return
+    endStroke()
     const next = history.redo(img)
     if (next) {
       img = next
@@ -388,6 +403,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    if (help || confirmLeave || error || notice) return
     const target = e.target as HTMLElement
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
     const mod = e.ctrlKey || e.metaKey
@@ -413,17 +429,24 @@
 
   // ---- Guardar y salir ----------------------------------------------------------------------
   async function save(): Promise<boolean> {
-    if (saving) return false
+    if (saving || loading || loadFailed) return false
+    endStroke()
+    const saveVersion = version
+    const saveName = name
+    const saveModel = model
     saving = true
     error = null
     notice = null
     try {
-      const saved = await api.skinsSave(skinId, name, toPngDataUrl(), model)
+      const saved = await api.skinsSave(skinId, saveName, toPngDataUrl(), saveModel)
       skinId = saved.id
       skins.editingId = saved.id
-      dirty = false
-      await skins.load()
-      notice = 'Skin guardada en tu biblioteca.'
+      if (version === saveVersion) pixelDirty = false
+      savedName = saveName
+      savedModel = saveModel
+      skins.invalidatePreview(saved.id)
+      await skins.load(true)
+      notice = 'Guardada. Vuelve a Skins y pulsa Usar.'
       return true
     } catch (e) {
       error = (e as Error).message
@@ -444,6 +467,7 @@
   }
 
   function back() {
+    endStroke()
     if (dirty) confirmLeave = true
     else leave()
   }
@@ -471,23 +495,36 @@
   const groups = BODY_GROUPS.map((g) => ({ value: g.id, label: g.label }))
 </script>
 
-<svelte:window onkeydown={onKey} onpointerup={endStroke} />
+<svelte:window onkeydown={onKey} onpointerup={endStroke} onpointercancel={endStroke} />
 
-{#if sub === 'options'}
+{#if sub === 'setup'}
+  <McScreen title="Crear skin · 1 de 2">
+    <McLabel x={-150} y={30} text="1. Ponle un nombre" />
+    <McField x={-150} y={44} w={300} maxlength={48} bind:value={name} label="Nombre de la skin" />
+    <McCycle x={-150} y={76} w={300} label="Brazos" options={models} bind:value={model} />
+    <McText x={-150} y={104} w={300} text="Clásico: brazos anchos. Fino: brazos como Alex. Empezarás con una base coloreada lista para pintar." maxLines={3} />
+    <McText x={-150} y={144} w={300} text="2. Elige una parte, un color y pinta. Revisa el resultado en 3D; puedes deshacer cada trazo." maxLines={3} />
+    <McButton x={-150} w={146} anchor="bottom" y={-28} label="Cancelar" onclick={leave} />
+    <McButton x={4} w={146} anchor="bottom" y={-28} label="Empezar a pintar" disabled={loading || !name.trim()} onclick={() => {
+      img = blankSkin(model); savedModel = model; savedName = name; refreshPreview(); version++; sub = 'main'
+    }} />
+  </McScreen>
+{:else if sub === 'options'}
   <McScreen title="Opciones del editor">
-    <McCycle x={-155} y={24} w={150} label="Capa" options={layers} bind:value={layer} />
+    <McCycle x={-155} y={24} w={150} label="Capa" options={layers} value={layer} onchange={(next) => { layer = next; focusGroup(group) }} />
     <McCycle x={5} y={24} w={150} label="Parte" options={groups} value={group} onchange={focusGroup} />
     <McToggle x={-155} y={48} w={150} label="Ver capa base" bind:checked={showBase} />
     <McToggle x={5} y={48} w={150} label="Ver capa exterior" bind:checked={showOverlay} />
     <McToggle x={-155} y={72} w={150} label="Espejo" bind:checked={mirror} />
     <McToggle x={5} y={72} w={150} label="Cuadrícula" bind:checked={grid} />
-    <McCycle x={-155} y={96} w={150} label="Modelo" options={models} bind:value={model} />
+    <McCycle x={-155} y={96} w={150} label="Modelo" options={models} value={model} onchange={(next) => { model = next; focusGroup(group) }} />
     <McLabel x={-155} y={124} color="#a0a0a0" text="Nombre" />
     <McField x={-155} y={134} w={310} maxlength={48} bind:value={name} placeholder="Mi skin" label="Nombre de la skin" />
-    <McButton anchor="bottom" y={-28} label="Hecho" onclick={() => (sub = 'main')} />
+    <McButton x={-150} w={146} anchor="bottom" y={-28} label="Cómo pintar..." onclick={() => { sub = 'main'; help = true }} />
+    <McButton x={4} w={146} anchor="bottom" y={-28} label="Hecho" onclick={() => (sub = 'main')} />
   </McScreen>
 {:else}
-  <McScreen title={`${skinId ? 'Editar skin' : 'Nueva skin'}${dirty ? ' *' : ''}`}>
+  <McScreen title={`${skinId ? 'Editar skin' : 'Crear skin · 2 de 2'}${dirty ? ' *' : ''}`}>
     <form
       class="mc-form"
       onsubmit={(e) => {
@@ -509,6 +546,7 @@
           onblur={() => (canvasFocused = false)}
           onpointerdown={onPointerDown}
           onpointermove={onPointerMove}
+          onlostpointercapture={endStroke}
         ></canvas>
       </McViewport>
       <p class="sr-only" role="status" aria-live="polite">{cursorNote}</p>
@@ -549,23 +587,21 @@
       <McSlider x={rightX + 84} y={144} w={80} value={rgb[1]} min={0} max={255} format={(v) => `G: ${v}`} label="Verde" onchange={(v) => setChannel(1, v)} />
       <McSlider x={rightX + 84} y={164} w={80} value={rgb[2]} min={0} max={255} format={(v) => `B: ${v}`} label="Azul" onchange={(v) => setChannel(2, v)} />
 
+      <McCycle x={left} y={26 + canvasSize} w={canvasSize} label="Parte" options={groups} value={group} onchange={focusGroup} />
       {#if loading}
         <McText text="Cargando..." x={left} y={22 + (canvasSize >> 1) - 5} w={canvasSize} align="center" color="#a0a0a0" />
       {/if}
-      {#if error}
-        <McText text={error} x={left} y={22 + canvasSize + 4} w={canvasSize} color="#ff5555" maxLines={3} role="alert" />
-      {:else if notice}
-        <McText text={notice} x={left} y={22 + canvasSize + 4} w={canvasSize} color="#55ff55" maxLines={3} role="status" />
-      {/if}
-
       <McButton anchor="bottom" x={-155} y={-52} w={100} label="Deshacer" disabled={!canUndo} onclick={undo} />
       <McButton anchor="bottom" x={-50} y={-52} w={100} label="Rehacer" disabled={!canRedo} onclick={redo} />
-      <McButton anchor="bottom" x={55} y={-52} w={100} label="Opciones..." ariaLabel="Opciones del editor" onclick={() => (sub = 'options')} />
-      <McButton anchor="bottom" x={-155} y={-28} w={100} type="submit" label={saving ? 'Guardando…' : 'Guardar'} disabled={saving || loading || name.trim().length === 0} />
-      <McButton anchor="bottom" x={-50} y={-28} w={100} label="Exportar PNG..." ariaLabel="Guardar y exportar PNG" disabled={saving || loading || name.trim().length === 0} onclick={saveAndExport} />
+      <McButton anchor="bottom" x={55} y={-52} w={100} label="Opciones / ayuda" ariaLabel="Opciones del editor" onclick={() => (sub = 'options')} />
+      <McButton anchor="bottom" x={-155} y={-28} w={100} type="submit" label={saving ? 'Guardando…' : 'Guardar'} disabled={saving || loading || loadFailed || name.trim().length === 0} />
+      <McButton anchor="bottom" x={-50} y={-28} w={100} label="Exportar PNG..." ariaLabel="Guardar y exportar PNG" disabled={saving || loading || loadFailed || name.trim().length === 0} onclick={saveAndExport} />
       <McButton anchor="bottom" x={55} y={-28} w={100} label="Volver" onclick={back} />
     </form>
 
+    {#if help}
+      <McDialog title="Pinta tu skin" message="Elige una parte para resaltar su zona en el lienzo. Selecciona un color y usa Lápiz o Relleno. Arrastra el personaje para girarlo. Deshacer recupera el último trazo. En Opciones puedes cambiar la capa, activar espejo y renombrar. Guarda y vuelve a Skins para pulsar Usar en tu perfil." scroll buttons={[{ label: 'Entendido', onclick: () => (help = false) }]} onclose={() => (help = false)} />
+    {/if}
     {#if confirmLeave}
       <McDialog
         title="¿Salir sin guardar?"
@@ -579,6 +615,10 @@
       />
     {/if}
   </McScreen>
+{/if}
+
+{#if error || notice}
+  <McDialog title={error ? 'Error de skin' : 'Skin guardada'} message={error ?? notice ?? ''} buttons={[{ label: 'Hecho', onclick: () => { error = null; notice = null } }]} onclose={() => { error = null; notice = null }} />
 {/if}
 
 <style>

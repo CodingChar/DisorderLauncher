@@ -45,17 +45,29 @@ export const navParent: Record<View, View> = {
 }
 
 class NavStore {
+  private prepareView: ((view: View) => void) | null = null
   view = $state<View>('menu')
   /** Tipo de instancia que `Crear instancia` preselecciona (lo fijan los atajos de Explorar). */
   createLoader = $state<'vanilla' | 'fabric'>('vanilla')
 
   go(view: View) {
+    this.prepare(view)
     this.view = view
+  }
+
+  prepare(view: View) {
+    // Un fallo de precarga nunca debe impedir navegar.
+    try { this.prepareView?.(view) } catch { /* La pantalla maneja sus propios errores. */ }
+  }
+
+  setPreparation(prepare: (view: View) => void): () => void {
+    this.prepareView = prepare
+    return () => { if (this.prepareView === prepare) this.prepareView = null }
   }
 
   create(loader: 'vanilla' | 'fabric' = 'vanilla') {
     this.createLoader = loader
-    this.view = 'create'
+    this.go('create')
   }
 }
 

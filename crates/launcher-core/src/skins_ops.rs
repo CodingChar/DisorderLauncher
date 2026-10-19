@@ -64,11 +64,7 @@ impl Launcher {
     ) -> Result<SkinAsset, LauncherError> {
         match id {
             None => Ok(self.skin_library.import(png, name, Some(model)).await?),
-            Some(id) => {
-                self.skin_library.replace_pixels(id, png).await?;
-                self.skin_library.rename(id, name).await?;
-                Ok(self.skin_library.set_model(id, model).await?)
-            }
+            Some(id) => Ok(self.skin_library.save_edited(id, png, name, model).await?),
         }
     }
 

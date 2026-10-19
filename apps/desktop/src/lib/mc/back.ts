@@ -31,7 +31,7 @@ export const navBack: Record<View, View> = {
   edit: 'instances',
   settings: 'menu',
   mods: 'instances',
-  skins: 'accounts',
+  skins: 'menu',
   skinEditor: 'skins',
 }
 

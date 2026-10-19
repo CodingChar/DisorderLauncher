@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest'
+afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
+it('shows once, remembers both skip and completion across launches', async () => {
+  const data = new Map<string, string>()
+  vi.stubGlobal('localStorage', { getItem: (k: string) => data.get(k), setItem: (k: string, v: string) => data.set(k, v) })
+  let tour = await import('./onboarding')
+  expect(tour.needsTour()).toBe(true)
+  tour.finishTour()
+  expect(tour.needsTour()).toBe(false)
+  vi.resetModules()
+  tour = await import('./onboarding')
+  expect(tour.needsTour()).toBe(false)
+})
+it('survives unavailable storage and dismisses for the session', async () => {
+  vi.stubGlobal('localStorage', { getItem: () => { throw Error('blocked') }, setItem: () => { throw Error('blocked') } })
+  const tour = await import('./onboarding')
+  expect(tour.needsTour()).toBe(true)
+  expect(() => tour.finishTour()).not.toThrow()
+  expect(tour.needsTour()).toBe(false)
+})

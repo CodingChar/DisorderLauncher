@@ -68,8 +68,8 @@
   {/if}
 
   <McButton anchor="bottom" x={-154} y={-52} w={150} label="Jugar seleccionada" disabled={!canPlay} onclick={() => selected && play(selected.id)} />
-  <McButton anchor="bottom" x={4} y={-52} w={150} label="Nueva instancia" onclick={() => nav.create()} />
-  <McButton anchor="bottom" x={-150} y={-28} w={72} label="Editar" disabled={!selected} onclick={() => selected && configure(selected.id)} />
+  <McButton anchor="bottom" x={4} y={-52} w={150} label="Nueva instancia" onintent={() => nav.prepare('create')} onclick={() => nav.create()} />
+  <McButton anchor="bottom" x={-150} y={-28} w={72} label="Editar" disabled={!selected} onintent={() => nav.prepare('edit')} onclick={() => selected && configure(selected.id)} />
   <McButton anchor="bottom" x={-74} y={-28} w={72} label="Mods" disabled={!selected} onclick={() => selected && (instances.select(selected.id), nav.go('mods'))} />
   <McButton anchor="bottom" x={2} y={-28} w={72} label="Explorar" onclick={() => nav.go('explore')} />
   <McButton anchor="bottom" x={78} y={-28} w={72} label="Atrás" onclick={() => nav.go('menu')} />

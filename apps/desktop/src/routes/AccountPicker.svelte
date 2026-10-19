@@ -141,7 +141,6 @@
     <McButton anchor="bottom" x={-155} y={-52} w={100} label="Usar" ariaLabel="Usar este perfil" disabled={!selected || selected.id === accounts.defaultId} onclick={() => selected && use(selected.id)} />
     <McButton anchor="bottom" x={-50} y={-52} w={100} label="Quitar..." ariaLabel="Quitar este perfil" disabled={!selected} onclick={() => (toRemove = selected)} />
     <McButton anchor="bottom" x={55} y={-52} w={100} label="Añadir..." ariaLabel="Añadir perfil sin conexión" onclick={() => (sub = 'new')} />
-    <McButton anchor="bottom" x={-155} y={-28} w={100} label="Skins" onclick={() => nav.go('skins')} />
     {#if showMicrosoft}
       {#if accounts.microsoft.loginInProgress}
         <McButton anchor="bottom" x={-50} y={-28} w={100} label="Cancelar" ariaLabel="Cancelar el inicio de sesión" onclick={() => accounts.cancelLogin()} />

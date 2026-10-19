@@ -29,7 +29,7 @@ export async function seed(extra = 0) {
   for (const [i, name] of names.entries()) await instances.create(name, i === 3 ? '1.21.4-forge-54.0.12' : '1.21.4', i % 2 ? 'fabric' : 'vanilla')
   for (let i = 0; i < extra; i++) await instances.create(`Instancia ${i + 1}`, '1.20.1', 'vanilla')
   for (const name of ['Steve', 'Una skin con un nombre larguísimo de cuarenta y ocho caracteres!!']) await api.skinsSave(null, name, pngDataUrl(), 'classic')
-  await skins.load()
+  await skins.load(true)
 }
 
 export async function runMatrix(options: { seed?: boolean; extra?: number } = {}): Promise<string[]> {

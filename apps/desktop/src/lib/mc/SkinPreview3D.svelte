@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { boxParts, faceRects, type BoxPart, type FaceName } from '../skinEditor'
+  import { boxParts, faceRects, upgradeLegacy, type BoxPart, type FaceName } from '../skinEditor'
   import type { SkinModel } from '../types'
 
   interface Props {
@@ -13,6 +13,28 @@
   }
 
   let { src, model, unit = 3, yaw = $bindable(-28) }: Props = $props()
+  let texture = $state('')
+
+  // La biblioteca tambien admite PNG 64x32: el modelo 3D siempre necesita una textura 64x64.
+  $effect(() => {
+    const source = src
+    texture = source
+    if (!source) return
+    const image = new Image()
+    image.onload = () => {
+      if (image.width !== 64 || image.height !== 32) return
+      const canvas = document.createElement('canvas')
+      canvas.width = 64
+      canvas.height = 64
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(image, 0, 0)
+      const pixels = upgradeLegacy(ctx.getImageData(0, 0, 64, 32).data)
+      ctx.putImageData(new ImageData(pixels, 64, 64), 0, 0)
+      texture = canvas.toDataURL('image/png')
+    }
+    image.src = source
+    return () => { image.onload = null }
+  })
 
   // Centro de cada pieza (en pixeles de skin, y hacia abajo) y escala de la capa exterior.
   const OVERLAY_SCALE = 1.0625
@@ -90,7 +112,7 @@
   onpointerup={() => (dragging = false)}
   onpointercancel={() => (dragging = false)}
   onkeydown={onKey}
-  style:--tex={src ? `url(${src})` : 'none'}
+  style:--tex={texture ? `url(${texture})` : 'none'}
   style:perspective="{unit * 100}px"
 >
   <div class="scene" style:transform="translateY({-16 * unit}px) rotateX({pitch}deg) rotateY({yaw}deg)">

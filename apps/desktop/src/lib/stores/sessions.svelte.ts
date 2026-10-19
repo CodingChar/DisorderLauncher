@@ -72,6 +72,7 @@ class SessionsStore {
         const prev = this.byInstance[e.instanceId]
         switch (e.state) {
           case 'failed':
+            this.stopping.delete(e.instanceId)
             this.set(e.instanceId, { phase: 'failed', message: e.message, kind: e.kind })
             break
           case 'exited': {
@@ -90,6 +91,8 @@ class SessionsStore {
   }
 
   async launch(id: string) {
+    if (this.isBusy(id)) return
+    this.stopping.delete(id)
     this.clearLog(id)
     this.set(id, { phase: 'preparing', startedAt: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) })
     try {
@@ -106,16 +109,20 @@ class SessionsStore {
   }
 
   async stop(id: string) {
+    if (this.get(id)?.phase !== 'running' || this.stopping.has(id)) return
     this.stopping.add(id)
     try {
       await api.instancesStop(id)
     } catch (e) {
       this.stopping.delete(id)
-      this.set(id, { phase: 'failed', message: (e as Error).message, kind: 'other' })
+      // Un fallo al pedir el cierre no significa que el proceso haya terminado.
+      const current = this.get(id)
+      if (current?.phase === 'running') this.set(id, { ...current, message: (e as Error).message })
     }
   }
 
   async repair(id: string) {
+    if (this.isBusy(id)) return
     this.set(id, { phase: 'repairing' })
     try {
       const r = await api.instancesRepair(id)
@@ -135,7 +142,7 @@ class SessionsStore {
 
   private progress(id: string, phase: SessionPhase, e: { phase: InstallPhase; completed: number; total: number }) {
     const prev = this.byInstance[id]
-    if (!prev || prev.phase === 'running') return
+    if (!prev || !BUSY.includes(prev.phase) || prev.phase === 'running') return
     this.set(id, { ...prev, phase, progress: { phase: e.phase, completed: e.completed, total: e.total } })
   }
 
@@ -143,6 +150,9 @@ class SessionsStore {
   private appendLog(id: string, line: Omit<LogLine, 'id'>) {
     const queue = this.pending.get(id) ?? []
     queue.push({ ...line, id: this.nextLineId++ })
+    // requestAnimationFrame se pausa al minimizar: acotar tambien la cola pendiente.
+    // Recortar por tandas evita desplazar el array por cada linea recibida.
+    if (queue.length >= MAX_LOG_LINES * 2) queue.splice(0, MAX_LOG_LINES)
     this.pending.set(id, queue)
     if (this.flushTimer === null) {
       this.flushTimer = (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => this.flushLogs()) : setTimeout(() => this.flushLogs(), 16)) as unknown as number

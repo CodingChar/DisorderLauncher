@@ -60,6 +60,24 @@ export function stringWidth(text: string | null | undefined): number {
 
 const cache = new Map<string, HTMLCanvasElement>()
 const CACHE_LIMIT = 600
+const atlases = new Map<string, HTMLCanvasElement>()
+
+/** Se tine la textura una vez por color, en lugar de crear tres lienzos auxiliares por etiqueta. */
+function atlas(color: string): HTMLCanvasElement {
+  const cached = atlases.get(color)
+  if (cached) return cached
+  const canvas = document.createElement('canvas')
+  canvas.width = image!.naturalWidth
+  canvas.height = image!.naturalHeight
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(image!, 0, 0)
+  ctx.globalCompositeOperation = 'source-in'
+  ctx.fillStyle = color
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  if (atlases.size >= 32) atlases.delete(atlases.keys().next().value!)
+  atlases.set(color, canvas)
+  return canvas
+}
 
 /** Dibuja `text` con sombra (color >> 2). El lienzo devuelto es compartido: no se debe modificar. */
 export function renderText(text: string, color = '#ffffff'): HTMLCanvasElement {
@@ -76,32 +94,17 @@ export function renderText(text: string, color = '#ffffff'): HTMLCanvasElement {
 
   const ctx = canvas.getContext('2d')!
   ctx.imageSmoothingEnabled = false
-  const mask = document.createElement('canvas')
-  mask.width = canvas.width
-  mask.height = 8
-  const m = mask.getContext('2d')!
-  let x = 0
-  for (const ch of text) {
-    const i = glyphIndex(ch)
-    const advance = WIDTHS[i]
-    if (advance > 1) m.drawImage(image, (i % 16) * 8, Math.floor(i / 16) * 8, advance - 1, 8, x, 0, advance - 1, 8)
-    x += advance
-  }
-  const tint = (fill: string) => {
-    const copy = document.createElement('canvas')
-    copy.width = mask.width
-    copy.height = 8
-    const g = copy.getContext('2d')!
-    g.drawImage(mask, 0, 0)
-    g.globalCompositeOperation = 'source-in'
-    g.fillStyle = fill
-    g.fillRect(0, 0, copy.width, 8)
-    return copy
-  }
   const n = parseInt(color.slice(1), 16) || 0
   const shadow = `rgb(${((n >> 16) & 252) >> 2},${((n >> 8) & 252) >> 2},${(n & 252) >> 2})`
-  ctx.drawImage(tint(shadow), 1, 1)
-  ctx.drawImage(tint(color), 0, 0)
+  for (const [texture, offset] of [[atlas(shadow), 1], [atlas(color), 0]] as const) {
+    let x = offset
+    for (const ch of text) {
+      const i = glyphIndex(ch)
+      const advance = WIDTHS[i]
+      if (advance > 1) ctx.drawImage(texture, (i % 16) * 8, Math.floor(i / 16) * 8, advance - 1, 8, x, offset, advance - 1, 8)
+      x += advance
+    }
+  }
 
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!)
   cache.set(key, canvas)

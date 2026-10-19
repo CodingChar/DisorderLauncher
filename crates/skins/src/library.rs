@@ -174,6 +174,16 @@ impl SkinLibrary {
 
     /// Reemplaza los pixeles de una skin existente (editor). Conserva id y nombre.
     pub async fn replace_pixels(&self, id: &str, bytes: &[u8]) -> Result<SkinAsset, SkinError> {
+        self.replace(id, bytes, None).await
+    }
+
+    /// Valida el documento completo antes de escribir y serializa sus pixeles y metadatos juntos.
+    pub async fn save_edited(&self, id: &str, bytes: &[u8], name: &str, model: SkinModel) -> Result<SkinAsset, SkinError> {
+        let name = validate_name(name)?;
+        self.replace(id, bytes, Some((name, model))).await
+    }
+
+    async fn replace(&self, id: &str, bytes: &[u8], metadata: Option<(String, SkinModel)>) -> Result<SkinAsset, SkinError> {
         let checked = check_skin_png(bytes)?;
         let _guard = self.write_lock.lock().await;
         let mut index = self.load().await;
@@ -186,6 +196,10 @@ impl SkinLibrary {
 
         entry.width = checked.width;
         entry.height = checked.height;
+        if let Some((name, model)) = metadata {
+            entry.name = name;
+            entry.model = model;
+        }
         entry.updated_at = Utc::now();
         let updated = entry.clone();
         self.save(index).await?;
@@ -375,6 +389,36 @@ mod tests {
         assert_eq!(edited.name, "Base");
         assert!(lib.replace_pixels(&asset.id, b"nope").await.is_err());
         assert_eq!(lib.replace_pixels("skin_00000000000000000000000000000000", &png(false)).await.unwrap_err(), SkinError::NotFound);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn editor_saves_keep_pixels_and_metadata_from_the_same_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let lib = std::sync::Arc::new(SkinLibrary::new(dir.path()));
+        let asset = lib.import(&png(false), "Original", None).await.unwrap();
+        let mut tasks = Vec::new();
+        for i in 0..16u8 {
+            let lib = lib.clone();
+            let id = asset.id.clone();
+            tasks.push(tokio::spawn(async move {
+                let rgba = vec![i; 64 * 64 * 4];
+                let bytes = encode_rgba(&rgba, 64, 64).unwrap();
+                let model = if i.is_multiple_of(2) { SkinModel::Classic } else { SkinModel::Slim };
+                lib.save_edited(&id, &bytes, &format!("Documento {i}"), model).await.unwrap();
+            }));
+        }
+        for task in tasks { task.await.unwrap(); }
+        let reopened = SkinLibrary::new(dir.path());
+        let saved = reopened.get(&asset.id).await.unwrap();
+        let pixels = check_skin_png(&reopened.read_png(&asset.id).await.unwrap()).unwrap().rgba;
+        let value = pixels[0];
+        assert!(pixels.iter().all(|&p| p == value));
+        assert_eq!(saved.name, format!("Documento {value}"));
+        assert_eq!(saved.model, if value.is_multiple_of(2) { SkinModel::Classic } else { SkinModel::Slim });
+        let before = reopened.read_png(&asset.id).await.unwrap();
+        assert!(reopened.save_edited(&asset.id, b"corrupto", "Nuevo", SkinModel::Classic).await.is_err());
+        assert_eq!(reopened.read_png(&asset.id).await.unwrap(), before);
+        assert_eq!(reopened.get(&asset.id).await.unwrap(), saved);
     }
 
     #[tokio::test]

@@ -48,10 +48,10 @@
 <McScreen title="Versión de Minecraft">
   {#if failed}
     <McText text={versions.error ?? ''} x={-155} y={60} w={310} align="center" color="#ff5555" maxLines={5} role="alert" />
-    <McButton y={120} label="Reintentar" onclick={() => versions.load(loader)} />
+    <McButton y={120} label="Reintentar" onclick={() => versions.load(loader, true)} />
   {:else if none}
     <McText text="No hay versiones disponibles para este tipo de instancia. Conéctate a internet para ver la lista completa." x={-155} y={60} w={310} align="center" color="#a0a0a0" maxLines={4} />
-    <McButton y={120} label="Buscar de nuevo" onclick={() => versions.load(loader)} />
+    <McButton y={120} label="Buscar de nuevo" onclick={() => versions.load(loader, true)} />
   {:else}
     <McCycle label="Mostrar" options={SHOW_LEVELS} value={level} onchange={onlevel} y={22} {disabled} />
     <McList
