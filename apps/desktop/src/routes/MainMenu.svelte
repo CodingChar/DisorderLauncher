@@ -163,7 +163,7 @@
 
   <McLabel center x={skinX + skinW / 2} y={k} max={skinW} text={account?.label ?? 'Jugador'} />
   <McViewport x={skinX} y={k + 10} w={skinW} h={72} frame={false}>
-    <SkinPreview3D src={skinSrc} model={asset?.model ?? 'classic'} unit={2} />
+    <SkinPreview3D src={skinSrc} model={asset?.model ?? 'classic'} height={asset?.height ?? 64} unit={2} />
   </McViewport>
   {#if !skinId}<McLabel center x={skinX + skinW / 2} y={k + 84} max={skinW} color="#a0a0a0" text="Sin skin local" />{/if}
   <McButton x={skinX} y={k + 96} w={skinW} label="Skins" onclick={() => nav.go('skins')} />

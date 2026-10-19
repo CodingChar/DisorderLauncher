@@ -48,3 +48,10 @@ El resaltado continúa siendo CSS estático. No se añadieron sondeos ni ciclos 
 Validación final del frontend: `npm run check` sin errores ni advertencias, 107 pruebas correctas en 18 archivos y compilación Vite correcta. Paquete principal: 209,04 kB (73,39 kB gzip); editor separado: 15,18 kB (6,24 kB gzip). Estos tamaños no constituyen una medición de FPS o memoria.
 
 Validación nativa: `cargo test --workspace` completado correctamente en Windows, incluyendo la compilación de Tauri y las pruebas del backend de skins. Se respetaron las pruebas marcadas `ignored` (integraciones con internet/Minecraft y mediciones de rendimiento). Compilar y ejecutar pruebas no equivale a probar visualmente la ventana Tauri.
+
+## Optimización adicional de texturas
+- Las vistas proporcionan el alto validado del PNG a la vista 3D. Para 64 × 64 se usa directamente la textura y se evita crear/decodificar un `Image` adicional en cada actualización del editor. Para 64 × 32 y dimensiones desconocidas permanece la conversión existente; las pruebas de conversión de skins siguen pasando.
+- Guardar reutiliza el PNG de la vista previa. Antes de capturarlo se termina el trazo pendiente, que actualiza esa vista; se evita una segunda codificación idéntica.
+- Una lectura de miniatura invalidada mientras espera turno se descarta antes de llamar al backend, incluso cuando la versión de sus metadatos no cambió. Una prueba de regresión cubre la cola saturada y su reemplazo.
+- La captura del giro 3D admite solamente el puntero primario con botón izquierdo y se limpia al perder la captura.
+- Validación: 108 pruebas frontend correctas, comprobación Svelte/TypeScript sin errores ni advertencias, build correcto y revisión visual de rellenar la cara, guardar, reabrir y girar el personaje con el ratón. Evidencia: `review-assets/skin-optimized-2026-10-19.png`. No se repitió Rust porque estos cambios afectan exclusivamente al frontend. No se midieron FPS.

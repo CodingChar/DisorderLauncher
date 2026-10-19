@@ -72,7 +72,7 @@ export class SkinsStore {
     const version = asset.updatedAt
     const request = this.acquire().then(async () => {
       try {
-        if (this.list.find((item) => item.id === id)?.updatedAt !== version) return ''
+        if (this.reads.get(id) !== request || this.list.find((item) => item.id === id)?.updatedAt !== version) return ''
         const png = await api.skinsRead(id)
         if (this.reads.get(id) !== request || this.list.find((item) => item.id === id)?.updatedAt !== version) return ''
         this.previews[id] = png

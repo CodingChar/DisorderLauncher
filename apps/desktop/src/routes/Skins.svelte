@@ -230,7 +230,7 @@
 
     <McViewport x={41} y={44} w={114} h={previewH}>
       {#if selected && selectedSrc}
-        <SkinPreview3D src={selectedSrc} model={selected.model} {unit} bind:yaw />
+        <SkinPreview3D src={selectedSrc} model={selected.model} height={selected.height} {unit} bind:yaw />
       {/if}
     </McViewport>
     <McButton x={76} y={44 + previewH + 3} w={20} label="<" ariaLabel="Girar a la izquierda" disabled={!selectedSrc} onclick={() => (yaw -= 45)} />

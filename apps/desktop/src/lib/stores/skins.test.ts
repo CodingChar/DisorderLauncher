@@ -76,6 +76,28 @@ it('una skin eliminada no reaparece cuando llega un PNG pendiente', async () => 
   expect(store.previews.a).toBeUndefined()
 })
 
+it('una miniatura invalidada en la cola no llega a leer un PNG obsoleto', async () => {
+  const store = new SkinsStore()
+  store.list = Array.from({ length: 5 }, (_, i) => asset(String(i)))
+  const gates: (() => void)[] = []
+  const read = vi.spyOn(api, 'skinsRead').mockImplementation((id) => new Promise((resolve) => {
+    gates.push(() => resolve(`png:${id}`))
+  }))
+  const active = [0, 1, 2, 3].map((id) => store.ensurePreview(String(id)))
+  const obsolete = store.ensurePreview('4')
+  await flush()
+  expect(read).toHaveBeenCalledTimes(4)
+  store.invalidatePreview('4')
+  const fresh = store.ensurePreview('4')
+  gates.splice(0).forEach((done) => done())
+  await flush()
+  expect(await obsolete).toBe('')
+  expect(read.mock.calls.filter(([id]) => id === '4')).toHaveLength(1)
+  gates.splice(0).forEach((done) => done())
+  await Promise.all([...active, fresh])
+  expect(store.previews['4']).toBe('png:4')
+})
+
 it('entradas simultaneas comparten metadatos; las mutaciones fuerzan su renovacion', async () => {
   const store = new SkinsStore()
   const list = vi.spyOn(api, 'skinsList').mockResolvedValue([asset('a')])

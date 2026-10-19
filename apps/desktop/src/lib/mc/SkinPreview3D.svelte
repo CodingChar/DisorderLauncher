@@ -6,20 +6,22 @@
     /** Data URL del PNG 64x64. */
     src: string
     model: SkinModel
+    /** Alto validado del PNG; evita decodificar de nuevo las texturas modernas. */
+    height?: number
     /** Px de GUI por pixel de skin. */
     unit?: number
     /** Giro horizontal en grados (se puede enlazar a botones externos). */
     yaw?: number
   }
 
-  let { src, model, unit = 3, yaw = $bindable(-28) }: Props = $props()
+  let { src, model, height, unit = 3, yaw = $bindable(-28) }: Props = $props()
   let texture = $state('')
 
   // La biblioteca tambien admite PNG 64x32: el modelo 3D siempre necesita una textura 64x64.
   $effect(() => {
     const source = src
     texture = source
-    if (!source) return
+    if (!source || height === 64) return
     const image = new Image()
     image.onload = () => {
       if (image.width !== 64 || image.height !== 32) return
@@ -81,6 +83,7 @@
   }
 
   function onDown(e: PointerEvent) {
+    if (e.button !== 0 || !e.isPrimary) return
     dragging = true
     last = { x: e.clientX, y: e.clientY }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -111,6 +114,7 @@
   onpointermove={onMove}
   onpointerup={() => (dragging = false)}
   onpointercancel={() => (dragging = false)}
+  onlostpointercapture={() => (dragging = false)}
   onkeydown={onKey}
   style:--tex={texture ? `url(${texture})` : 'none'}
   style:perspective="{unit * 100}px"

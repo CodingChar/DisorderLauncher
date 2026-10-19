@@ -438,7 +438,7 @@
     error = null
     notice = null
     try {
-      const saved = await api.skinsSave(skinId, saveName, toPngDataUrl(), saveModel)
+      const saved = await api.skinsSave(skinId, saveName, previewSrc, saveModel)
       skinId = saved.id
       skins.editingId = saved.id
       if (version === saveVersion) pixelDirty = false
@@ -552,7 +552,7 @@
       <p class="sr-only" role="status" aria-live="polite">{cursorNote}</p>
 
       <McViewport x={rightX} y={22} w={80} h={100}>
-        <SkinPreview3D src={previewSrc} {model} unit={2} bind:yaw />
+        <SkinPreview3D src={previewSrc} {model} height={64} unit={2} bind:yaw />
       </McViewport>
       {#each tools as t, i (t.id)}
         <McButton
