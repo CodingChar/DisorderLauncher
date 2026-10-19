@@ -932,3 +932,54 @@ async fn simultaneous_mod_changes_on_one_instance_are_all_kept() {
     }
     assert_eq!(launcher.mods_list(&instance.id).await.unwrap().mods.len(), 10);
 }
+
+/// Importa un `.mrpack` real (ruta en `DISORDER_E2E_MRPACK`), lo lanza y comprueba que el juego arranca con sus mods.
+/// `DISORDER_E2E_DIR=target/e2e-data DISORDER_E2E_MRPACK=ruta.mrpack cargo test -p launcher-core --test launcher -- --ignored --nocapture real_modpack_import_and_launch`
+#[tokio::test]
+#[ignore = "requiere internet, un .mrpack en DISORDER_E2E_MRPACK y abre Minecraft unos segundos"]
+async fn real_modpack_import_and_launch() {
+    let pack = std::path::PathBuf::from(std::env::var("DISORDER_E2E_MRPACK").expect("DISORDER_E2E_MRPACK"));
+    let temp;
+    let root = match std::env::var("DISORDER_E2E_DIR") {
+        Ok(dir) => {
+            // El juego corre desde su carpeta: la raiz debe ser absoluta o el classpath no se resuelve.
+            std::fs::create_dir_all(&dir).unwrap();
+            std::path::absolute(dir).unwrap()
+        }
+        Err(_) => {
+            temp = tempfile::tempdir().unwrap();
+            temp.path().to_path_buf()
+        }
+    };
+    let events = Arc::new(Collector::default());
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(&root), events.clone()));
+    if launcher.accounts_list().await.unwrap().is_empty() {
+        launcher.accounts_create_local("Steve").await.unwrap();
+    }
+
+    let instance = launcher.modpack_import(&pack).await.unwrap();
+    let mods = launcher.mods_list(&instance.id).await.unwrap();
+    println!("instancia {:?} ({} {:?}) con {} mods", instance.name, instance.minecraft_version, instance.loader, mods.mods.len());
+
+    launcher.launch(&instance.id).await.unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(2400);
+    let first = loop {
+        {
+            let states = events.states.lock().unwrap();
+            if let Some(e) = states.iter().find(|e| matches!(e.state, LaunchState::Running { .. } | LaunchState::Failed { .. } | LaunchState::Exited { .. })) {
+                break e.state.clone();
+            }
+        }
+        assert!(std::time::Instant::now() < deadline, "timeout");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    assert!(matches!(first, LaunchState::Running { .. }), "{first:?}");
+
+    tokio::time::sleep(Duration::from_secs(45)).await;
+    let output = events.output.lock().unwrap().join("\n");
+    println!("salida del juego:\n{}", output.lines().take(80).collect::<Vec<_>>().join("\n"));
+    let alive = events.states.lock().unwrap().iter().all(|e| !matches!(e.state, LaunchState::Exited { .. }));
+    let _ = launcher.stop(&instance.id);
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+    assert!(alive, "el juego se cerro solo antes de tiempo");
+}
