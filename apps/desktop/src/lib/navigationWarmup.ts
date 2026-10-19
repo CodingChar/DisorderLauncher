@@ -19,22 +19,14 @@ export function prepareScreen(view: View) {
   if (view === 'skins' || view === 'skinEditor') void loadSkinEditor().catch(() => {})
 }
 
-const decodedImages = new Map<string, HTMLImageElement>()
-
 /** Trabajo de baja prioridad despues de mostrar el menu, no en el clic. */
 export function warmNavigation(): () => void {
   let cancelled = false
   const run = () => {
     if (cancelled) return
-    for (const file of ['options_background.png', 'widgets.png', 'button.png', 'button-hover.png']) {
-      if (decodedImages.has(file)) continue
-      const image = new Image()
-      image.src = `/assets/${file}`
-      decodedImages.set(file, image)
-      void image.decode().catch(() => decodedImages.delete(file))
-    }
     prepareScreen('accounts')
     prepareScreen('create')
+    void versions.prefetch('fabric')
     void loadSkinEditor().catch(() => {})
   }
   if (typeof requestIdleCallback === 'function') {

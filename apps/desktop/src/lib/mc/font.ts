@@ -59,7 +59,7 @@ export function stringWidth(text: string | null | undefined): number {
 }
 
 const cache = new Map<string, HTMLCanvasElement>()
-const CACHE_LIMIT = 600
+const CACHE_LIMIT = 2000 // lienzos de ~4 KB: unos 8 MB como maximo
 const atlases = new Map<string, HTMLCanvasElement>()
 
 /** Se tine la textura una vez por color, en lugar de crear tres lienzos auxiliares por etiqueta. */
@@ -77,6 +77,16 @@ function atlas(color: string): HTMLCanvasElement {
   if (atlases.size >= 32) atlases.delete(atlases.keys().next().value!)
   atlases.set(color, canvas)
   return canvas
+}
+
+/** Tine por adelantado la textura (y su sombra) de los colores habituales: la primera etiqueta de cada color ya no paga ese coste. */
+export function warmAtlases(colors: readonly string[]) {
+  if (!image || !image.complete || !image.naturalWidth) return
+  for (const color of colors) {
+    const n = parseInt(color.slice(1), 16) || 0
+    atlas(`rgb(${((n >> 16) & 252) >> 2},${((n >> 8) & 252) >> 2},${(n & 252) >> 2})`)
+    atlas(color)
+  }
 }
 
 /** Dibuja `text` con sombra (color >> 2). El lienzo devuelto es compartido: no se debe modificar. */
