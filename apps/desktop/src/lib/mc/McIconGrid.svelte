@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { playSfx } from '../audio/sfx'
   import type { GridIcon } from './listTypes'
 
   interface Props {
@@ -50,7 +51,10 @@
       tabindex={i === selectedIndex ? 0 : -1}
       {disabled}
       style="left:{(i % cols) * STRIDE}px;top:{Math.floor(i / cols) * STRIDE}px"
-      onclick={() => pick(i)}
+      onclick={() => {
+        playSfx('click')
+        pick(i)
+      }}
       onkeydown={key}
     >
       <img src={icon.src} alt="" draggable="false" />

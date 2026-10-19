@@ -3,6 +3,7 @@
   import { fitText, stringWidth } from './font'
   import { palette } from './palette.svelte'
   import { posStyle, type Anchor } from './pos'
+  import { playSfx, resolveSound, type SoundChoice } from '../audio/sfx'
 
   interface Props {
     label: string
@@ -17,13 +18,15 @@
     active?: boolean
     type?: 'button' | 'submit'
     onclick?: (event: MouseEvent) => void
+    /** Sonido al pulsar: `auto` lo deduce de la etiqueta («Atras», «Volver»... suenan a volver). */
+    sound?: SoundChoice
     /** Prepara los datos al acercar el puntero o enfocar, sin retrasar el clic. */
     onintent?: () => void
     /** Atributos extra (role, aria-*, eventos de teclado...). */
     extra?: Record<string, unknown>
   }
 
-  let { label, ariaLabel, x = -100, y = 0, w = 200, anchor = 'top', disabled = false, active = false, type = 'button', onclick, onintent, extra = {} }: Props = $props()
+  let { label, ariaLabel, x = -100, y = 0, w = 200, anchor = 'top', disabled = false, active = false, type = 'button', sound = 'auto', onclick, onintent, extra = {} }: Props = $props()
   let hovered = $state(false)
   let keyboardFocus = $state(false)
   const color = $derived(disabled ? '#a0a0a0' : active ? '#ffffff' : hovered || keyboardFocus ? palette.hover : '#ffffff')
@@ -39,7 +42,10 @@
   class:is-active={active}
   style="{posStyle(x, y, anchor)};width:{w}px;--w:{w}"
   {disabled}
-  {onclick}
+  onclick={(event) => {
+    playSfx(resolveSound(sound, label))
+    onclick?.(event)
+  }}
   aria-label={ariaLabel ?? label}
   {...extra}
   onpointerenter={(event) => { hovered = true; if (!disabled) onintent?.(); if (typeof extra.onpointerenter === 'function') extra.onpointerenter(event) }}

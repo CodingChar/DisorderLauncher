@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { api } from './lib/api'
+  import { playSfx } from './lib/audio/sfx'
   import { goBack, runBack, trackView } from './lib/mc/back'
   import McButton from './lib/mc/McButton.svelte'
   import McDialog from './lib/mc/McDialog.svelte'
@@ -50,7 +51,11 @@
       event.target.blur()
       return
     }
-    if (!runBack() && nav.view !== 'menu') goBack()
+    if (runBack()) playSfx('back')
+    else if (nav.view !== 'menu') {
+      playSfx('back')
+      goBack()
+    }
   }
 
   onMount(() => {

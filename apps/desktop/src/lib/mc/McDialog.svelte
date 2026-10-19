@@ -5,6 +5,7 @@
   import McText from './McText.svelte'
   import BitmapText from './BitmapText.svelte'
   import { wrap } from './font'
+  import { playSfx } from '../audio/sfx'
   import { pushBack } from './back'
   import { useGui } from './gui'
 
@@ -81,6 +82,7 @@
     if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault()
       event.stopPropagation()
+      playSfx('back')
       onclose()
       return
     }

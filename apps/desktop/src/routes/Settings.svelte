@@ -4,9 +4,11 @@
   import McCycle from '../lib/mc/McCycle.svelte'
   import McField from '../lib/mc/McField.svelte'
   import McLabel from '../lib/mc/McLabel.svelte'
+  import McSlider from '../lib/mc/McSlider.svelte'
   import McScreen from '../lib/mc/McScreen.svelte'
   import McText from '../lib/mc/McText.svelte'
   import { useGui } from '../lib/mc/gui'
+  import { setSfxVolume, sfxVolume } from '../lib/audio/sfx'
   import { FEATURES } from '../lib/features'
   import { nav } from '../lib/stores/nav.svelte'
   import { settings } from '../lib/stores/settings.svelte'
@@ -24,6 +26,7 @@
   let speed = $state<DownloadProfile>(settings.value.downloadProfile)
   let javaPath = $state(settings.value.javaPath ?? '')
   let msClientId = $state(settings.value.microsoftClientId ?? '')
+  let volume = $state(Math.round(sfxVolume() * 100))
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
   let saving = $state(false)
@@ -75,6 +78,7 @@
       }}
     >
       <McLabel center y={30} text="Apariencia clásica de Minecraft" />
+      <McSlider y={44} bind:value={volume} min={0} max={100} step={5} format={(v) => `Volumen de sonidos: ${v}%`} label="Volumen de sonidos" onchange={(v) => setSfxVolume(v / 100)} />
       <McCycle y={70} label="Descargas" options={speeds} bind:value={speed} />
       <McText text={speedHint} x={-155} y={94} w={310} align="center" color="#808080" maxLines={1} />
 

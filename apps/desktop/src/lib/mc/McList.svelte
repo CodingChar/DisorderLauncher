@@ -1,5 +1,6 @@
 <script lang="ts" generics="T">
   import { untrack } from 'svelte'
+  import { playSfx } from '../audio/sfx'
   import BitmapText from './BitmapText.svelte'
   import McText from './McText.svelte'
   import type { RowIconLayer, RowSpec } from './listTypes'
@@ -208,7 +209,11 @@
         class:selected={selectable && selectedIndex === index}
         class:disabled={spec.disabled}
         style="top:{LIST_PAD + index * rowHeight}px;width:{rowWidth}px;height:{rowHeight}px"
-        onclick={() => selectable && choose(index)}
+        onclick={() => {
+          if (!selectable) return
+          if (!spec.disabled) playSfx('click')
+          choose(index)
+        }}
         ondblclick={() => selectable && !spec.disabled && onactivate?.(item)}
       >
         {#if icon.length}
