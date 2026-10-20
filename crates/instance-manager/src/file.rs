@@ -21,6 +21,10 @@ pub struct InstanceFile {
     pub icon: Option<String>,
     #[serde(default)]
     pub optimization: crate::Optimization,
+    #[serde(default)]
+    pub jvm_tweaks: Vec<String>,
+    #[serde(default)]
+    pub jvm_args: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -48,6 +52,8 @@ impl InstanceFile {
             memory: instance.memory.clone(),
             icon: instance.icon.clone(),
             optimization: instance.optimization,
+            jvm_tweaks: instance.jvm_tweaks.clone(),
+            jvm_args: instance.jvm_args.clone(),
             created_at: instance.created_at,
             updated_at: instance.updated_at,
         }
@@ -68,6 +74,8 @@ impl InstanceFile {
             memory: self.memory,
             icon: self.icon,
             optimization: self.optimization,
+            jvm_tweaks: self.jvm_tweaks,
+            jvm_args: self.jvm_args,
             game_dir,
             created_at: self.created_at,
             updated_at: self.updated_at,

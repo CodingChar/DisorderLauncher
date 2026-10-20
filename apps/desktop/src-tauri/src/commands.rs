@@ -195,6 +195,18 @@ pub async fn instances_optimize_mods(
   state.launcher.optimization_install_mods(&id).await.map_err(user_message)
 }
 
+/// Comprueba (sin guardar) el nivel, los ajustes y los argumentos de Java de una instancia contra su Java.
+#[tauri::command]
+pub async fn instances_jvm_check(
+  state: State<'_, AppState>,
+  id: String,
+  optimization: instance_manager::Optimization,
+  tweaks: Vec<String>,
+  args: String,
+) -> Result<launcher_core::JvmCheck, String> {
+  state.launcher.jvm_options_check(&id, optimization, tweaks, args).await.map_err(user_message)
+}
+
 #[tauri::command]
 pub async fn settings_get(state: State<'_, AppState>) -> Result<launcher_core::SettingsSnapshot, String> {
   Ok(state.launcher.settings_snapshot())

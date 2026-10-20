@@ -50,7 +50,7 @@ pub struct Launcher {
     ms_endpoints: Option<MicrosoftEndpoints>,
     pub(crate) login: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     loader_providers: HashMap<LoaderKind, Arc<dyn LoaderProvider>>,
-    java: JavaManager,
+    pub(crate) java: JavaManager,
     pub(crate) events: Arc<dyn LauncherEvents>,
     manifest_url: String,
     /// Ultimo manifiesto descargado: cambiar de tipo de instancia no vuelve a pedirlo durante un minuto.
@@ -658,7 +658,7 @@ impl Launcher {
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
 
         let mut ctx = LaunchContext::new(&data_dir, &instance.game_dir);
-        ctx.extra_jvm_args = self.apply_optimization(instance).await;
+        ctx.extra_jvm_args = self.apply_optimization(instance, &java).await;
         ctx.game_assets_dir = game_assets_dir;
         ctx.overlay = overlay;
         ctx.memory = match &instance.memory {
@@ -811,12 +811,13 @@ impl Launcher {
         descriptor: &VersionDescriptor,
     ) -> Result<JavaInstallation, LauncherError> {
         match &instance.java {
-            JavaSelection::Path { path } => Ok(JavaInstallation {
+            // Se detecta la version real para decidir las banderas de rendimiento; si no se puede, se juega igual.
+            JavaSelection::Path { path } => Ok(java_runtime::detect_java_at(path).await.unwrap_or(JavaInstallation {
                 path: path.clone(),
                 version: "personalizado".into(),
                 major: 0,
                 managed: false,
-            }),
+            })),
             JavaSelection::Auto => {
                 let major = descriptor
                     .java_version

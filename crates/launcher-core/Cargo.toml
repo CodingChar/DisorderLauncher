@@ -15,6 +15,7 @@ minecraft-launch = { path = "../minecraft-launch" }
 java-runtime = { path = "../java-runtime" }
 download-manager = { path = "../download-manager" }
 instance-manager = { path = "../instance-manager" }
+jvm-tuning = { path = "../jvm-tuning" }
 loaders = { path = "../loaders" }
 mods = { path = "../mods" }
 modpacks = { path = "../modpacks" }

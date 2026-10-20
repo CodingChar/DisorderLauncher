@@ -6,7 +6,7 @@ import { instances } from './instances.svelte'
 const make = (id: string, name = id): Instance => ({
   id, name, minecraftVersion: '1.21', loader: 'vanilla', loaderVersion: null,
   profileId: 'acc_local_test', java: { mode: 'auto' }, memory: { mode: 'auto' },
-  icon: null, optimization: 'off',
+  icon: null, optimization: 'off', jvmTweaks: [], jvmArgs: '',
   createdAt: '2026-10-18T00:00:00Z', updatedAt: '2026-10-18T00:00:00Z',
 })
 beforeEach(() => {

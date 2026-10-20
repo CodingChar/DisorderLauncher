@@ -5,6 +5,7 @@ import type { Instance, JavaSelection, LoaderKind, MemoryPolicy, Optimization } 
 export const PERFORMANCE_LEVELS: { value: Optimization; label: string; hint: string }[] = [
   { value: 'off', label: 'Normal', hint: 'Sin cambios. Para equipos con buen rendimiento.' },
   { value: 'balanced', label: 'Equilibrado', hint: 'Menos tirones: distancia de visión moderada y menos partículas.' },
+  { value: 'performance', label: 'Alto rendimiento', hint: 'Equipo potente (6 GB de RAM o más): mejor gestión de memoria para modpacks grandes.' },
   { value: 'lowEnd', label: 'Modesto', hint: 'Equipo modesto: lo mínimo en gráficos y menos carga para el procesador y la memoria.' },
 ]
 

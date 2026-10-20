@@ -219,7 +219,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         java: { mode: 'auto' },
         memory: { mode: 'auto' },
         icon: null,
-        optimization: 'off',
+        optimization: 'off', jvmTweaks: [], jvmArgs: '',
         createdAt: now,
         updatedAt: now,
       }
@@ -341,7 +341,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         await sleep(80)
       }
       const now = new Date().toISOString()
-      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, optimization: 'off', createdAt: now, updatedAt: now }
+      const inst: Instance = { id, name: 'Pack importado', minecraftVersion: '1.20.1', loader: 'fabric', loaderVersion: '0.15.0', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, optimization: 'off', jvmTweaks: [], jvmArgs: '', createdAt: now, updatedAt: now }
       instances = [...instances, inst]
       return inst
     }
@@ -423,6 +423,26 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       if (!inst || inst.loader === 'vanilla') throw 'Esta instancia no admite mods. Crea una con Fabric, Quilt, Forge o NeoForge para añadir mods de rendimiento.'
       return { installed: ['Sodium (grafico)', 'Lithium (logica del juego)', 'FerriteCore (memoria)'], skipped: [{ name: 'ImmediatelyFast', reason: 'No hay una version compatible con esta version de Minecraft.' }] }
     }
+    case 'instances_jvm_check': {
+      const bad = String(args.args ?? '').split(/\s+/).find((a: string) => a && !/^-(XX:|X|D)/.test(a))
+      if (bad || /javaagent|OnError/i.test(String(args.args))) throw `Argumento de Java «${bad ?? args.args}»: no se permite.`
+      const tweak = (id: string, label: string, hint: string, risk: string, unavailable: string | null = null) => ({
+        id, label, hint, risk, source: 'https://docs.papermc.io/paper/aikars-flags',
+        selected: (args.tweaks as string[]).includes(id), fromLevel: args.optimization === 'balanced' && id === 'g1', unavailable,
+      })
+      return {
+        javaMajor: 21,
+        verified: true,
+        tweaks: [
+          tweak('g1', 'Recolector G1', 'Recolector de basura con pausas cortas.', 'safe'),
+          tweak('no-explicit-gc', 'Ignorar limpiezas forzadas', 'Evita que un mod fuerce una limpieza completa de memoria.', 'safe'),
+          tweak('string-dedup', 'Textos sin duplicar (G1)', 'Comparte textos repetidos en memoria.', 'tradeoff'),
+          tweak('zgc', 'ZGC generacional', 'Pausas casi nulas a cambio de algo mas de memoria.', 'experimental', 'necesita un equipo con 8 GB de RAM o mas'),
+        ],
+        flags: ['-XX:+UseG1GC', ...(args.tweaks as string[]).map((t) => `-XX:+${t}`), ...String(args.args ?? '').split(/\s+/).filter(Boolean)],
+        skipped: [],
+      }
+    }
     case 'external_versions_scan':
       return mockExternal
     case 'external_versions_pick_dir':
@@ -440,7 +460,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         java: { mode: 'auto' },
         memory: { mode: 'auto' },
         icon: null,
-        optimization: 'off',
+        optimization: 'off', jvmTweaks: [], jvmArgs: '',
         createdAt: now,
         updatedAt: now,
       }

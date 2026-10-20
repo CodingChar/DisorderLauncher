@@ -64,6 +64,7 @@ pub fn run() {
       commands::external_versions_pick_dir,
       commands::instances_create_custom,
       commands::instances_optimize_mods,
+      commands::instances_jvm_check,
       commands::modpacks_import,
       commands::modpacks_export,
       commands::mods_list,

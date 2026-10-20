@@ -1,5 +1,5 @@
 use crate::file::InstanceFile;
-use crate::model::{validate_icon, validate_memory, validate_name, validate_required, validate_version};
+use crate::model::{validate_icon, validate_jvm_args, validate_jvm_tweaks, validate_memory, validate_name, validate_required, validate_version};
 use crate::{
     Instance, InstanceError, InstanceUpdate, JavaSelection, MemoryPolicy, NewInstance, Optimization,
 };
@@ -146,6 +146,8 @@ impl InstanceRepository for FileInstanceRepository {
             memory: MemoryPolicy::Auto,
             icon: None,
             optimization: Optimization::default(),
+            jvm_tweaks: Vec::new(),
+            jvm_args: String::new(),
             game_dir,
             created_at: now,
             updated_at: now,
@@ -180,6 +182,12 @@ impl InstanceRepository for FileInstanceRepository {
         }
         if let Some(optimization) = changes.optimization {
             instance.optimization = optimization;
+        }
+        if let Some(tweaks) = changes.jvm_tweaks {
+            instance.jvm_tweaks = validate_jvm_tweaks(&tweaks)?;
+        }
+        if let Some(args) = changes.jvm_args {
+            instance.jvm_args = validate_jvm_args(&args)?;
         }
         if let Some(icon) = changes.icon {
             instance.icon = validate_icon(&icon)?;
@@ -283,6 +291,50 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let repo = FileInstanceRepository::new(dir.path().join("instances"));
         (dir, repo)
+    }
+
+    #[tokio::test]
+    async fn jvm_options_are_validated_normalized_and_persisted() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("A")).await.unwrap();
+        assert!(inst.jvm_tweaks.is_empty() && inst.jvm_args.is_empty());
+
+        let updated = repo
+            .update(
+                &inst.id,
+                InstanceUpdate {
+                    jvm_tweaks: Some(vec!["g1".into(), "no-explicit-gc".into(), "g1".into()]),
+                    jvm_args: Some("  -XX:MaxGCPauseMillis=100    -Dfoo=bar ".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.jvm_tweaks, ["g1", "no-explicit-gc"]);
+        assert_eq!(updated.jvm_args, "-XX:MaxGCPauseMillis=100 -Dfoo=bar");
+        assert_eq!(repo.get(&inst.id).await.unwrap().unwrap().jvm_args, updated.jvm_args);
+
+        for bad in ["-javaagent:x.jar", "-XX:OnError=calc", "-Xmx9G", "sin-guion"] {
+            let err = repo.update(&inst.id, InstanceUpdate { jvm_args: Some(bad.into()), ..Default::default() }).await;
+            assert!(matches!(err, Err(InstanceError::Invalid(_))), "debia rechazar {bad}");
+        }
+        let err = repo.update(&inst.id, InstanceUpdate { jvm_tweaks: Some(vec!["inventado".into()]), ..Default::default() }).await;
+        assert!(matches!(err, Err(InstanceError::Invalid(_))));
+        // Un rechazo no pisa lo guardado.
+        assert_eq!(repo.get(&inst.id).await.unwrap().unwrap().jvm_args, updated.jvm_args);
+    }
+
+    #[tokio::test]
+    async fn old_instance_files_without_jvm_options_still_load() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("Vieja")).await.unwrap();
+        let path = repo.instance_dir(&inst.id).unwrap().join("instance.json");
+        let mut json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        json.as_object_mut().unwrap().remove("jvmTweaks");
+        json.as_object_mut().unwrap().remove("jvmArgs");
+        std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+        let loaded = repo.get(&inst.id).await.unwrap().unwrap();
+        assert!(loaded.jvm_tweaks.is_empty() && loaded.jvm_args.is_empty());
     }
 
     #[tokio::test]

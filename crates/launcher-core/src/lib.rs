@@ -23,7 +23,7 @@ pub use memory::*;
 pub use modpack_ops::*;
 pub use microsoft_ops::*;
 pub use mods_ops::*;
-pub use optimization::{OptimizationReport, SkippedMod};
+pub use optimization::{JvmCheck, JvmTweakInfo, OptimizationReport, SkippedMod};
 pub use paths::*;
 pub use registry::*;
 pub use settings::*;

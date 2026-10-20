@@ -16,9 +16,11 @@
     javaPath: string
     disabled?: boolean
     onback: () => void
+    /** Si se da, aparece el acceso a los ajustes de Java (solo con una instancia ya creada). */
+    onjava?: () => void
   }
 
-  let { memoryMode = $bindable(), maxGb = $bindable(), javaMode = $bindable(), javaPath = $bindable(), disabled = false, onback }: Props = $props()
+  let { memoryMode = $bindable(), maxGb = $bindable(), javaMode = $bindable(), javaPath = $bindable(), disabled = false, onback, onjava }: Props = $props()
 
   const gui = useGui()
 </script>
@@ -34,6 +36,10 @@
   {#if javaMode === 'path'}
     <McLabel x={-100} y={124} color="#a0a0a0" text="Carpeta de Java" />
     <McField bind:value={javaPath} y={134} {disabled} maxlength={260} placeholder={'C:\\Program Files\\Java\\jdk-21'} label="Carpeta de Java" hint={'La carpeta que contiene «bin».'} />
+  {/if}
+
+  {#if onjava}
+    <McButton x={-100} y={javaMode === 'path' ? 160 : 124} label="Ajustes de Java..." ariaLabel="Ajustes de rendimiento de Java" {disabled} onclick={onjava} />
   {/if}
 
   <McText text="Puedes dejarlas como están: no hace falta tocar nada para jugar." x={-155} y={gui.H - 50} w={310} align="center" color="#707070" />

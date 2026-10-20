@@ -2132,6 +2132,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "jvm-tuning",
  "serde",
  "serde_json",
  "tempfile",
@@ -2351,6 +2352,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jvm-tuning"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2385,6 +2395,7 @@ dependencies = [
  "identity-microsoft",
  "instance-manager",
  "java-runtime",
+ "jvm-tuning",
  "loaders",
  "minecraft-install",
  "minecraft-launch",

@@ -23,6 +23,7 @@
   import { useVersionPicker } from '../lib/versionPicker.svelte'
   import type { Optimization } from '../lib/types'
   import AdvancedOptions from './parts/AdvancedOptions.svelte'
+  import JavaTweaks from './parts/JavaTweaks.svelte'
   import IconScreen from './parts/IconScreen.svelte'
   import VersionScreen from './parts/VersionScreen.svelte'
 
@@ -32,7 +33,7 @@
   const instance = $derived(instances.selected)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
 
-  type Sub = 'main' | 'version' | 'advanced' | 'icon' | 'more' | 'profile'
+  type Sub = 'main' | 'version' | 'advanced' | 'jvm' | 'icon' | 'more' | 'profile'
   let sub = $state<Sub>('main')
 
   // Copia de trabajo del formulario; se inicializa una vez al abrir la pantalla.
@@ -45,6 +46,8 @@
   let javaPath = $state('')
   let icon = $state('')
   let optimization = $state<Optimization>('off')
+  let jvmTweaks = $state<string[]>([])
+  let jvmArgs = $state('')
 
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
@@ -61,6 +64,8 @@
     profileId = instance.profileId
     icon = normalizeIconId(instance.icon)
     optimization = instance.optimization ?? 'off'
+    jvmTweaks = [...(instance.jvmTweaks ?? [])]
+    jvmArgs = instance.jvmArgs ?? ''
     const form = formFromInstance(instance)
     memoryMode = form.memoryMode
     maxGb = form.maxGb
@@ -99,6 +104,8 @@
         profileId,
         icon,
         optimization,
+        jvmTweaks,
+        jvmArgs,
         memory: memoryPolicy(memoryMode, maxGb),
         java: javaSelection(javaMode, javaPath),
       })
@@ -160,7 +167,9 @@
 {:else if sub === 'icon'}
   <IconScreen bind:value={icon} loader={instance.loader} disabled={busy} onback={() => (sub = 'main')} />
 {:else if sub === 'advanced'}
-  <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} />
+  <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} onjava={() => (sub = 'jvm')} />
+{:else if sub === 'jvm'}
+  <JavaTweaks instanceId={instance.id} level={optimization} bind:tweaks={jvmTweaks} bind:args={jvmArgs} disabled={busy} onback={() => (sub = 'advanced')} />
 {:else if sub === 'profile'}
   <McScreen title="Perfil que juega">
     <McList

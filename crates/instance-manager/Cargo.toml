@@ -12,6 +12,7 @@ tokio = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
+jvm-tuning = { path = "../jvm-tuning" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

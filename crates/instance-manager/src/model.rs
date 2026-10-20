@@ -25,6 +25,12 @@ pub struct Instance {
     /// Ajustes de rendimiento para equipos modestos.
     #[serde(default)]
     pub optimization: Optimization,
+    /// Ajustes de JVM del catalogo (`jvm-tuning`) activados a mano, ademas de los del nivel de optimizacion.
+    #[serde(default)]
+    pub jvm_tweaks: Vec<String>,
+    /// Argumentos de Java propios, separados por espacios (validados al guardar).
+    #[serde(default)]
+    pub jvm_args: String,
     /// Derivado de la ubicacion en disco; no se guarda en `instance.json`.
     pub game_dir: PathBuf,
     pub created_at: DateTime<Utc>,
@@ -77,6 +83,8 @@ pub struct InstanceUpdate {
     /// Cadena vacia: vuelve al icono por defecto.
     pub icon: Option<String>,
     pub optimization: Option<Optimization>,
+    pub jvm_tweaks: Option<Vec<String>>,
+    pub jvm_args: Option<String>,
 }
 
 /// Nivel de optimizacion de una instancia: ajusta la JVM y las opciones graficas iniciales del juego.
@@ -90,6 +98,8 @@ pub enum Optimization {
     Balanced,
     /// Para equipos modestos: lo minimo en graficos y la JVM mas ligera.
     LowEnd,
+    /// Para equipos potentes (6 GB de RAM o mas): ajustes de memoria pensados para modpacks grandes.
+    Performance,
 }
 
 pub(crate) fn validate_name(name: &str) -> Result<String, InstanceError> {
@@ -119,6 +129,26 @@ pub(crate) fn validate_icon(icon: &str) -> Result<Option<String>, InstanceError>
         return Err(InstanceError::Invalid("el icono no es valido".into()));
     }
     Ok(Some(icon.to_string()))
+}
+
+/// Ajustes de JVM: solo ids del catalogo, sin repetir.
+pub(crate) fn validate_jvm_tweaks(tweaks: &[String]) -> Result<Vec<String>, InstanceError> {
+    let mut out: Vec<String> = Vec::new();
+    for id in tweaks {
+        if jvm_tuning::find(id).is_none() {
+            return Err(InstanceError::Invalid(format!("el ajuste de Java «{id}» no existe")));
+        }
+        if !out.contains(id) {
+            out.push(id.clone());
+        }
+    }
+    Ok(out)
+}
+
+/// Argumentos de Java propios: se normalizan a un solo espacio entre ellos y se rechaza lo peligroso.
+pub(crate) fn validate_jvm_args(args: &str) -> Result<String, InstanceError> {
+    let parsed = jvm_tuning::parse_args(args).map_err(|e| InstanceError::Invalid(format!("argumento de Java {e}")))?;
+    Ok(parsed.join(" "))
 }
 
 pub(crate) fn validate_memory(memory: &MemoryPolicy) -> Result<(), InstanceError> {

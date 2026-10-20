@@ -30,7 +30,32 @@ export type MemoryPolicy =
   | { mode: 'fixed'; minMb: number; maxMb: number }
 
 /** Nivel de optimizacion de una instancia para equipos modestos. */
-export type Optimization = 'off' | 'balanced' | 'lowEnd'
+export type Optimization = 'off' | 'balanced' | 'performance' | 'lowEnd'
+
+export type JvmRisk = 'safe' | 'tradeoff' | 'experimental'
+
+/** Un ajuste de Java del catalogo del launcher, tal como lo describe `instances_jvm_check`. */
+export interface JvmTweakInfo {
+  id: string
+  label: string
+  hint: string
+  risk: JvmRisk
+  source: string
+  selected: boolean
+  /** Ya lo aplica el nivel de rendimiento elegido. */
+  fromLevel: boolean
+  /** Motivo por el que no sirve en este Java o equipo; `null`: disponible. */
+  unavailable: string | null
+}
+
+export interface JvmCheck {
+  javaMajor: number
+  /** `true`: probado con el Java instalado. `false`: ese Java aun no esta descargado. */
+  verified: boolean
+  tweaks: JvmTweakInfo[]
+  flags: string[]
+  skipped: { id: string; reason: string }[]
+}
 
 export interface OptimizationReport {
   installed: string[]
@@ -49,6 +74,10 @@ export interface Instance {
   /** Icono elegido (id de `itemIcons`); `null`: el del tipo de instancia. */
   icon: string | null
   optimization: Optimization
+  /** Ajustes de Java activados a mano (ids del catalogo). */
+  jvmTweaks: string[]
+  /** Argumentos de Java propios, separados por espacios. */
+  jvmArgs: string
   createdAt: string
   updatedAt: string
 }
@@ -117,6 +146,8 @@ export interface InstanceChanges {
   /** Cadena vacia: vuelve al icono por defecto. */
   icon?: string
   optimization?: Optimization
+  jvmTweaks?: string[]
+  jvmArgs?: string
 }
 
 export type Theme = 'system' | 'light' | 'dark'
