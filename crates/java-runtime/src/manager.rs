@@ -56,12 +56,27 @@ impl JavaManager {
         &self,
         requirement: &JavaRequirement,
     ) -> Result<JavaInstallation, JavaError> {
-        match self.select_for_version(requirement).await {
+        let installed = self.detect_installed().await;
+        if let Some(exact) = installed.iter().find(|j| j.major == requirement.major_version) {
+            return Ok(exact.clone());
+        }
+        // Un Java mas nuevo del sistema "sirve" para el juego, pero los loaders antiguos (Fabric con Mixin < 0.12
+        // en 1.18-1.20.1) no leen las clases de Java 21: por eso se descarga primero el Java exacto que pide la
+        // version y el del sistema queda como alternativa si no hay red.
+        match self.download_runtime(requirement).await {
             Ok(inst) => Ok(inst),
-            Err(JavaError::NoCompatibleVersion(_)) => {
-                self.download_runtime(requirement).await
-            }
-            Err(e) => Err(e),
+            Err(download_error) => match select_best_java(&installed, requirement.major_version) {
+                Some(fallback) => {
+                    tracing::warn!(
+                        required = requirement.major_version,
+                        found = fallback.major,
+                        error = %download_error,
+                        "no se pudo descargar el Java exacto; se usa uno mas nuevo del sistema"
+                    );
+                    Ok(fallback.clone())
+                }
+                None => Err(download_error),
+            },
         }
     }
 
