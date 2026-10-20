@@ -23,6 +23,11 @@ const INHERITED_ENV_PREFIXES: &[&str] = &["LC_", "XDG_", "MESA_", "LIBGL_", "__G
 
 const CHANNEL_CAPACITY: usize = 512;
 const MIN_REDACTABLE_SECRET_LEN: usize = 8;
+/// Tiempo que se da a Minecraft para cerrarse solo antes de forzarlo.
+#[cfg(not(test))]
+const GRACEFUL_CLOSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+#[cfg(test)]
+const GRACEFUL_CLOSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LaunchEvent {
@@ -124,8 +129,18 @@ impl ProcessRunner {
             let status = tokio::select! {
                 status = child.wait() => status,
                 _ = kill_rx.recv() => {
-                    let _ = child.kill().await;
-                    child.wait().await
+                    // Primero un cierre normal (guarda el mundo y evita avisos de «el juego se ha cerrado»
+                    // en mods como Crash Assistant); solo si el juego no responde se fuerza.
+                    let asked = request_graceful_close(pid).await;
+                    let graceful = if asked { tokio::time::timeout(GRACEFUL_CLOSE_TIMEOUT, child.wait()).await.ok() } else { None };
+                    match graceful {
+                        Some(status) => status,
+                        None => {
+                            tracing::warn!(pid, "Minecraft no admite cierre normal o no respondio; se fuerza");
+                            let _ = child.kill().await;
+                            child.wait().await
+                        }
+                    }
                 }
             };
 
@@ -186,6 +201,33 @@ pub struct GameKiller(mpsc::Sender<()>);
 impl GameKiller {
     pub fn kill(&self) {
         let _ = self.0.try_send(());
+    }
+}
+
+/// Pide al sistema que cierre la ventana del juego (WM_CLOSE en Windows, SIGTERM en el resto), sin shell.
+/// `true` si el sistema acepto la peticion (el proceso tiene ventana / acepta la senal).
+async fn request_graceful_close(pid: u32) -> bool {
+    let pid = pid.to_string();
+    let mut command = if cfg!(windows) {
+        let mut c = Command::new("taskkill");
+        c.args(["/PID", &pid]);
+        c
+    } else {
+        let mut c = Command::new("kill");
+        c.args(["-TERM", &pid]);
+        c
+    };
+    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        command.creation_flags(0x0800_0000);
+    }
+    match command.status().await {
+        Ok(status) => status.success(),
+        Err(error) => {
+            tracing::warn!(%error, "no se pudo pedir el cierre normal de Minecraft");
+            false
+        }
     }
 }
 
@@ -348,8 +390,13 @@ mod tests {
 
     #[tokio::test]
     async fn kill_terminates_long_running_process() {
-        let script = if cfg!(windows) { "ping -n 30 127.0.0.1 >nul" } else { "sleep 30" };
-        let handle = ProcessRunner::spawn(shell_spec(script, vec![])).await.unwrap();
+        // Un solo proceso (sin cmd/sh intermedio): un nieto heredaria los pipes y retrasaria `Exited`.
+        let spec = if cfg!(windows) {
+            RunSpec { program: "ping.exe".into(), args: vec!["-n".into(), "30".into(), "127.0.0.1".into()], ..shell_spec("", vec![]) }
+        } else {
+            RunSpec { program: "sleep".into(), args: vec!["30".into()], ..shell_spec("", vec![]) }
+        };
+        let handle = ProcessRunner::spawn(spec).await.unwrap();
         handle.kill().await;
 
         let code = tokio::time::timeout(std::time::Duration::from_secs(10), handle.wait())
