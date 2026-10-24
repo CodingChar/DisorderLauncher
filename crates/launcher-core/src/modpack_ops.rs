@@ -75,9 +75,16 @@ impl Launcher {
             })
             .await?;
 
-        // La instancia queda reservada mientras se importa: no se puede lanzar ni editar.
+        // La instancia queda reservada mientras se importa: no se puede lanzar ni editar. La marca en disco
+        // permite deshacer la importacion si el launcher se cierra a medias (`instances_integrity`).
         self.running_guard().insert(instance.id.clone(), None);
-        let result = self.fill_instance_from_pack(&instance, &index, mrpack).await;
+        let result = match crate::integrity::mark_import_pending(&instance.game_dir).await {
+            Ok(()) => self.fill_instance_from_pack(&instance, &index, mrpack).await,
+            Err(_) => Err(LauncherError::Storage),
+        };
+        if result.is_ok() {
+            crate::integrity::clear_import_marker(&instance.game_dir).await;
+        }
         self.running_guard().remove(&instance.id);
 
         match result {

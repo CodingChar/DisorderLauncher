@@ -14,7 +14,7 @@
 //! ModernFix, EntityCulling, ImmediatelyFast, Embeddium (puerto de Sodium para Forge), Dynamic FPS y
 //! MemoryLeakFix, todos en Modrinth.
 
-use crate::{auto_memory, system_memory_mb, GameOutputEvent, Launcher, LauncherError, OutputStream};
+use crate::{auto_memory_for_mods, count_mods, system_memory_mb, GameOutputEvent, Launcher, LauncherError, OutputStream};
 use instance_manager::{Instance, LoaderKind, MemoryPolicy, Optimization};
 use java_runtime::JavaInstallation;
 use jvm_tuning::Env;
@@ -41,7 +41,7 @@ pub(crate) fn jvm_env(instance: &Instance, java_major: u32) -> Env {
     let ram_mb = system_memory_mb();
     let heap_mb = match &instance.memory {
         MemoryPolicy::Fixed { max_mb, .. } => u64::from(*max_mb),
-        MemoryPolicy::Auto => auto_memory(ram_mb).max_mb.map(u64::from).unwrap_or(1024),
+        MemoryPolicy::Auto => auto_memory_for_mods(ram_mb, count_mods(&instance.game_dir)).max_mb.map(u64::from).unwrap_or(1024),
     };
     let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2);
     Env { java_major, cpus, ram_mb, heap_mb }

@@ -1,6 +1,8 @@
+mod crash_hints;
 mod error;
 mod events;
 mod external_versions;
+mod integrity;
 mod launcher;
 mod memory;
 mod modpack_ops;
@@ -18,6 +20,7 @@ mod version_catalog;
 pub use error::*;
 pub use events::*;
 pub use external_versions::{default_minecraft_dir, display_version, ExternalKind, ExternalScan, ExternalVersion, CUSTOM_PREFIX};
+pub use integrity::{IntegrityIssue, IntegrityReport, IssueKind};
 pub use launcher::*;
 pub use memory::*;
 pub use modpack_ops::*;

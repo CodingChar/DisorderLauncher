@@ -2,7 +2,7 @@ use crate::settings::{self, Settings};
 use crate::{
     GameOutputEvent, IdentityRegistry, InstallProgressEvent, LaunchState, LaunchStateEvent,
     LauncherError, LauncherEvents, LauncherPaths, OutputStream, RepairSummary,
-    auto_memory, system_memory_mb,
+    auto_memory_for_mods, count_mods, system_memory_mb,
 };
 use account_storage::{AccountRepository, FileAccountRepository};
 use chrono::Utc;
@@ -509,6 +509,7 @@ impl Launcher {
             .get(instance_id)
             .await?
             .ok_or(LauncherError::InstanceNotFound)?;
+        self.prepare_instance_dirs(&instance).await?;
 
         {
             let mut running = self.running_guard();
@@ -600,12 +601,12 @@ impl Launcher {
         self.running_guard().insert(instance.id.clone(), Some(game.killer()));
 
         let mut log = open_log(&self.instances.logs_dir(id)?).await;
-        let mut java_too_new = false;
+        let mut watch = crate::crash_hints::CrashWatch::default();
         while let Some(event) = game.next_event().await {
             match event {
                 LaunchEvent::Started { pid } => self.emit_state(id, LaunchState::Running { pid }),
                 LaunchEvent::Stdout(line) => {
-                    java_too_new |= is_java_too_new_line(&line);
+                    watch.observe(&line);
                     write_log(&mut log, &line).await;
                     self.events.game_output(
                         OutputStream::Stdout,
@@ -613,23 +614,19 @@ impl Launcher {
                     );
                 }
                 LaunchEvent::Stderr(line) => {
-                    java_too_new |= is_java_too_new_line(&line);
+                    watch.observe(&line);
                     write_log(&mut log, &line).await;
                     self.events.game_output(
                         OutputStream::Stderr,
                         GameOutputEvent { instance_id: id.to_string(), line },
                     );
                 }
-                LaunchEvent::Exited { code } if java_too_new && code != Some(0) => {
-                    tracing::warn!(?code, "el juego se cerro por una version de Java no compatible");
+                LaunchEvent::Exited { code } if code != Some(0) && watch.hint().is_some() => {
+                    let hint = watch.hint().expect("comprobado arriba");
+                    tracing::warn!(?code, ?hint, "el juego se cerro con una causa conocida");
                     self.emit_state(
                         id,
-                        LaunchState::Failed {
-                            message: "El juego se cerro porque esta instancia no es compatible con el Java que se uso. \
-                                      Elige el Java automatico, o uno mas antiguo como Java 17, en los ajustes de Java de la instancia."
-                                .into(),
-                            kind: crate::ErrorKind::Other,
-                        },
+                        LaunchState::Failed { message: hint.message().into(), kind: crate::ErrorKind::Other },
                     );
                 }
                 LaunchEvent::Exited { code } => self.emit_state(id, LaunchState::Exited { code }),
@@ -642,7 +639,7 @@ impl Launcher {
     pub async fn prepare_launch(&self, instance: &Instance) -> Result<LaunchPlan, LauncherError> {
         let id = instance.id.as_str();
 
-        let mut account = self
+        let account = self
             .accounts
             .get(&instance.profile_id)
             .await?
@@ -680,13 +677,12 @@ impl Launcher {
             MemoryPolicy::Fixed { min_mb, max_mb } => {
                 MemorySettings { min_mb: Some(*min_mb), max_mb: Some(*max_mb) }
             }
-            MemoryPolicy::Auto => auto_memory(system_memory_mb()),
+            MemoryPolicy::Auto => auto_memory_for_mods(system_memory_mb(), count_mods(&instance.game_dir)),
         };
         let plan = LaunchPlanBuilder::build(&descriptor, &identity, &java, &ctx)?;
         plan.validate()?;
 
-        account.last_used_at = Some(Utc::now());
-        if let Err(e) = self.accounts.save(&account).await {
+        if let Err(e) = self.accounts.touch_used(&account.id, Utc::now()).await {
             tracing::warn!(error = %e, "no se pudo actualizar el ultimo uso del perfil");
         }
         Ok(plan)
@@ -875,29 +871,6 @@ impl Launcher {
 
     pub(crate) fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
         self.running.lock().unwrap_or_else(|p| p.into_inner())
-    }
-}
-
-/// Linea del juego que delata un Java demasiado nuevo para el Mixin/ASM del loader.
-fn is_java_too_new_line(line: &str) -> bool {
-    line.contains("Unsupported class file major version")
-}
-
-#[cfg(test)]
-mod java_too_new_tests {
-    use super::is_java_too_new_line;
-
-    #[test]
-    fn detects_asm_rejecting_newer_class_files() {
-        assert!(is_java_too_new_line(
-            "[main/WARN]: Error loading class: java/lang/Thread (java.lang.IllegalArgumentException: Unsupported class file major version 65)"
-        ));
-    }
-
-    #[test]
-    fn ignores_other_lines() {
-        assert!(!is_java_too_new_line("[main/INFO]: Loading Minecraft 1.19 with Fabric Loader 0.14.8"));
-        assert!(!is_java_too_new_line("java.lang.UnsupportedClassVersionError: class file version 65.0"));
     }
 }
 

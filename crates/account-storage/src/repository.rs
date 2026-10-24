@@ -17,6 +17,8 @@ pub trait AccountRepository: Send + Sync {
     async fn list(&self) -> Result<Vec<AccountRecord>, StorageError>;
     async fn get(&self, id: &str) -> Result<Option<AccountRecord>, StorageError>;
     async fn save(&self, record: &AccountRecord) -> Result<(), StorageError>;
+    /// Anota el ultimo uso releyendo el perfil actual, sin pisar cambios hechos mientras tanto (p. ej. la skin).
+    async fn touch_used(&self, id: &str, at: chrono::DateTime<chrono::Utc>) -> Result<(), StorageError>;
     async fn delete(&self, id: &str) -> Result<(), StorageError>;
     async fn get_default(&self) -> Result<Option<String>, StorageError>;
     async fn set_default(&self, id: &str) -> Result<(), StorageError>;

@@ -11,7 +11,7 @@ pub enum LauncherError {
     #[error("Primero crea un perfil para poder jugar.")]
     NoDefaultProfile,
 
-    #[error("No se encontro el perfil asociado a esta instancia.")]
+    #[error("El perfil de esta instancia ya no existe. Edita la instancia y elige otro perfil.")]
     ProfileMissing,
 
     #[error("No se encontro la instancia.")]

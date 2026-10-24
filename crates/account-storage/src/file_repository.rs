@@ -2,8 +2,12 @@ use crate::{AccountRepository, StorageError};
 use identity_api::AccountRecord;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tokio::fs;
+
+/// Contador para dar a cada escritura su propio archivo temporal.
+static WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Version actual del formato de archivo de cuenta (`schemaVersion`).
 pub const ACCOUNT_SCHEMA_VERSION: u32 = 1;
@@ -22,11 +26,13 @@ pub enum StorageNotice {
 pub struct FileAccountRepository {
     dir: PathBuf,
     notices: Mutex<Vec<StorageNotice>>,
+    /// Serializa las escrituras: dos guardados a la vez (cerrar una instancia y abrir otra) no se pisan.
+    write_lock: tokio::sync::Mutex<()>,
 }
 
 impl FileAccountRepository {
     pub fn new(dir: impl AsRef<Path>) -> Self {
-        Self { dir: dir.as_ref().to_path_buf(), notices: Mutex::new(Vec::new()) }
+        Self { dir: dir.as_ref().to_path_buf(), notices: Mutex::new(Vec::new()), write_lock: tokio::sync::Mutex::new(()) }
     }
 
     /// Avisos acumulados desde la ultima llamada.
@@ -56,9 +62,16 @@ impl FileAccountRepository {
     /// Lee un archivo de cuenta aplicando migraciones. `Ok(None)` si esta danado o es de una version futura.
     async fn read_file(&self, path: &Path) -> Result<Option<AccountRecord>, StorageError> {
         let file_name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        let data = fs::read_to_string(path).await?;
+        let mut data = fs::read_to_string(path).await?;
 
-        let Ok(value) = serde_json::from_str::<Value>(&data) else {
+        let mut parsed = serde_json::from_str::<Value>(&data);
+        if parsed.is_err() {
+            // Una lectura puede coincidir con una escritura externa a medias: se reintenta antes de apartar el archivo.
+            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            data = fs::read_to_string(path).await?;
+            parsed = serde_json::from_str::<Value>(&data);
+        }
+        let Ok(value) = parsed else {
             self.quarantine(path, &file_name).await;
             return Ok(None);
         };
@@ -81,7 +94,7 @@ impl FileAccountRepository {
             // Nunca se reescribe sin una copia del original.
             let backup = path.with_file_name(format!("{file_name}.bak-v{version}"));
             fs::copy(path, &backup).await?;
-            self.write_record(&record).await?;
+            self.write_unlocked(&record).await?;
             self.notify(StorageNotice::Migrated { account: record.id.clone(), from_version: version });
         }
         Ok(Some(record))
@@ -96,15 +109,25 @@ impl FileAccountRepository {
     }
 
     async fn write_record(&self, record: &AccountRecord) -> Result<(), StorageError> {
+        let _guard = self.write_lock.lock().await;
+        self.write_unlocked(record).await
+    }
+
+    /// Escribe a un temporal propio y lo renombra: un lector nunca ve un archivo a medias.
+    async fn write_unlocked(&self, record: &AccountRecord) -> Result<(), StorageError> {
         self.ensure_dir().await?;
         let path = self.account_path(&record.id)?;
-        let part = path.with_extension("json.part");
+        let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
+        let part = path.with_extension(format!("json.{}-{seq}.part", std::process::id()));
         let mut value = serde_json::to_value(record)?;
         if let Some(object) = value.as_object_mut() {
             object.insert("schemaVersion".into(), ACCOUNT_SCHEMA_VERSION.into());
         }
         fs::write(&part, serde_json::to_string_pretty(&value)?).await?;
-        fs::rename(&part, &path).await?;
+        if let Err(e) = fs::rename(&part, &path).await {
+            let _ = fs::remove_file(&part).await;
+            return Err(e.into());
+        }
         Ok(())
     }
 }
@@ -193,7 +216,17 @@ impl AccountRepository for FileAccountRepository {
         self.write_record(record).await
     }
 
+    async fn touch_used(&self, id: &str, at: chrono::DateTime<chrono::Utc>) -> Result<(), StorageError> {
+        // Primero se deja el archivo en el formato actual (la migracion escribe sin el candado).
+        self.get(id).await?;
+        let _guard = self.write_lock.lock().await;
+        let mut record = self.get(id).await?.ok_or_else(|| StorageError::NotFound(id.to_string()))?;
+        record.last_used_at = Some(at);
+        self.write_unlocked(&record).await
+    }
+
     async fn delete(&self, id: &str) -> Result<(), StorageError> {
+        let _guard = self.write_lock.lock().await;
         let path = self.account_path(id)?;
         if path.exists() {
             fs::remove_file(&path).await?;
@@ -226,9 +259,14 @@ impl AccountRepository for FileAccountRepository {
         if self.get(id).await?.is_none() {
             return Err(StorageError::NotFound(id.to_string()));
         }
-        let part = self.default_path().with_extension("txt.part");
+        let _guard = self.write_lock.lock().await;
+        let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
+        let part = self.default_path().with_extension(format!("txt.{}-{seq}.part", std::process::id()));
         fs::write(&part, id).await?;
-        fs::rename(&part, self.default_path()).await?;
+        if let Err(e) = fs::rename(&part, self.default_path()).await {
+            let _ = fs::remove_file(&part).await;
+            return Err(e.into());
+        }
         Ok(())
     }
 }

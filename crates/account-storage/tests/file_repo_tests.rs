@@ -162,3 +162,58 @@ async fn account_ids_cannot_escape_the_directory() {
     wrapper.id = "../evil".into();
     assert!(repo.save(&wrapper).await.is_err());
 }
+
+#[tokio::test]
+async fn concurrent_saves_never_leave_a_torn_or_quarantined_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = std::sync::Arc::new(FileAccountRepository::new(dir.path().join("accounts")));
+    repo.save(&make_account("a1", "Steve")).await.unwrap();
+
+    let mut tasks = Vec::new();
+    for i in 0..40 {
+        let repo = repo.clone();
+        tasks.push(tokio::spawn(async move {
+            if i % 2 == 0 {
+                repo.save(&make_account("a1", "Steve")).await.unwrap();
+            } else {
+                repo.touch_used("a1", Utc::now()).await.unwrap();
+            }
+            // Lecturas intercaladas con las escrituras: siempre debe verse el perfil.
+            assert!(repo.get("a1").await.unwrap().is_some());
+        }));
+    }
+    for task in tasks {
+        task.await.unwrap();
+    }
+
+    assert!(repo.get("a1").await.unwrap().is_some());
+    let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("accounts"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n != "a1.json")
+        .collect();
+    assert!(leftovers.is_empty(), "no deben quedar temporales ni .corrupt: {leftovers:?}");
+}
+
+#[tokio::test]
+async fn touch_used_keeps_changes_made_after_the_profile_was_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = FileAccountRepository::new(dir.path().join("accounts"));
+    repo.save(&make_account("a1", "Steve")).await.unwrap();
+
+    // Alguien cambia la skin mientras otra tarea ya tenia el perfil viejo en memoria.
+    let mut changed = make_account("a1", "Steve");
+    if let ProviderAccountData::Local(data) = &mut changed.provider_data {
+        data.skin_id = Some("skin_nueva".into());
+    }
+    repo.save(&changed).await.unwrap();
+    repo.touch_used("a1", Utc::now()).await.unwrap();
+
+    let stored = repo.get("a1").await.unwrap().unwrap();
+    assert!(stored.last_used_at.is_some());
+    match stored.provider_data {
+        ProviderAccountData::Local(data) => assert_eq!(data.skin_id.as_deref(), Some("skin_nueva")),
+        _ => panic!("perfil local"),
+    }
+    assert!(matches!(repo.touch_used("nope", Utc::now()).await, Err(account_storage::StorageError::NotFound(_))));
+}

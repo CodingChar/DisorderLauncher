@@ -10,6 +10,22 @@ use std::sync::{Arc, Mutex, Weak};
 use tokio::fs;
 
 const ID_PREFIX: &str = "inst_";
+const BACKUP_FILE: &str = "instance.json.bak";
+
+/// Carpeta dentro de `instances/` con forma de instancia pero sin una ficha utilizable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderProblem {
+    pub id: String,
+    pub kind: FolderProblemKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FolderProblemKind {
+    /// No hay `instance.json`: resto de un borrado incompleto.
+    Orphan,
+    /// Existe pero no se puede leer ni recuperar.
+    Unreadable(String),
+}
 /// Subcarpetas que se crean dentro de `game/` para que el usuario no tenga que tocar el filesystem.
 const GAME_SUBDIRS: &[&str] = &["mods", "config", "saves", "resourcepacks", "shaderpacks"];
 
@@ -63,7 +79,27 @@ impl FileInstanceRepository {
     async fn read(&self, id: &str) -> Result<Option<Instance>, InstanceError> {
         let dir = self.instance_dir(id)?;
         let path = dir.join("instance.json");
-        let data = match fs::read_to_string(&path).await {
+        match self.read_file(id, &dir, &path).await {
+            Ok(found) => Ok(found),
+            // El archivo esta ilegible pero queda la copia del ultimo guardado bueno: se restaura. Un formato
+            // mas nuevo o un id distinto no se "arreglan" con la copia: se informan tal cual.
+            Err(primary @ InstanceError::Serialization(_)) => {
+                let backup = dir.join(BACKUP_FILE);
+                match self.read_file(id, &dir, &backup).await {
+                    Ok(Some(instance)) => {
+                        tracing::warn!(instance = %id, error = %primary, "instance.json danado; se restauro la copia");
+                        let _ = fs::copy(&backup, &path).await;
+                        Ok(Some(instance))
+                    }
+                    _ => Err(primary),
+                }
+            }
+            Err(other) => Err(other),
+        }
+    }
+
+    async fn read_file(&self, id: &str, dir: &Path, path: &Path) -> Result<Option<Instance>, InstanceError> {
+        let data = match fs::read_to_string(path).await {
             Ok(d) => d,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(e.into()),
@@ -82,8 +118,61 @@ impl FileInstanceRepository {
         let part = dir.join("instance.json.part");
         let data = serde_json::to_string_pretty(&InstanceFile::from_instance(instance))?;
         fs::write(&part, data).await?;
+        // Copia del guardado anterior (si era valido) para poder recuperarse de un archivo danado.
+        if self.read_file(&instance.id, &dir, &path).await.is_ok_and(|found| found.is_some()) {
+            let _ = fs::copy(&path, dir.join(BACKUP_FILE)).await;
+        }
         fs::rename(&part, &path).await?;
         Ok(())
+    }
+
+    /// Recrea `game/` y sus subcarpetas si se borraron desde fuera (no toca lo que ya existe).
+    /// Devuelve `true` si hubo que crear algo.
+    pub async fn ensure_layout(&self, id: &str) -> Result<bool, InstanceError> {
+        let dir = self.instance_dir(id)?;
+        let game = dir.join("game");
+        let missing = !dir.join("logs").is_dir() || GAME_SUBDIRS.iter().any(|sub| !game.join(sub).is_dir());
+        if missing {
+            self.create_layout(id).await?;
+        }
+        Ok(missing)
+    }
+
+    /// Revisa la carpeta de instancias: carpetas con forma de instancia que no se pueden leer.
+    pub async fn scan(&self) -> Result<Vec<FolderProblem>, InstanceError> {
+        let mut entries = match fs::read_dir(&self.root).await {
+            Ok(e) => e,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e.into()),
+        };
+        let mut problems = Vec::new();
+        while let Some(entry) = entries.next_entry().await? {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if validate_id(&name).is_err() || !entry.file_type().await.is_ok_and(|t| t.is_dir()) {
+                continue;
+            }
+            match self.read(&name).await {
+                Ok(Some(_)) => {}
+                // Sin instance.json: sobra de un borrado incompleto (p. ej. con el juego abierto).
+                Ok(None) => problems.push(FolderProblem { id: name, kind: FolderProblemKind::Orphan }),
+                Err(e) => problems.push(FolderProblem { id: name, kind: FolderProblemKind::Unreadable(e.to_string()) }),
+            }
+        }
+        problems.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(problems)
+    }
+
+    /// Elimina una carpeta huerfana (sin `instance.json` legible ni copia). No toca instancias validas.
+    pub async fn remove_orphan(&self, id: &str) -> Result<bool, InstanceError> {
+        let _guard = self.mutation_guard(id).await?;
+        if self.read(id).await.ok().flatten().is_some() {
+            return Ok(false);
+        }
+        match fs::remove_dir_all(self.instance_dir(id)?).await {
+            Ok(()) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(e.into()),
+        }
     }
 
     async fn create_layout(&self, id: &str) -> Result<PathBuf, InstanceError> {
@@ -200,10 +289,22 @@ impl InstanceRepository for FileInstanceRepository {
     async fn delete(&self, id: &str) -> Result<(), InstanceError> {
         let _guard = self.mutation_guard(id).await?;
         let dir = self.instance_dir(id)?;
-        match fs::remove_dir_all(&dir).await {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e.into()),
+        // La ficha se quita primero: si algun archivo queda bloqueado (antivirus, juego abierto) la instancia ya
+        // no aparece y la carpeta sobrante se limpia como huerfana en el siguiente arranque.
+        for file in ["instance.json", BACKUP_FILE, "instance.json.part"] {
+            let _ = fs::remove_file(dir.join(file)).await;
+        }
+        let mut attempt = 0;
+        loop {
+            match fs::remove_dir_all(&dir).await {
+                Ok(()) => return Ok(()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(_) if attempt < 2 => {
+                    attempt += 1;
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+                Err(e) => return Err(e.into()),
+            }
         }
     }
 
@@ -335,6 +436,63 @@ mod tests {
         std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
         let loaded = repo.get(&inst.id).await.unwrap().unwrap();
         assert!(loaded.jvm_tweaks.is_empty() && loaded.jvm_args.is_empty());
+    }
+
+    #[tokio::test]
+    async fn damaged_instance_json_is_restored_from_the_backup() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("Original")).await.unwrap();
+        // Segundo guardado: deja la copia del primero.
+        repo.update(&inst.id, InstanceUpdate { name: Some("Renombrada".into()), ..Default::default() }).await.unwrap();
+        let path = repo.instance_dir(&inst.id).unwrap().join("instance.json");
+        std::fs::write(&path, "{ esto no es json").unwrap();
+
+        let restored = repo.get(&inst.id).await.unwrap().expect("se recupera de la copia");
+        assert_eq!(restored.name, "Original", "vuelve al ultimo guardado valido");
+        assert!(serde_json::from_str::<serde_json::Value>(&std::fs::read_to_string(&path).unwrap()).is_ok());
+    }
+
+    #[tokio::test]
+    async fn newer_schema_is_reported_not_overwritten_by_the_backup() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("A")).await.unwrap();
+        repo.update(&inst.id, InstanceUpdate { name: Some("B".into()), ..Default::default() }).await.unwrap();
+        let path = repo.instance_dir(&inst.id).unwrap().join("instance.json");
+        let mut json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        json["schemaVersion"] = 99.into();
+        std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+        assert!(matches!(repo.get(&inst.id).await, Err(InstanceError::UnsupportedSchema(99))));
+    }
+
+    #[tokio::test]
+    async fn ensure_layout_recreates_folders_deleted_from_outside() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("A")).await.unwrap();
+        assert!(!repo.ensure_layout(&inst.id).await.unwrap(), "intacta: nada que hacer");
+
+        std::fs::remove_dir_all(&inst.game_dir).unwrap();
+        std::fs::remove_dir_all(repo.logs_dir(&inst.id).unwrap()).unwrap();
+        assert!(repo.ensure_layout(&inst.id).await.unwrap());
+        assert!(inst.game_dir.join("mods").is_dir() && repo.logs_dir(&inst.id).unwrap().is_dir());
+    }
+
+    #[tokio::test]
+    async fn scan_finds_orphans_and_delete_leaves_no_trace() {
+        let (_d, repo) = repo();
+        let keep = repo.create(new_instance("Sana")).await.unwrap();
+        let gone = repo.create(new_instance("Rota")).await.unwrap();
+        // Borrado externo parcial: queda la carpeta sin ficha.
+        std::fs::remove_file(repo.instance_dir(&gone.id).unwrap().join("instance.json")).unwrap();
+
+        let problems = repo.scan().await.unwrap();
+        assert_eq!(problems, vec![FolderProblem { id: gone.id.clone(), kind: FolderProblemKind::Orphan }]);
+        assert!(!repo.remove_orphan(&keep.id).await.unwrap(), "una instancia valida nunca se borra como huerfana");
+        assert!(repo.remove_orphan(&gone.id).await.unwrap());
+        assert!(repo.scan().await.unwrap().is_empty());
+
+        repo.delete(&keep.id).await.unwrap();
+        assert!(!repo.instance_dir(&keep.id).unwrap().exists());
+        assert!(repo.list().await.unwrap().is_empty());
     }
 
     #[tokio::test]
