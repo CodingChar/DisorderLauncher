@@ -157,3 +157,6 @@ details p { margin: 0; padding: 0 18px 16px; color: var(--muted); }
   .download-box .btn { width: 100%; }
   .section { padding: 52px 0; }
 }
+
+details ul { margin: 0; padding: 0 18px 16px 38px; color: var(--muted); }
+details li { margin-bottom: 4px; }
