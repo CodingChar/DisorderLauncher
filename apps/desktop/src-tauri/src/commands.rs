@@ -195,6 +195,15 @@ pub async fn instances_optimize_mods(
   state.launcher.optimization_install_mods(&id).await.map_err(user_message)
 }
 
+/// Nivel de optimizacion y memoria que mejor encajan con este equipo y los mods de la instancia.
+#[tauri::command]
+pub async fn instances_recommendation(
+  state: State<'_, AppState>,
+  id: String,
+) -> Result<launcher_core::Recommendation, String> {
+  state.launcher.instances_recommendation(&id).await.map_err(user_message)
+}
+
 /// Comprueba (sin guardar) el nivel, los ajustes y los argumentos de Java de una instancia contra su Java.
 #[tauri::command]
 pub async fn instances_jvm_check(

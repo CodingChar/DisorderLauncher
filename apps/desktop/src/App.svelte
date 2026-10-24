@@ -66,12 +66,19 @@
     const goOffline = () => (online = false)
     window.addEventListener('online', goOnline)
     window.addEventListener('offline', goOffline)
+    // Si se borra o cambia una instancia desde el explorador, al volver al launcher la lista se pone al dia.
+    const refreshOnFocus = () => {
+      if (instances.loaded && instances.importPercent === null) void instances.load()
+    }
+    window.addEventListener('focus', refreshOnFocus)
 
     ;(async () => {
       // Suscripciones y lecturas iniciales a la vez: ninguna depende de otra y el arranque tarda lo de la mas lenta.
       await Promise.all([sessions.init(), accounts.listen(), settings.load(), accounts.load(), instances.load(), accounts.loadMicrosoft()])
       if (alive) cancelWarmup = warmNavigation()
       notices = await api.startupNotices().catch(() => [])
+      // La revision de arranque puede haber limpiado o deshecho instancias: se vuelve a leer la lista.
+      if (alive && notices.length > 0) await instances.load()
     })()
 
     return () => {
@@ -80,6 +87,7 @@
       stopPreparation()
       window.removeEventListener('online', goOnline)
       window.removeEventListener('offline', goOffline)
+      window.removeEventListener('focus', refreshOnFocus)
     }
   })
 </script>

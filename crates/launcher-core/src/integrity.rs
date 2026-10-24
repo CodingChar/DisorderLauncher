@@ -66,6 +66,23 @@ pub struct IntegrityReport {
     pub issues: Vec<IntegrityIssue>,
 }
 
+impl IntegrityIssue {
+    /// Texto para la persona, o `None` si fue una reparacion silenciosa que no vale la pena contar.
+    pub fn notice(&self) -> Option<String> {
+        let name = if self.name.is_empty() { "una instancia".to_string() } else { format!("«{}»", self.name) };
+        match self.kind {
+            IssueKind::ProfileMissing => Some(format!("A {name} le falta su perfil. Editala y elige otro perfil para poder jugar.")),
+            IssueKind::JavaMissing => Some(format!("A {name} le falta el Java que elegiste. Editala y vuelve a elegir Java.")),
+            IssueKind::ImportRolledBack => Some("Se deshizo una importacion de modpack que quedo a medias. Puedes importarla de nuevo.".to_string()),
+            IssueKind::Unreadable => Some("Hay una instancia que no se pudo leer. Se dejo como estaba, sin tocarla.".to_string()),
+            IssueKind::LayoutRepaired | IssueKind::LeftoverRemoved => {
+                tracing::info!(instance = %self.instance_id, kind = ?self.kind, "reparacion silenciosa de instancia");
+                None
+            }
+        }
+    }
+}
+
 impl IntegrityReport {
     /// Problemas que esperan una decision de la persona.
     pub fn needs_attention(&self) -> impl Iterator<Item = &IntegrityIssue> {

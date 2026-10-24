@@ -423,6 +423,8 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       if (!inst || inst.loader === 'vanilla') throw 'Esta instancia no admite mods. Crea una con Fabric, Quilt, Forge o NeoForge para añadir mods de rendimiento.'
       return { installed: ['Sodium (grafico)', 'Lithium (logica del juego)', 'FerriteCore (memoria)'], skipped: [{ name: 'ImmediatelyFast', reason: 'No hay una version compatible con esta version de Minecraft.' }] }
     }
+    case 'instances_recommendation':
+      return { optimization: 'balanced', memoryMb: 4096, reasons: ['Tu equipo es de gama media: un ajuste equilibrado da mas fluidez sin perder calidad.'], ramMb: 10240, cpus: 4, mods: 12 }
     case 'instances_jvm_check': {
       const bad = String(args.args ?? '').split(/\s+/).find((a: string) => a && !/^-(XX:|X|D)/.test(a))
       if (bad || /javaagent|OnError/i.test(String(args.args))) throw `Argumento de Java «${bad ?? args.args}»: no se permite.`

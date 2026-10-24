@@ -39,6 +39,34 @@ impl From<ModpackError> for LauncherError {
     }
 }
 
+const GIB: u64 = 1024 * 1024 * 1024;
+
+/// Espacio a reservar para importar: lo que pesan los archivos del modpack (con margen para overrides y
+/// archivos temporales) mas lo que ocupa instalar Minecraft y su loader si aun no estan.
+pub(crate) fn required_space_bytes(index: &modpacks::ModpackIndex) -> u64 {
+    let files: u64 = index.client_files().map(|f| f.file_size).sum();
+    files + files / 4 + GIB
+}
+
+/// Bytes libres en el disco que contiene `path` (el punto de montaje mas especifico). `None` si no se sabe.
+pub(crate) fn free_space_bytes(path: &Path) -> Option<u64> {
+    let probe = path.ancestors().find(|p| p.exists())?.canonicalize().ok()?;
+    let plain = strip_verbatim(&probe);
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    disks
+        .list()
+        .iter()
+        .filter(|d| plain.starts_with(d.mount_point()))
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| d.available_space())
+}
+
+/// En Windows `canonicalize` devuelve rutas «verbatim» (con el prefijo `\\?\`): se quita para comparar con los discos.
+fn strip_verbatim(path: &Path) -> std::path::PathBuf {
+    let text = path.to_string_lossy();
+    text.strip_prefix("\\\\?\\").map(std::path::PathBuf::from).unwrap_or_else(|| path.to_path_buf())
+}
+
 /// Nombre valido para una instancia a partir del nombre del modpack.
 fn instance_name(pack_name: &str) -> String {
     let cleaned: String = pack_name.chars().filter(|c| !c.is_control()).take(MAX_NAME_LEN).collect();
@@ -63,6 +91,24 @@ impl Launcher {
             }
             None => (LoaderKind::Vanilla, None),
         };
+
+        // Fallar pronto y claro: sin version de Minecraft o sin espacio no tiene sentido empezar a descargar.
+        let minecraft_version = index.minecraft_version()?.to_string();
+        if matches!(self.resolve_descriptor(&minecraft_version).await, Err(LauncherError::VersionUnavailable)) {
+            return Err(LauncherError::InvalidInput(format!(
+                "Este modpack necesita Minecraft {minecraft_version}, que no esta disponible."
+            )));
+        }
+        let needed = required_space_bytes(&index);
+        if let Some(free) = free_space_bytes(&self.paths().instances_dir()) {
+            if free < needed {
+                return Err(LauncherError::InvalidInput(format!(
+                    "No hay espacio suficiente en el disco: se necesitan unos {} GB libres y hay {}.",
+                    needed.div_ceil(GIB),
+                    free / GIB
+                )));
+            }
+        }
 
         let instance = self
             .instances
@@ -184,6 +230,23 @@ impl Launcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn space_needed_covers_the_files_plus_margin() {
+        let json = r#"{"formatVersion":1,"game":"minecraft","versionId":"1","name":"p","files":[
+            {"path":"mods/a.jar","hashes":{"sha1":"aa","sha512":"bb"},"downloads":["https://cdn.modrinth.com/a.jar"],"fileSize":400},
+            {"path":"mods/b.jar","hashes":{"sha1":"aa","sha512":"bb"},"env":{"client":"unsupported","server":"required"},"downloads":["https://cdn.modrinth.com/b.jar"],"fileSize":9999}
+        ],"dependencies":{"minecraft":"1.20.1"}}"#;
+        let index = modpacks::parse_index(json.as_bytes()).unwrap();
+        assert_eq!(required_space_bytes(&index), 400 + 100 + GIB, "los mods solo de servidor no cuentan");
+    }
+
+    #[test]
+    fn free_space_of_a_real_folder_is_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let free = free_space_bytes(&dir.path().join("aun/no/existe")).expect("el disco de la carpeta existente");
+        assert!(free > 0);
+    }
 
     #[test]
     fn instance_names_are_sanitized() {

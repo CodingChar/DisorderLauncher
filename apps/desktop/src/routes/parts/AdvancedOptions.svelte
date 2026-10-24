@@ -18,11 +18,29 @@
     onback: () => void
     /** Si se da, aparece el acceso a los ajustes de Java (solo con una instancia ya creada). */
     onjava?: () => void
+    /** Si se da, aparece «Recomendado para mi equipo»; devuelve el texto que explica lo que se aplico. */
+    onrecommend?: () => Promise<string>
   }
 
-  let { memoryMode = $bindable(), maxGb = $bindable(), javaMode = $bindable(), javaPath = $bindable(), disabled = false, onback, onjava }: Props = $props()
+  let { memoryMode = $bindable(), maxGb = $bindable(), javaMode = $bindable(), javaPath = $bindable(), disabled = false, onback, onjava, onrecommend }: Props = $props()
 
   const gui = useGui()
+  let recommended = $state<string | null>(null)
+  let recommending = $state(false)
+
+  async function recommend() {
+    if (!onrecommend || recommending) return
+    recommending = true
+    try {
+      recommended = await onrecommend()
+    } catch (e) {
+      recommended = (e as Error).message ?? String(e)
+    } finally {
+      recommending = false
+    }
+  }
+
+  const rowY = $derived(javaMode === 'path' ? 160 : 124)
 </script>
 
 <McScreen title="Opciones avanzadas">
@@ -39,9 +57,17 @@
   {/if}
 
   {#if onjava}
-    <McButton x={-100} y={javaMode === 'path' ? 160 : 124} label="Ajustes de Java..." ariaLabel="Ajustes de rendimiento de Java" {disabled} onclick={onjava} />
+    <McButton x={-100} y={rowY} label="Ajustes de Java..." ariaLabel="Ajustes de rendimiento de Java" {disabled} onclick={onjava} />
+  {/if}
+  {#if onrecommend}
+    <McButton x={-100} y={rowY + (onjava ? 24 : 0)} label={recommending ? 'Mirando tu equipo...' : 'Recomendado para mi equipo'} ariaLabel="Aplicar el rendimiento recomendado para este equipo" disabled={disabled || recommending} onclick={() => void recommend()} />
+    {#if recommended}
+      <McText text={recommended} x={-155} y={rowY + (onjava ? 48 : 24)} w={310} color="#55ff55" maxLines={3} role="status" />
+    {/if}
   {/if}
 
-  <McText text="Puedes dejarlas como están: no hace falta tocar nada para jugar." x={-155} y={gui.H - 50} w={310} align="center" color="#707070" />
+  {#if !recommended}
+    <McText text="Puedes dejarlas como están: no hace falta tocar nada para jugar." x={-155} y={gui.H - 50} w={310} align="center" color="#707070" />
+  {/if}
   <McButton anchor="bottom" y={-28} label="Hecho" onclick={onback} />
 </McScreen>

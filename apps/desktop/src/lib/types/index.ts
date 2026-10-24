@@ -48,6 +48,16 @@ export interface JvmTweakInfo {
   unavailable: string | null
 }
 
+/** Nivel y memoria sugeridos para esta instancia en este equipo. */
+export interface Recommendation {
+  optimization: Optimization
+  memoryMb: number
+  reasons: string[]
+  ramMb: number
+  cpus: number
+  mods: number
+}
+
 export interface JvmCheck {
   javaMajor: number
   /** `true`: probado con el Java instalado. `false`: ese Java aun no esta descargado. */

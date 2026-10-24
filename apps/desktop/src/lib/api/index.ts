@@ -26,6 +26,7 @@ import type {
   ThemeEntry,
   OptimizationReport,
   JvmCheck,
+  Recommendation,
   Optimization,
   VersionCatalog,
   VersionEntry,
@@ -101,6 +102,7 @@ export const api = {
   instancesOptimizeMods: (id: string) => call<OptimizationReport>('instances_optimize_mods', { id }),
   instancesJvmCheck: (id: string, optimization: Optimization, tweaks: string[], args: string) =>
     call<JvmCheck>('instances_jvm_check', { id, optimization, tweaks, args }),
+  instancesRecommendation: (id: string) => call<Recommendation>('instances_recommendation', { id }),
   modsCheckUpdates: (id: string) => call<UpdateInfo[]>('mods_check_updates', { id }),
   modsUpdate: (id: string, file: string) => call<InstalledMod>('mods_update', { id, file }),
   modsRollback: (id: string, file: string) => call<void>('mods_rollback', { id, file }),

@@ -139,6 +139,10 @@ impl Launcher {
                 }
             }
         }
+        match self.instances_integrity().await {
+            Ok(report) => messages.extend(report.issues.iter().filter_map(|i| i.notice())),
+            Err(e) => tracing::warn!(error = %e, "no se pudo revisar la integridad de las instancias"),
+        }
         messages.dedup();
         messages
     }

@@ -84,6 +84,15 @@
   const iconLabel = $derived(icon ? (findItemIcon(icon)?.label ?? 'Por defecto') : 'Por defecto')
   const level = $derived(PERFORMANCE_LEVELS.find((l) => l.value === optimization) ?? PERFORMANCE_LEVELS[0])
 
+  /** Aplica el nivel que mejor encaja con este equipo; la memoria automatica ya se ajusta sola a los mods. */
+  async function recommend(): Promise<string> {
+    if (!instance) return ''
+    const r = await api.instancesRecommendation(instance.id)
+    optimization = r.optimization
+    const label = PERFORMANCE_LEVELS.find((l) => l.value === r.optimization)?.label ?? ''
+    return `Nivel «${label}» elegido. ${r.reasons.join(' ')} Pulsa Guardar para conservarlo.`
+  }
+
   async function save() {
     if (!instance || saving) return
     error = null
@@ -167,7 +176,7 @@
 {:else if sub === 'icon'}
   <IconScreen bind:value={icon} loader={instance.loader} disabled={busy} onback={() => (sub = 'main')} />
 {:else if sub === 'advanced'}
-  <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} onjava={() => (sub = 'jvm')} />
+  <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} onjava={() => (sub = 'jvm')} onrecommend={recommend} />
 {:else if sub === 'jvm'}
   <JavaTweaks instanceId={instance.id} level={optimization} bind:tweaks={jvmTweaks} bind:args={jvmArgs} disabled={busy} onback={() => (sub = 'advanced')} />
 {:else if sub === 'profile'}

@@ -51,6 +51,10 @@ Solo Equilibrado y Modesto. Se aplican una vez por nivel (marca `.disorder-optim
 
 Se instalan a peticion (`instances_optimize_mods`) desde Modrinth segun el loader: Sodium/Embeddium, Lithium, FerriteCore, Entity Culling, ModernFix, ImmediatelyFast; en Modesto tambien Dynamic FPS y MemoryLeakFix. Todos los slugs se comprobaron contra la API de Modrinth el 2026-10-20 (activos, 37-250 M de descargas; MemoryLeakFix solo se actualiza para versiones antiguas).
 
+## Memoria automatica y recomendacion por equipo
+
+La memoria «Automatica» ya no es solo un cuarto de la RAM: con 20 mods o mas sube a 2 GB + 20 MB por mod, sin pasar del 60 % de la RAM ni de 8 GB (`auto_memory_for_mods`), y la JVM recibe ese mismo tope para decidir sus banderas. En Opciones avanzadas, «Recomendado para mi equipo» propone el nivel segun hilos de CPU, RAM y mods (Modesto < 4 GB o <= 2 hilos; Equilibrado < 8 GB o <= 4 hilos; Alto rendimiento con 100 mods o mas en equipos potentes; Normal en el resto). Ver `docs/INSTANCE_INTEGRITY.md`.
+
 ## Anadir un ajuste
 
 1. Entrada nueva en `CATALOG` (`crates/jvm-tuning/src/catalog.rs`) con version minima/maxima, RAM minima, recolector que elige o exige y fuente.
