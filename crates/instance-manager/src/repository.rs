@@ -84,6 +84,14 @@ impl FileInstanceRepository {
             // El archivo esta ilegible pero queda la copia del ultimo guardado bueno: se restaura. Un formato
             // mas nuevo o un id distinto no se "arreglan" con la copia: se informan tal cual.
             Err(primary @ InstanceError::Serialization(_)) => {
+                // Un JSON valido que no encaja (variante o campo de una version mas nueva) no es un dano: no se pisa.
+                let broken = match fs::read_to_string(&path).await {
+                    Ok(text) => serde_json::from_str::<serde_json::Value>(&text).is_err(),
+                    Err(_) => false,
+                };
+                if !broken {
+                    return Err(primary);
+                }
                 let backup = dir.join(BACKUP_FILE);
                 match self.read_file(id, &dir, &backup).await {
                     Ok(Some(instance)) => {
@@ -222,6 +230,8 @@ impl InstanceRepository for FileInstanceRepository {
         validate_required("el perfil", &new.profile_id)?;
 
         let id = format!("{ID_PREFIX}{}", uuid::Uuid::new_v4().simple());
+        // El id queda reservado hasta escribir instance.json: la limpieza de huerfanas espera en vez de borrarlo.
+        let _reserved = self.mutation_guard(&id).await?;
         let game_dir = self.create_layout(&id).await?;
         let now = Utc::now();
         let instance = Instance {
@@ -316,6 +326,7 @@ impl InstanceRepository for FileInstanceRepository {
             .ok_or_else(|| InstanceError::NotFound(id.to_string()))?;
 
         let new_id = format!("{ID_PREFIX}{}", uuid::Uuid::new_v4().simple());
+        let _reserved = self.mutation_guard(&new_id).await?;
         let new_game = self.create_layout(&new_id).await?;
 
         let from = source.game_dir.clone();
@@ -462,6 +473,38 @@ mod tests {
         json["schemaVersion"] = 99.into();
         std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
         assert!(matches!(repo.get(&inst.id).await, Err(InstanceError::UnsupportedSchema(99))));
+    }
+
+    #[tokio::test]
+    async fn valid_json_with_unknown_shape_is_not_replaced_by_the_backup() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("A")).await.unwrap();
+        repo.update(&inst.id, InstanceUpdate { name: Some("B".into()), ..Default::default() }).await.unwrap();
+        let path = repo.instance_dir(&inst.id).unwrap().join("instance.json");
+        let mut json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        json["loader"]["kind"] = "loader-del-futuro".into();
+        let written = serde_json::to_string(&json).unwrap();
+        std::fs::write(&path, &written).unwrap();
+
+        assert!(repo.get(&inst.id).await.is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), written, "el archivo de la version nueva queda intacto");
+    }
+
+    #[tokio::test]
+    async fn an_instance_being_created_is_never_taken_for_an_orphan() {
+        let (_d, repo) = repo();
+        let id = "inst_000000000000000000000000000000aa";
+        let guard = repo.mutation_guard(id).await.unwrap();
+        std::fs::create_dir_all(repo.instance_dir(id).unwrap().join("game")).unwrap();
+        let repo = std::sync::Arc::new(repo);
+        let cleaner = {
+            let repo = repo.clone();
+            tokio::spawn(async move { repo.remove_orphan(id).await })
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(!cleaner.is_finished(), "la limpieza espera mientras el id esta reservado");
+        drop(guard);
+        assert!(cleaner.await.unwrap().unwrap(), "sin reserva ni ficha si es huerfana");
     }
 
     #[tokio::test]

@@ -62,6 +62,8 @@ pub struct Launcher {
     mods_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// `None` mientras se prepara; `Some` cuando el proceso ya existe.
     running: Mutex<HashMap<String, Option<GameKiller>>>,
+    /// Instancias cuyo cierre pidio el launcher (Detener): su codigo de salida no es un fallo del juego.
+    stopping: Mutex<std::collections::HashSet<String>>,
 }
 
 impl Launcher {
@@ -115,6 +117,7 @@ impl Launcher {
             theme_store: themes::ThemeStore::new(paths.themes_dir()),
             skin_library: skins::SkinLibrary::new(paths.skins_dir()),
             running: Mutex::new(HashMap::new()),
+            stopping: Mutex::new(std::collections::HashSet::new()),
             mods_locks: Mutex::new(HashMap::new()),
             paths,
         }
@@ -513,6 +516,8 @@ impl Launcher {
             .get(instance_id)
             .await?
             .ok_or(LauncherError::InstanceNotFound)?;
+        // Primero si esta reservada (p. ej. importandose): asi no se confunde con una importacion cortada.
+        self.ensure_idle(&instance.id)?;
         self.prepare_instance_dirs(&instance).await?;
 
         {
@@ -586,6 +591,7 @@ impl Launcher {
     pub fn stop(&self, instance_id: &str) -> Result<(), LauncherError> {
         match self.running_guard().get(instance_id) {
             Some(Some(killer)) => {
+                self.stopping.lock().unwrap_or_else(|p| p.into_inner()).insert(instance_id.to_string());
                 killer.kill();
                 Ok(())
             }
@@ -604,6 +610,7 @@ impl Launcher {
         let mut game = ProcessRunner::launch(&plan).await?;
         self.running_guard().insert(instance.id.clone(), Some(game.killer()));
 
+        self.stopping.lock().unwrap_or_else(|p| p.into_inner()).remove(id);
         let mut log = open_log(&self.instances.logs_dir(id)?).await;
         let mut watch = crate::crash_hints::CrashWatch::default();
         while let Some(event) = game.next_event().await {
@@ -625,7 +632,11 @@ impl Launcher {
                         GameOutputEvent { instance_id: id.to_string(), line },
                     );
                 }
-                LaunchEvent::Exited { code } if code != Some(0) && watch.hint().is_some() => {
+                LaunchEvent::Exited { code }
+                    if code != Some(0)
+                        && watch.hint().is_some()
+                        && !self.stopping.lock().unwrap_or_else(|p| p.into_inner()).remove(id) =>
+                {
                     let hint = watch.hint().expect("comprobado arriba");
                     tracing::warn!(?code, ?hint, "el juego se cerro con una causa conocida");
                     self.emit_state(
@@ -844,10 +855,10 @@ impl Launcher {
                 }
                 let requirement = JavaRequirement { major_version: major };
                 // Con mods no se acepta un Java mas nuevo: el Mixin de los loaders antiguos no lo lee.
-                if matches!(instance.loader, LoaderKind::Vanilla) {
-                    Ok(self.java.ensure_java(&requirement).await?)
-                } else {
+                if is_modded(instance, descriptor) {
                     Ok(self.java.ensure_exact_java(&requirement).await?)
+                } else {
+                    Ok(self.java.ensure_java(&requirement).await?)
                 }
             }
         }
@@ -876,6 +887,12 @@ impl Launcher {
     pub(crate) fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
         self.running.lock().unwrap_or_else(|p| p.into_inner())
     }
+}
+
+/// Con mods: un loader elegido en la instancia, o una version personalizada que se apoya en otra
+/// (Forge, Fabric u OptiFine puestos a mano llevan `inheritsFrom`).
+fn is_modded(instance: &Instance, descriptor: &VersionDescriptor) -> bool {
+    !matches!(instance.loader, LoaderKind::Vanilla) || descriptor.inherits_from.is_some()
 }
 
 /// Nombre legible del cargador de mods.

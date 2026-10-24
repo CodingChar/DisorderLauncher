@@ -52,7 +52,8 @@ pub(crate) fn required_space_bytes(index: &modpacks::ModpackIndex) -> u64 {
 pub(crate) fn free_space_bytes(path: &Path) -> Option<u64> {
     let probe = path.ancestors().find(|p| p.exists())?.canonicalize().ok()?;
     let plain = strip_verbatim(&probe);
-    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let kind = sysinfo::DiskRefreshKind::nothing().with_storage();
+    let disks = sysinfo::Disks::new_with_refreshed_list_specifics(kind);
     disks
         .list()
         .iter()
@@ -100,7 +101,10 @@ impl Launcher {
             )));
         }
         let needed = required_space_bytes(&index);
-        if let Some(free) = free_space_bytes(&self.paths().instances_dir()) {
+        // La enumeracion de discos es bloqueante (y lenta con unidades de red o opticas): fuera del runtime.
+        let instances_dir = self.paths().instances_dir();
+        let free = tokio::task::spawn_blocking(move || free_space_bytes(&instances_dir)).await.ok().flatten();
+        if let Some(free) = free {
             if free < needed {
                 return Err(LauncherError::InvalidInput(format!(
                     "No hay espacio suficiente en el disco: se necesitan unos {} GB libres y hay {}.",

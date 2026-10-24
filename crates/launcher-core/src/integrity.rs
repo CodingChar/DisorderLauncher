@@ -136,8 +136,11 @@ impl Launcher {
             report.issues.push(issue(id, name, IssueKind::LayoutRepaired, true));
         }
 
-        if !matches!(self.accounts.get(&instance.profile_id).await, Ok(Some(_))) {
-            report.issues.push(issue(id, name, IssueKind::ProfileMissing, false));
+        match self.accounts.get(&instance.profile_id).await {
+            Ok(Some(_)) => {}
+            Ok(None) => report.issues.push(issue(id, name, IssueKind::ProfileMissing, false)),
+            // Un fallo de lectura pasajero no es un perfil faltante: se registra y no se avisa.
+            Err(e) => tracing::warn!(instance = %id, error = %e, "no se pudo leer el perfil de la instancia"),
         }
         if let JavaSelection::Path { path } = &instance.java {
             if !java_runtime::java_executable(path).is_file() {

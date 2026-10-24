@@ -52,7 +52,8 @@ pub(crate) fn classify_line(line: &str) -> Option<CrashHint> {
     if line.contains("Could not reserve enough space") || line.contains("Invalid maximum heap size") {
         return Some(CrashHint::HeapReserve);
     }
-    if line.contains("java.lang.OutOfMemoryError") {
+    // Solo la excepcion que tumba el hilo principal: las capturadas e impresas por mods no son un cierre por memoria.
+    if line.contains("Exception in thread") && line.contains("java.lang.OutOfMemoryError") {
         return Some(CrashHint::OutOfMemory);
     }
     const MOD_SIGNATURES: &[&str] = &[
@@ -63,7 +64,6 @@ pub(crate) fn classify_line(line: &str) -> Option<CrashHint> {
         "net.minecraftforge.fml.ModLoadingException",
         "net.neoforged.fml.ModLoadingException",
         "MixinTransformerError",
-        "Mixin apply failed",
     ];
     MOD_SIGNATURES.iter().any(|s| line.contains(s)).then_some(CrashHint::IncompatibleMods)
 }

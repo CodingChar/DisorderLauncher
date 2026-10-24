@@ -80,8 +80,8 @@ impl JavaManager {
         }
     }
 
-    /// Como `ensure_java`, pero sin alternativa mas nueva: devuelve el Java exacto o falla.
-    /// Los loaders de mods (Mixin/ASM de Fabric y Forge) se rompen con un Java mas nuevo que el esperado.
+    /// Como `ensure_java`, pero con un tope a la alternativa mas nueva (`modded_java_cap`).
+    /// Los loaders de mods (Mixin/ASM de Fabric y Forge) se rompen con un Java mucho mas nuevo que el esperado.
     pub async fn ensure_exact_java(
         &self,
         requirement: &JavaRequirement,
@@ -90,7 +90,23 @@ impl JavaManager {
         if let Some(exact) = installed.iter().find(|j| j.major == requirement.major_version) {
             return Ok(exact.clone());
         }
-        self.download_runtime(requirement).await
+        let required = requirement.major_version;
+        let cap = modded_java_cap(required);
+        let download_error = match self.download_runtime(requirement).await {
+            Ok(inst) => return Ok(inst),
+            Err(e) => e,
+        };
+        if let Some(fallback) = select_capped_java(&installed, required, cap) {
+            tracing::warn!(required, found = fallback.major, error = %download_error, "se usa un Java compatible mas nuevo");
+            return Ok(fallback.clone());
+        }
+        // Versiones sin Java propio publicado (p. ej. 16 en Minecraft 1.17): se prueba el tope, que si existe.
+        if cap > required {
+            if let Ok(inst) = self.download_runtime(&JavaRequirement { major_version: cap }).await {
+                return Ok(inst);
+            }
+        }
+        Err(download_error)
     }
 
     pub async fn download_runtime(
@@ -108,6 +124,27 @@ impl JavaManager {
     pub fn managed_runtime_path(&self, major: u32) -> PathBuf {
         self.managed_runtimes_dir.join(format!("jre-{}", major))
     }
+}
+
+/// Java mas nuevo que se acepta para un juego con mods: los loaders actuales leen hasta Java 17 sin problema,
+/// y por encima solo se acepta el Java que el propio juego pida.
+pub fn modded_java_cap(required_major: u32) -> u32 {
+    required_major.max(17)
+}
+
+/// Java instalado mas cercano a `required_major` sin pasar de `cap` (solo para Java 9 o superior).
+pub fn select_capped_java(
+    installations: &[JavaInstallation],
+    required_major: u32,
+    cap: u32,
+) -> Option<&JavaInstallation> {
+    if required_major <= LEGACY_JAVA_MAJOR {
+        return None;
+    }
+    installations
+        .iter()
+        .filter(|j| j.major >= required_major && j.major <= cap)
+        .min_by_key(|j| j.major)
 }
 
 /// Elige el Java a usar para `required_major`.
@@ -134,6 +171,19 @@ pub fn select_best_java(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn modded_games_accept_java_17_for_java_16_but_never_21() {
+        let installations = vec![
+            JavaInstallation { path: "a".into(), version: "17.0.9".into(), major: 17, managed: false },
+            JavaInstallation { path: "b".into(), version: "21.0.2".into(), major: 21, managed: true },
+        ];
+        let cap = modded_java_cap(16);
+        assert_eq!(select_capped_java(&installations, 16, cap).map(|j| j.major), Some(17));
+        assert!(select_capped_java(&installations[1..], 17, modded_java_cap(17)).is_none(), "21 no sirve para 17");
+        assert_eq!(modded_java_cap(21), 21);
+        assert!(select_capped_java(&installations, 8, modded_java_cap(8)).is_none(), "Java 8 solo exacto");
+    }
 
     #[test]
     fn select_best_exact_match() {
