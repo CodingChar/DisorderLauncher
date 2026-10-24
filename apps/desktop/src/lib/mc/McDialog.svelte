@@ -26,9 +26,11 @@
     cancelIndex?: number
     /** Mensaje largo: se muestra en una lista con barra de desplazamiento. */
     scroll?: boolean
+    /** Dialogo de error: suena el aviso de «no se pudo» al abrirlo. */
+    error?: boolean
   }
 
-  let { topAligned = false, highlight, title, message = '', buttons, onclose, cancelIndex = buttons.length - 1, scroll = false }: Props = $props()
+  let { topAligned = false, highlight, title, message = '', buttons, onclose, cancelIndex = buttons.length - 1, scroll = false, error = false }: Props = $props()
 
   const gui = useGui()
   const uid = $props.id()
@@ -58,6 +60,7 @@
   $effect(() => pushBack(() => onclose()))
 
   onMount(() => {
+    if (error) playSfx('fail')
     const opener = document.activeElement as HTMLElement | null
     const stage = layer?.closest('.mc-stage')
     // Todo lo que rodea al dialogo (a cualquier nivel, hasta el escenario) queda inerte; sus ancestros no.

@@ -48,9 +48,9 @@
   }}
   aria-label={ariaLabel ?? label}
   {...extra}
-  onpointerenter={(event) => { hovered = true; if (!disabled) onintent?.(); if (typeof extra.onpointerenter === 'function') extra.onpointerenter(event) }}
+  onpointerenter={(event) => { hovered = true; if (!disabled) { playSfx('focus'); onintent?.() } if (typeof extra.onpointerenter === 'function') extra.onpointerenter(event) }}
   onpointerleave={(event) => { hovered = false; if (typeof extra.onpointerleave === 'function') extra.onpointerleave(event) }}
-  onfocus={(event) => { keyboardFocus = event.currentTarget.matches(':focus-visible'); if (!disabled) onintent?.(); if (typeof extra.onfocus === 'function') extra.onfocus(event) }}
+  onfocus={(event) => { keyboardFocus = event.currentTarget.matches(':focus-visible'); if (!disabled) { if (keyboardFocus) playSfx('focus'); onintent?.() } if (typeof extra.onfocus === 'function') extra.onfocus(event) }}
   onblur={(event) => { keyboardFocus = false; if (typeof extra.onblur === 'function') extra.onblur(event) }}
 >
   <span class="caption" style:left="{left}px">

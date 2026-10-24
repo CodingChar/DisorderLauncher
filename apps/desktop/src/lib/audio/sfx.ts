@@ -7,7 +7,13 @@ export const SOUNDS = {
   click: { file: 'minecraft_click.mp3', gain: 1 },
   /** Volver, cancelar, cerrar un dialogo o salir. */
   back: { file: 'back-or-exit.mp3', gain: 1 },
-} as const
+  /** Pasar el puntero o moverse con teclado por un boton (Minecraft Legacy). */
+  focus: { file: 'legacy-focus.mp3', gain: 0.6, gap: 60 },
+  /** Mover un deslizador o la seleccion de una lista (Minecraft Legacy). */
+  scroll: { file: 'legacy-scroll.mp3', gain: 0.8, gap: 70 },
+  /** Dialogo de error o algo que no se pudo hacer (Minecraft Legacy). */
+  fail: { file: 'legacy-fail.mp3', gain: 1 },
+} as const satisfies Record<string, { file: string; gain: number; gap?: number }>
 
 export type SoundId = keyof typeof SOUNDS
 export type SoundChoice = SoundId | 'auto' | 'none'
@@ -85,7 +91,8 @@ export function playSfx(id: SoundId | null) {
   const ctx = ensureContext()
   if (!ctx || !master) return
   const now = performance.now()
-  if (now - (lastPlayed.get(id) ?? -Infinity) < MIN_GAP_MS) return
+  const gap = (SOUNDS[id] as { gap?: number }).gap ?? MIN_GAP_MS
+  if (now - (lastPlayed.get(id) ?? -Infinity) < gap) return
   lastPlayed.set(id, now)
   // Navegadores que arrancan el contexto suspendido hasta el primer gesto del usuario.
   if (ctx.state === 'suspended') void ctx.resume().catch(() => {})

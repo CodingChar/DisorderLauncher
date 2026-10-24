@@ -618,7 +618,7 @@
 {/if}
 
 {#if error || notice}
-  <McDialog title={error ? 'Error de skin' : 'Skin guardada'} message={error ?? notice ?? ''} buttons={[{ label: 'Hecho', onclick: () => { error = null; notice = null } }]} onclose={() => { error = null; notice = null }} />
+  <McDialog title={error ? 'Error de skin' : 'Skin guardada'} message={error ?? notice ?? ''} error={!!error} buttons={[{ label: 'Hecho', onclick: () => { error = null; notice = null } }]} onclose={() => { error = null; notice = null }} />
 {/if}
 
 <style>

@@ -3,6 +3,7 @@
   import { fitText, stringWidth } from './font'
   import { palette } from './palette.svelte'
   import { posStyle, type Anchor } from './pos'
+  import { playSfx } from '../audio/sfx'
 
   interface Props {
     value: number
@@ -36,6 +37,7 @@
   function set(next: number) {
     if (next === value) return
     value = next
+    playSfx('scroll')
     onchange?.(next)
   }
 

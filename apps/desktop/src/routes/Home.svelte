@@ -179,6 +179,7 @@
       <McDialog
         title={failure.retry ? 'Sin conexión' : failure.signIn ? 'Inicia sesión de nuevo' : 'Algo salió mal'}
         message={failure.message}
+        error
         buttons={failureButtons}
         cancelIndex={0}
         onclose={dismissFailure}

@@ -151,7 +151,10 @@
     const key = event.key as ListKey
     if (selectable) {
       const next = moveSelection(selectedIndex, key, count, pageRows)
-      if (next >= 0) choose(next)
+      if (next >= 0) {
+        if (next !== selectedIndex) playSfx('scroll')
+        choose(next)
+      }
       return
     }
     if (key === 'Home') setScroll(0)
