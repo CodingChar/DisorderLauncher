@@ -9,6 +9,7 @@
   import McText from '../lib/mc/McText.svelte'
   import { useGui } from '../lib/mc/gui'
   import { setSfxVolume, sfxVolume } from '../lib/audio/sfx'
+  import { panoramaMoves, setPanoramaMoves } from '../lib/mc/motion'
   import { FEATURES } from '../lib/features'
   import { nav } from '../lib/stores/nav.svelte'
   import { settings } from '../lib/stores/settings.svelte'
@@ -27,6 +28,11 @@
   let javaPath = $state(settings.value.javaPath ?? '')
   let msClientId = $state(settings.value.microsoftClientId ?? '')
   let volume = $state(Math.round(sfxVolume() * 100))
+  let background = $state<'moving' | 'still'>(panoramaMoves() ? 'moving' : 'still')
+  const backgrounds = [
+    { value: 'moving' as const, label: 'En movimiento' },
+    { value: 'still' as const, label: 'Quieto' },
+  ]
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
   let saving = $state(false)
@@ -79,14 +85,15 @@
     >
       <McLabel center y={30} text="Apariencia clásica de Minecraft" />
       <McSlider y={44} bind:value={volume} min={0} max={100} step={5} format={(v) => `Volumen de sonidos: ${v}%`} label="Volumen de sonidos" onchange={(v) => setSfxVolume(v / 100)} />
-      <McCycle y={70} label="Descargas" options={speeds} bind:value={speed} />
-      <McText text={speedHint} x={-155} y={94} w={310} align="center" color="#808080" maxLines={1} />
+      <McCycle y={68} label="Fondo del menú" options={backgrounds} bind:value={background} onchange={(v) => setPanoramaMoves(v === 'moving')} />
+      <McCycle y={92} label="Descargas" options={speeds} bind:value={speed} />
+      <McText text={speedHint} x={-155} y={116} w={310} align="center" color="#808080" maxLines={1} />
 
-      <McLabel x={-155} y={112} color="#a0a0a0" text="Java propio (opcional)" />
-      <McField x={-155} y={122} w={310} maxlength={260} bind:value={javaPath} placeholder="Déjalo vacío para que se gestione solo" label="Java propio (opcional)" />
-      <McText text="Solo se usa si es compatible con la versión de Minecraft; si no, el launcher elige uno adecuado." x={-155} y={146} w={310} color="#808080" maxLines={2} />
+      <McLabel x={-155} y={132} color="#a0a0a0" text="Java propio (opcional)" />
+      <McField x={-155} y={142} w={310} maxlength={260} bind:value={javaPath} placeholder="Déjalo vacío para que se gestione solo" label="Java propio (opcional)" />
+      <McText text="Solo se usa si es compatible con la versión de Minecraft; si no, el launcher elige uno adecuado." x={-155} y={166} w={310} color="#808080" maxLines={2} />
 
-      <McLabel x={-155} y={170} color="#707070" max={310} text={`Carpeta de datos: ${settings.dataDir || '—'}`} />
+      <McLabel x={-155} y={gui.H - 52} color="#707070" max={310} text={`Carpeta de datos: ${settings.dataDir || '—'}`} />
       {#if FEATURES.microsoftSettings}
         <McButton x={-155} y={gui.H - 78} w={150} label="Avanzado..." ariaLabel="Opciones avanzadas" onclick={() => (sub = 'advanced')} />
       {/if}

@@ -1,39 +1,40 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { animateVisible } from './animation'
+  import { panoramaMoves } from './motion'
 
-  let panorama = $state<HTMLDivElement>()
-  let cube = $state<HTMLDivElement>()
-
-  let distance = 800
-
-  function place(ticks: number) {
-    if (!cube) return
-    const pitch = Math.sin(ticks / 400) * 25 + 20
-    cube.style.transform = `translateZ(${distance}px) rotateX(${-pitch}deg) rotateY(${-ticks * 0.1}deg)`
-  }
+  // El giro es una animacion CSS (compositor/GPU): sin JavaScript por fotograma, a la tasa del monitor.
+  // Formula del menu original (RotatingCubeMapRenderer, 20 ticks por segundo):
+  //   yaw   = -ticks * 0.1            -> 2 grados por segundo, vuelta completa en 180 s
+  //   pitch = sin(ticks / 400) * 25 + 20 -> oscila entre -5 y 45 grados, periodo de 125,7 s
+  let wrap = $state<HTMLDivElement>()
+  const moves = panoramaMoves()
+  let paused = $state(false)
 
   onMount(() => {
     const resize = () => {
-      distance = Math.round(Math.max(innerWidth, innerHeight) / 2 / 0.81)
-      if (panorama) panorama.style.perspective = `${distance}px`
-      place(0)
+      // Distancia de la camara para un campo de vision vertical equivalente al original.
+      const distance = Math.round(Math.max(innerWidth, innerHeight) / 2 / 0.81)
+      wrap?.style.setProperty('--pano-d', `${distance}px`)
     }
+    // Pestana oculta o ventana minimizada: se detiene en lugar de gastar GPU sin que nadie lo vea.
+    const sync = () => (paused = document.hidden)
     resize()
-    // El fondo gira lentamente: 30 Hz bastan, sin seguir los 120/144/240 Hz del monitor.
-    const stopAnimation = animateVisible((now, still) => place(still ? 0 : now / 50), 30)
+    sync()
     addEventListener('resize', resize, { passive: true })
+    document.addEventListener('visibilitychange', sync)
     return () => {
-      stopAnimation()
       removeEventListener('resize', resize)
+      document.removeEventListener('visibilitychange', sync)
     }
   })
 </script>
 
-<div class="panorama-wrap" aria-hidden="true">
-  <div class="panorama" bind:this={panorama}>
-    <div class="pano-cube" bind:this={cube}>
-      {#each [0, 1, 2, 3, 4, 5] as face (face)}<div class="pano-face pano-{face}"></div>{/each}
+<div class="panorama-wrap" class:still={!moves} class:paused aria-hidden="true" bind:this={wrap}>
+  <div class="panorama">
+    <div class="pano-pitch">
+      <div class="pano-cube">
+        {#each [0, 1, 2, 3, 4, 5] as face (face)}<div class="pano-face pano-{face}"></div>{/each}
+      </div>
     </div>
   </div>
   <div class="panorama-shade"></div>

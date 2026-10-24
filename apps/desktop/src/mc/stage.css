@@ -94,6 +94,8 @@ button {
   filter: blur(2.5px);
 }
 
+/* Cabeceo (pitch) y giro (yaw) en dos capas para animarlos con periodos distintos, igual que el original. */
+.pano-pitch,
 .pano-cube {
   position: absolute;
   left: 50%;
@@ -101,7 +103,44 @@ button {
   width: 0;
   height: 0;
   transform-style: preserve-3d;
+}
+
+.pano-pitch {
+  --pano-d: 843px;
+  transform: translateZ(var(--pano-d)) rotateX(-20deg);
+  /* pitch = sin(t) * 25 + 20: de rotateX(5deg) a rotateX(-45deg) con una curva de seno, media onda = 62,83 s.
+     El retraso negativo empieza en pitch 20 y subiendo, como el original al abrir el menu. */
+  animation: pano-pitch 62.83s cubic-bezier(0.37, 0, 0.63, 1) -31.4s infinite alternate;
   will-change: transform;
+}
+
+.pano-cube {
+  /* 2 grados por segundo: vuelta completa en 180 s. */
+  animation: pano-yaw 180s linear infinite;
+  will-change: transform;
+}
+
+@keyframes pano-pitch {
+  from { transform: translateZ(var(--pano-d)) rotateX(5deg); }
+  to { transform: translateZ(var(--pano-d)) rotateX(-45deg); }
+}
+
+@keyframes pano-yaw {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(-360deg); }
+}
+
+/* «Fondo en movimiento» apagado en Ajustes: queda quieto en la pose inicial. */
+.panorama-wrap.still .pano-pitch,
+.panorama-wrap.still .pano-cube {
+  animation: none;
+  will-change: auto;
+}
+
+/* Ventana oculta: las animaciones se detienen sin perder la posicion. */
+.panorama-wrap.paused .pano-pitch,
+.panorama-wrap.paused .pano-cube {
+  animation-play-state: paused;
 }
 
 .pano-face {

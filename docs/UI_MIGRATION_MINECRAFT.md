@@ -35,7 +35,7 @@
 
 | Componente | Notas |
 |---|---|
-| `McStage` | Fondo (panorama 3D en el menú, tierra tintada en el resto), escala entera, contexto `useGui()` con `W/H/cx/s/factor`. En DEV `window.__forceGui = {w, h}` fuerza el tamaño virtual. |
+| `McStage` | Fondo (panorama 3D giratorio en el menú, tierra tintada en el resto; el giro es una animación CSS de la GPU con la fórmula del menú original —yaw 2°/s, pitch `sin(t)*25+20`— que no depende de la preferencia de animaciones de Windows y se apaga en Ajustes › «Fondo del menú», ver `lib/mc/motion.ts`), escala entera, contexto `useGui()` con `W/H/cx/s/factor`. En DEV `window.__forceGui = {w, h}` fuerza el tamaño virtual. |
 | `McScreen` | Título bitmap centrado + `<h1 class="sr-only">` que recibe el foco al abrir la pantalla. |
 | `BitmapText` · `McLabel` · `McText` | Texto suelto, etiqueta posicionada y párrafo. `McText` con `role="alert"/"status"` para errores y avisos. |
 | `McButton` | Sprite de 200×20, hover amarillo (del tema), deshabilitado, `active` (pestaña/herramienta), `type="submit"`, `extra` para roles y eventos. |
