@@ -39,3 +39,6 @@ npm-debug.log*
 *.dll
 *.so
 *.dylib
+
+# Documentos personales
+Practica Final*

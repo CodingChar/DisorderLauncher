@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DisorderLauncher — Launcher de Minecraft Java ligero y seguro</title>
+  <meta name="description" content="DisorderLauncher es un launcher de Minecraft Java gratuito y de código abierto: modo offline, Fabric, Forge, Quilt y NeoForge, mods de Modrinth, modpacks, editor de skins y Java automático. Pensado para quien no sabe de informática.">
+  <meta name="theme-color" content="#2b2118">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DisorderLauncher — Launcher de Minecraft Java">
+  <meta property="og:description" content="Ligero, seguro y fácil. Offline, mods, modpacks, skins y Java automático. Gratis y de código abierto.">
+  <meta property="og:image" content="assets/shots/menu.jpg">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
+
+  <header class="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href="#inicio" aria-label="DisorderLauncher, inicio">
+        <img src="assets/logo.png" width="32" height="32" alt="">
+        <span>DisorderLauncher</span>
+      </a>
+      <nav aria-label="Principal">
+        <a href="#caracteristicas">Características</a>
+        <a href="#capturas">Capturas</a>
+        <a href="#como-empezar">Cómo empezar</a>
+        <a href="#preguntas">Preguntas</a>
+        <a href="https://github.com/CodingChar/DisorderLauncher" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido">
+    <section class="hero" id="inicio">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="wrap hero-in">
+        <p class="splash" aria-hidden="true">¡Gratis y de código abierto!</p>
+        <h1>DisorderLauncher</h1>
+        <p class="lead">El launcher de Minecraft Java que cualquiera puede usar. Ligero, seguro y sin complicaciones: elige una versión, pulsa jugar y listo.</p>
+        <div class="cta">
+          <a class="btn btn-green" id="dl-main" href="https://github.com/CodingChar/DisorderLauncher/releases/latest" rel="noopener">
+            <span class="btn-title">Descargar para Windows</span>
+            <span class="btn-sub" id="dl-meta">Windows 10 / 11 · 64 bits</span>
+          </a>
+          <a class="btn" href="https://github.com/CodingChar/DisorderLauncher" rel="noopener">
+            <span class="btn-title">Ver código en GitHub</span>
+            <span class="btn-sub">Licencia MIT</span>
+          </a>
+        </div>
+        <p class="legal-mini">No afiliado a Mojang ni a Microsoft. Minecraft es una marca de Mojang Studios.</p>
+      </div>
+    </section>
+
+    <section class="strip" aria-label="Datos rápidos">
+      <div class="wrap strip-in">
+        <div><strong>Rust + Tauri</strong><span>Arranque rápido y poco consumo</span></div>
+        <div><strong>4 loaders</strong><span>Fabric · Quilt · Forge · NeoForge</span></div>
+        <div><strong>Java automático</strong><span>Descarga la versión exacta que necesita</span></div>
+        <div><strong>Sin telemetría</strong><span>Tus datos se quedan en tu equipo</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="caracteristicas">
+      <div class="wrap">
+        <h2>Todo lo que necesitas para jugar</h2>
+        <p class="section-lead">Hecho para gente sin experiencia técnica: nada de términos raros ni configuraciones escondidas.</p>
+
+        <div class="grid">
+          <article class="card">
+            <img src="assets/icons/grass.png" width="48" height="48" alt="">
+            <h3>Modo offline completo</h3>
+            <p>Crea perfiles locales y juega sin conexión. Funciona de verdad, no es un parche: el launcher está construido sobre un sistema de identidades.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/crafting.png" width="48" height="48" alt="">
+            <h3>Instancias separadas</h3>
+            <p>Cada instancia tiene su versión, sus mods y su memoria. Prueba lo que quieras sin romper tu partida principal.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/pickaxe.png" width="48" height="48" alt="">
+            <h3>Mods con un clic</h3>
+            <p>Busca en Modrinth, instala dependencias automáticamente, actívalos o desactívalos y vuelve atrás si una actualización falla.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/sword.png" width="48" height="48" alt="">
+            <h3>Fabric, Quilt, Forge y NeoForge</h3>
+            <p>Instala el loader que quieras y el launcher se encarga del resto, también en versiones antiguas del juego.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/ender.png" width="48" height="48" alt="">
+            <h3>Modpacks .mrpack</h3>
+            <p>Importa y exporta modpacks de Modrinth. Si algo sale mal a mitad, se deshace todo y no se queda a medias.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/apple.png" width="48" height="48" alt="">
+            <h3>Editor de skins</h3>
+            <p>Dibuja tu skin con lápiz, relleno y capas, con vista 3D en vivo. La skin se adapta a la versión del juego.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/redstone.png" width="48" height="48" alt="">
+            <h3>Java y memoria sin pensar</h3>
+            <p>Descarga el Java correcto para cada versión (Java 8 exacto donde hace falta) y reparte la RAM según tu equipo y tus mods.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/torch.png" width="48" height="48" alt="">
+            <h3>Repara y diagnostica</h3>
+            <p>Verifica archivos, repara instalaciones dañadas y explica los cierres inesperados en lenguaje claro, no con un volcado de errores.</p>
+          </article>
+          <article class="card">
+            <img src="assets/icons/tnt.png" width="48" height="48" alt="">
+            <h3>Seguro por diseño</h3>
+            <p>Sin secretos en el frontend, sin ejecutar comandos de shell, descargas verificadas por hash y solo desde dominios de confianza.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="capturas">
+      <div class="wrap">
+        <h2>Así se ve</h2>
+        <p class="section-lead">Interfaz con el estilo clásico de Minecraft: botones, fuente y fondo que ya conoces.</p>
+
+        <figure class="shot shot-main">
+          <img src="assets/shots/menu.jpg" width="1280" height="720" alt="Menú principal de DisorderLauncher con los botones Mis instancias, Explorar, Herramientas, Perfiles, Ajustes y Skins" loading="lazy">
+          <figcaption>Menú principal</figcaption>
+        </figure>
+        <div class="shots">
+          <figure class="shot">
+            <img src="assets/shots/editor.jpg" width="1280" height="720" alt="Editor de skins con paleta de colores y vista previa 3D" loading="lazy">
+            <figcaption>Editor de skins</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="assets/shots/tutorial.jpg" width="1280" height="720" alt="Paseo guiado de bienvenida, paso de Ajustes" loading="lazy">
+            <figcaption>Paseo guiado para empezar</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="como-empezar">
+      <div class="wrap">
+        <h2>Empieza en tres pasos</h2>
+        <ol class="steps">
+          <li>
+            <span class="num">1</span>
+            <div>
+              <h3>Descarga el instalador</h3>
+              <p>Pulsa el botón verde de descarga. Es un instalador de Windows (<code>.exe</code>) de pocos megas.</p>
+            </div>
+          </li>
+          <li>
+            <span class="num">2</span>
+            <div>
+              <h3>Instálalo</h3>
+              <p>Ábrelo y sigue los pasos. Si Windows muestra «Windows protegió su PC», pulsa <strong>Más información</strong> y luego <strong>Ejecutar de todas formas</strong>: aún no tiene firma de editor y por eso Windows lo avisa.</p>
+            </div>
+          </li>
+          <li>
+            <span class="num">3</span>
+            <div>
+              <h3>Crea tu perfil y juega</h3>
+              <p>Un paseo guiado te lleva por los ajustes, elige una versión y pulsa jugar. El launcher descarga todo lo necesario.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="download-box">
+          <div>
+            <h3>Descarga DisorderLauncher</h3>
+            <p id="dl-detail">Windows 10 / 11 de 64 bits. Se recomienda tener 4 GB de RAM o más.</p>
+          </div>
+          <a class="btn btn-green" id="dl-second" href="https://github.com/CodingChar/DisorderLauncher/releases/latest" rel="noopener">
+            <span class="btn-title">Descargar</span>
+            <span class="btn-sub" id="dl-meta2">Última versión</span>
+          </a>
+        </div>
+        <p class="hash-note" id="hash-note" hidden></p>
+      </div>
+    </section>
+
+    <section class="section alt" id="preguntas">
+      <div class="wrap narrow">
+        <h2>Preguntas frecuentes</h2>
+
+        <details>
+          <summary>¿Es gratis?</summary>
+          <p>Sí. DisorderLauncher es software libre bajo licencia MIT: puedes usarlo, leer su código y modificarlo.</p>
+        </details>
+        <details>
+          <summary>¿Necesito una cuenta de Microsoft?</summary>
+          <p>Puedes jugar sin ella con un perfil offline, pensado para uso local, desarrollo y servidores que admiten identidades locales. El perfil offline no sustituye una cuenta de pago ni sirve en servidores que exigen una sesión oficial. El inicio de sesión de Microsoft ya está diseñado en el núcleo del launcher, pero todavía falta verificarlo contra los servidores reales, así que de momento no está activo.</p>
+        </details>
+        <details>
+          <summary>¿Es seguro?</summary>
+          <p>El código es público y se puede auditar. Los tokens nunca pasan por la interfaz, no se ejecutan comandos de shell para lanzar el juego, las descargas se validan con hash y solo se aceptan dominios de confianza. Puedes leer el <a href="https://github.com/CodingChar/DisorderLauncher/blob/main/docs/SECURITY_AUDIT.md" rel="noopener">informe de seguridad</a>.</p>
+        </details>
+        <details>
+          <summary>Windows me avisa al instalar, ¿por qué?</summary>
+          <p>Firmar un instalador con certificado de editor cuesta dinero cada año y todavía no lo tiene. Mientras tanto Windows SmartScreen avisa de cualquier programa sin firma. Puedes comprobar el instalador comparando su huella SHA-256 con la que aparece en la página de la versión.</p>
+        </details>
+        <details>
+          <summary>¿Funciona en Mac o Linux?</summary>
+          <p>El código está preparado para varios sistemas y el proyecto compila en Linux, pero por ahora solo se prueba y se distribuye para Windows.</p>
+        </details>
+        <details>
+          <summary>¿Está relacionado con Mojang o Microsoft?</summary>
+          <p>No. Es un proyecto independiente. Minecraft es una marca de Mojang Studios. El estilo visual es un homenaje y las texturas son propiedad de Mojang.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-in">
+      <p><strong>DisorderLauncher</strong> · Código bajo <a href="https://github.com/CodingChar/DisorderLauncher/blob/main/LICENSE" rel="noopener">licencia MIT</a>.</p>
+      <p>No afiliado a Mojang Studios ni a Microsoft. Las texturas, fuentes y sonidos de Minecraft son © Mojang y no están cubiertos por la licencia MIT. Ver <a href="https://github.com/CodingChar/DisorderLauncher/blob/main/NOTICE.md" rel="noopener">NOTICE</a>.</p>
+      <p><a href="https://github.com/CodingChar/DisorderLauncher" rel="noopener">GitHub</a> · <a href="https://github.com/CodingChar/DisorderLauncher/issues" rel="noopener">Reportar un problema</a></p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
