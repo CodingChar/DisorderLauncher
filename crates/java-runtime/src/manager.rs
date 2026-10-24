@@ -80,6 +80,19 @@ impl JavaManager {
         }
     }
 
+    /// Como `ensure_java`, pero sin alternativa mas nueva: devuelve el Java exacto o falla.
+    /// Los loaders de mods (Mixin/ASM de Fabric y Forge) se rompen con un Java mas nuevo que el esperado.
+    pub async fn ensure_exact_java(
+        &self,
+        requirement: &JavaRequirement,
+    ) -> Result<JavaInstallation, JavaError> {
+        let installed = self.detect_installed().await;
+        if let Some(exact) = installed.iter().find(|j| j.major == requirement.major_version) {
+            return Ok(exact.clone());
+        }
+        self.download_runtime(requirement).await
+    }
+
     pub async fn download_runtime(
         &self,
         requirement: &JavaRequirement,

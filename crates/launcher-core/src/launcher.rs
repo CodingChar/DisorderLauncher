@@ -600,10 +600,12 @@ impl Launcher {
         self.running_guard().insert(instance.id.clone(), Some(game.killer()));
 
         let mut log = open_log(&self.instances.logs_dir(id)?).await;
+        let mut java_too_new = false;
         while let Some(event) = game.next_event().await {
             match event {
                 LaunchEvent::Started { pid } => self.emit_state(id, LaunchState::Running { pid }),
                 LaunchEvent::Stdout(line) => {
+                    java_too_new |= is_java_too_new_line(&line);
                     write_log(&mut log, &line).await;
                     self.events.game_output(
                         OutputStream::Stdout,
@@ -611,10 +613,23 @@ impl Launcher {
                     );
                 }
                 LaunchEvent::Stderr(line) => {
+                    java_too_new |= is_java_too_new_line(&line);
                     write_log(&mut log, &line).await;
                     self.events.game_output(
                         OutputStream::Stderr,
                         GameOutputEvent { instance_id: id.to_string(), line },
+                    );
+                }
+                LaunchEvent::Exited { code } if java_too_new && code != Some(0) => {
+                    tracing::warn!(?code, "el juego se cerro por una version de Java no compatible");
+                    self.emit_state(
+                        id,
+                        LaunchState::Failed {
+                            message: "El juego se cerro porque esta instancia no es compatible con el Java que se uso. \
+                                      Elige el Java automatico, o uno mas antiguo como Java 17, en los ajustes de Java de la instancia."
+                                .into(),
+                            kind: crate::ErrorKind::Other,
+                        },
                     );
                 }
                 LaunchEvent::Exited { code } => self.emit_state(id, LaunchState::Exited { code }),
@@ -827,7 +842,13 @@ impl Launcher {
                 if let Some(global) = self.global_java(major).await {
                     return Ok(global);
                 }
-                Ok(self.java.ensure_java(&JavaRequirement { major_version: major }).await?)
+                let requirement = JavaRequirement { major_version: major };
+                // Con mods no se acepta un Java mas nuevo: el Mixin de los loaders antiguos no lo lee.
+                if matches!(instance.loader, LoaderKind::Vanilla) {
+                    Ok(self.java.ensure_java(&requirement).await?)
+                } else {
+                    Ok(self.java.ensure_exact_java(&requirement).await?)
+                }
             }
         }
     }
@@ -854,6 +875,29 @@ impl Launcher {
 
     pub(crate) fn running_guard(&self) -> std::sync::MutexGuard<'_, HashMap<String, Option<GameKiller>>> {
         self.running.lock().unwrap_or_else(|p| p.into_inner())
+    }
+}
+
+/// Linea del juego que delata un Java demasiado nuevo para el Mixin/ASM del loader.
+fn is_java_too_new_line(line: &str) -> bool {
+    line.contains("Unsupported class file major version")
+}
+
+#[cfg(test)]
+mod java_too_new_tests {
+    use super::is_java_too_new_line;
+
+    #[test]
+    fn detects_asm_rejecting_newer_class_files() {
+        assert!(is_java_too_new_line(
+            "[main/WARN]: Error loading class: java/lang/Thread (java.lang.IllegalArgumentException: Unsupported class file major version 65)"
+        ));
+    }
+
+    #[test]
+    fn ignores_other_lines() {
+        assert!(!is_java_too_new_line("[main/INFO]: Loading Minecraft 1.19 with Fabric Loader 0.14.8"));
+        assert!(!is_java_too_new_line("java.lang.UnsupportedClassVersionError: class file version 65.0"));
     }
 }
 

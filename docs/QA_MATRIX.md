@@ -58,6 +58,8 @@ Launcher (exe) 24 MB; WebView2 ≈ 280 MB de memoria total (165 MB privada) con 
 | Segundo arranque de una instancia ya instalada (sin red) | 0,4–1,2 s hasta `Running` |
 | Instalacion limpia Vanilla 1.0 + Java 8 + natives | ≈35–60 s (red) |
 
+Java con mods (2026-10-23): Fabric Loader 0.14.8 + Fabulously Optimized 1.19 (135 mods) fallaba con Java 21 (`Unsupported class file major version 65` en el Mixin) cuando se ejecutaba un instalador anterior a `b410a10`. Con el build actual la instancia usa el `jre-17` gestionado y llega a cargar LWJGL. Las instancias con loader ya no usan un Java mas nuevo del sistema si no pueden descargar el exacto (`ensure_exact_java`), y si el juego se cierra con ese error el launcher lo informa como fallo de compatibilidad de Java.
+
 ## Accesibilidad
 
 Auditada en navegador: objetivos ≥ 40 px (radios con etiqueta de 40 px), campos con etiqueta, un `<main>`/`<h1>`, foco movido al titulo al navegar, `aria-live` en estados, dialogos modales nativos, `prefers-reduced-motion`. El lienzo del editor tambien se maneja con teclado (flechas + Intro/Espacio); falta revisarlo con un lector de pantalla.
