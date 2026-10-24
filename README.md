@@ -64,6 +64,20 @@ Si dos documentos se contradicen, prevalece `00_MASTER.md`. Despues prevalece el
 
 El perfil Offline Gaming debe servir para uso local/offline compatible, desarrollo y entornos que admitan identidades locales. No debe representarse como una cuenta Microsoft, falsificar ownership, ni intentar sustituir autenticacion de servicios online que exijan una sesion valida.
 
+## Landing page
+
+La página de descarga está en [`landing/`](landing/) (HTML, CSS y JS estáticos, sin dependencias). Para verla en local:
+
+```bash
+python -m http.server 5180 --directory landing
+```
+
+El botón de descarga busca el instalador de la última versión publicada en GitHub Releases. Para publicarla, activa Settings › Pages › Source: «GitHub Actions» y lanza el workflow `Landing (GitHub Pages)`.
+
+## Licencia
+
+Código bajo licencia [MIT](LICENSE). Las texturas, fuente y sonidos de Minecraft no están cubiertos por ella: ver [`NOTICE.md`](NOTICE.md).
+
 ## Créditos
 
 Texturas y fuente inspiradas en Minecraft, © Mojang. DisorderLauncher no está afiliado a Mojang ni a Microsoft.
