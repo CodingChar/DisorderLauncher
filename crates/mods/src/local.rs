@@ -37,6 +37,8 @@ pub struct ModSource {
 #[serde(rename_all = "camelCase")]
 pub struct MissingDependency {
     pub mod_name: String,
+    /// Id del mod que falta tal como lo declara el mod que lo pide (p. ej. `fabric-api`).
+    pub id: String,
     /// Nombre legible de lo que falta (p. ej. "Fabric API").
     pub requires: String,
 }
@@ -198,6 +200,7 @@ impl ModManager {
                 if !provided.contains(required.as_str()) {
                     missing.push(MissingDependency {
                         mod_name: entry.name.clone(),
+                        id: required.clone(),
                         requires: friendly_dependency_name(required),
                     });
                 }
@@ -384,7 +387,7 @@ displayName = \"Cloth\"
         make_mod(m.mods_dir(), "b.jar", r#"{"id":"b","name":"Beta","depends":{"a":"*"}}"#);
 
         let missing = ModManager::missing_dependencies(&m.list().await.unwrap());
-        assert_eq!(missing, vec![MissingDependency { mod_name: "Alpha".into(), requires: "Fabric API".into() }]);
+        assert_eq!(missing, vec![MissingDependency { mod_name: "Alpha".into(), id: "fabric-api".into(), requires: "Fabric API".into() }]);
 
         make_mod(m.mods_dir(), "fabric-api.jar", r#"{"id":"fabric-api","name":"Fabric API"}"#);
         assert!(ModManager::missing_dependencies(&m.list().await.unwrap()).is_empty());

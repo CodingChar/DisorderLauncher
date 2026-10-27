@@ -313,7 +313,7 @@ async fn real_vanilla_install_launch_and_stop() {
 }
 
 #[tokio::test]
-async fn instance_crud_validates_profile_and_java() {
+async fn instance_crud_validates_java_and_ignores_per_instance_profile() {
     let (dir, launcher, _) = launcher();
     let first = launcher.accounts_create_local("David").await.unwrap();
     let second = launcher.accounts_create_local("Alex").await.unwrap();
@@ -332,10 +332,8 @@ async fn instance_crud_validates_profile_and_java() {
         )
         .await
         .unwrap();
-    assert_eq!((updated.name.as_str(), updated.profile_id.as_str()), ("Renombrada", second.id.as_str()));
-
-    let bad_profile = instance_manager::InstanceUpdate { profile_id: Some("acc_local_nope".into()), ..Default::default() };
-    assert!(matches!(launcher.instances_update(&instance.id, bad_profile).await, Err(LauncherError::ProfileMissing)));
+    // El perfil no se elige por instancia: lo decide el menu de Perfiles y esa orden se ignora.
+    assert_eq!((updated.name.as_str(), updated.profile_id.as_str()), ("Renombrada", first.id.as_str()));
 
     let bad_java = instance_manager::InstanceUpdate {
         java: Some(JavaSelection::Path { path: dir.path().join("no-java") }),
@@ -1232,4 +1230,25 @@ async fn deleting_an_instance_survives_a_file_held_by_another_program() {
     let repo = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir());
     assert_eq!(repo.remove_leftovers().await, 1);
     assert!(!launcher.paths().instances_dir().join(&inst.id).exists());
+}
+
+#[tokio::test]
+async fn the_selected_profile_plays_every_instance() {
+    let (dir, launcher, _) = launcher();
+    let jre = fake_installation(&launcher, dir.path());
+    launcher.accounts_create_local("David").await.unwrap();
+    let alex = launcher.accounts_create_local("Alex").await.unwrap();
+    // Se crea con David (el predeterminado de entonces) y despues se elige a Alex en Perfiles.
+    let instance = launcher.instances_create("Base", "1.99", LoaderKind::Vanilla, None).await.unwrap();
+    let repo = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir());
+    let instance = repo
+        .update(&instance.id, instance_manager::InstanceUpdate { java: Some(JavaSelection::Path { path: jre }), ..Default::default() })
+        .await
+        .unwrap();
+    launcher.accounts_set_default(&alex.id).await.unwrap();
+
+    let plan = launcher.prepare_launch(&instance).await.unwrap();
+    let args = plan.game_args.join(" ");
+    assert!(args.contains("Alex"), "juega con el perfil elegido, no con el de la creacion: {args}");
+    assert!(!args.contains("David"));
 }

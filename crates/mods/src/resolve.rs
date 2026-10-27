@@ -50,6 +50,58 @@ pub fn pick_best_version(versions: &[ModVersion]) -> Option<&ModVersion> {
     })
 }
 
+/// Nombres con los que Modrinth publica un mod que otros piden por su id interno. Primero los alias
+/// conocidos (el id de un mod no siempre coincide con su proyecto), despues el id tal cual y con `_` -> `-`.
+pub fn modrinth_candidates(mod_id: &str) -> Vec<String> {
+    let alias = match mod_id {
+        "fabric" | "fabric-api" | "fabric_api" => Some("fabric-api"),
+        "cloth-config" | "cloth-config2" | "cloth_config" | "cloth_config2" => Some("cloth-config"),
+        "yet_another_config_lib_v3" => Some("yacl"),
+        "modmenu" => Some("modmenu"),
+        "quilted_fabric_api" => Some("qsl"),
+        _ => None,
+    };
+    let mut out: Vec<String> = alias.into_iter().map(str::to_string).collect();
+    for candidate in [mod_id.to_string(), mod_id.replace('_', "-")] {
+        if !out.contains(&candidate) {
+            out.push(candidate);
+        }
+    }
+    out
+}
+
+/// Resultado de buscar en Modrinth lo que a una instancia le falta: que instalar y que no se encontro.
+#[derive(Debug, Default)]
+pub struct MissingPlan {
+    pub plan: Vec<PlannedMod>,
+    /// Ids que no existen en Modrinth para esta version de Minecraft y loader.
+    pub unresolved: Vec<String>,
+}
+
+/// Planifica la instalacion de varios mods que faltan (por su id) compartiendo lo ya decidido: una dependencia
+/// comun a dos de ellos se instala una sola vez. No escribe nada.
+pub async fn plan_missing(
+    source: &dyn VersionSource,
+    mod_ids: &[String],
+    installed_projects: &HashSet<String>,
+) -> MissingPlan {
+    let mut out = MissingPlan::default();
+    let mut tracked = installed_projects.clone();
+    'ids: for mod_id in mod_ids {
+        for candidate in modrinth_candidates(mod_id) {
+            if let Ok(found) = plan_install(source, &candidate, &tracked).await {
+                for item in found {
+                    tracked.insert(item.project_id.clone());
+                    out.plan.push(item);
+                }
+                continue 'ids;
+            }
+        }
+        out.unresolved.push(mod_id.clone());
+    }
+    out
+}
+
 /// Calcula que instalar para `project_id` y sus dependencias obligatorias, sin escribir nada.
 /// El resultado va en orden de instalacion: dependencias primero, el mod pedido al final.
 pub async fn plan_install(

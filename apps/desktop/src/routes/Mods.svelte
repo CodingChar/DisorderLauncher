@@ -67,7 +67,7 @@
   }
 
   const busyLabel = $derived(
-    mods.busy === 'search' ? 'Buscando mods' : mods.busy === 'optimize' ? 'Instalando mejoras de rendimiento' : mods.busy === 'updates' ? 'Buscando actualizaciones' : mods.busy === 'add' ? 'Agregando el archivo' : 'Trabajando',
+    mods.busy === 'search' ? 'Buscando mods' : mods.busy === 'optimize' ? 'Instalando mejoras de rendimiento' : mods.busy === 'updates' ? 'Buscando actualizaciones' : mods.busy === 'add' ? 'Agregando el archivo y sus dependencias' : mods.busy === 'deps' ? 'Instalando las dependencias que faltan' : 'Trabajando',
   )
 
   // Mensajes bajo la lista: lo mas importante primero (maximo dos lineas).
@@ -76,7 +76,7 @@
     if (mods.error) out.push({ text: mods.error, color: '#ff5555', role: 'alert' })
     if (mods.notice) out.push({ text: mods.notice, color: '#55ff55', role: 'status' })
     if (running) out.push({ text: 'El juego está abierto. Cierra el juego para cambiar mods.', color: '#ffaa00', role: 'status' })
-    for (const dep of overview?.missingDependencies ?? []) out.push({ text: `${dep.modName} necesita ${dep.requires}. Instálalo desde «Buscar mods».`, color: '#ffaa00', role: 'alert' })
+    for (const dep of overview?.missingDependencies ?? []) out.push({ text: `${dep.modName} necesita ${dep.requires}${mods.busy === 'deps' ? ': se está instalando.' : ' y no se encontró solo. Búscalo en «Buscar mods».'}`, color: '#ffaa00', role: 'alert' })
     if (tab === 'installed' && mods.updates !== null && mods.updates.length === 0) out.push({ text: 'Todos tus mods están al día.', color: '#808080', role: 'status' })
     return out.slice(0, 2)
   })

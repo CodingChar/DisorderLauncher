@@ -6,16 +6,13 @@
   import McDialog from '../lib/mc/McDialog.svelte'
   import McField from '../lib/mc/McField.svelte'
   import McLabel from '../lib/mc/McLabel.svelte'
-  import McList from '../lib/mc/McList.svelte'
   import McScreen from '../lib/mc/McScreen.svelte'
   import McText from '../lib/mc/McText.svelte'
   import { useGui } from '../lib/mc/gui'
-  import type { RowSpec } from '../lib/mc/listTypes'
   import { bandWidth } from '../lib/mc/pos'
   import { api } from '../lib/api'
   import { PERFORMANCE_LEVELS, formFromInstance, javaSelection, memoryError, memoryPolicy } from '../lib/instanceForm'
   import { findItemIcon, normalizeIconId } from '../lib/itemIcons'
-  import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
   import { nav } from '../lib/stores/nav.svelte'
   import { sessions } from '../lib/stores/sessions.svelte'
@@ -33,13 +30,12 @@
   const instance = $derived(instances.selected)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
 
-  type Sub = 'main' | 'version' | 'advanced' | 'jvm' | 'icon' | 'more' | 'profile'
+  type Sub = 'main' | 'version' | 'advanced' | 'jvm' | 'icon' | 'more'
   let sub = $state<Sub>('main')
 
   // Copia de trabajo del formulario; se inicializa una vez al abrir la pantalla.
   let name = $state('')
   let version = $state('')
-  let profileId = $state('')
   let memoryMode = $state<'auto' | 'fixed'>('auto')
   let maxGb = $state(4)
   let javaMode = $state<'auto' | 'path'>('auto')
@@ -61,7 +57,6 @@
     if (!instance) return
     name = instance.name
     version = instance.minecraftVersion
-    profileId = instance.profileId
     icon = normalizeIconId(instance.icon)
     optimization = instance.optimization ?? 'off'
     jvmTweaks = [...(instance.jvmTweaks ?? [])]
@@ -79,8 +74,6 @@
   })
 
   const custom = $derived(isCustomVersion(version))
-  const profileOptions = $derived(accounts.list.map((a) => ({ value: a.id, label: a.label })))
-  const profileLabel = $derived(accounts.list.find((a) => a.id === profileId)?.label ?? '')
   const iconLabel = $derived(icon ? (findItemIcon(icon)?.label ?? 'Por defecto') : 'Por defecto')
   const level = $derived(PERFORMANCE_LEVELS.find((l) => l.value === optimization) ?? PERFORMANCE_LEVELS[0])
 
@@ -110,7 +103,6 @@
         name,
         // Una version personalizada se queda como esta: no se cambia por otra de la lista oficial.
         ...(custom ? {} : { minecraftVersion: version }),
-        profileId,
         icon,
         optimization,
         jvmTweaks,
@@ -160,10 +152,6 @@
       error = (e as Error).message
     }
   }
-
-  function profileRow(a: { label: string; provider: string; id: string }): RowSpec {
-    return { lines: [{ text: a.label }, { text: a.provider === 'microsoft' ? 'Microsoft' : 'Offline Gaming' }, { text: a.id === profileId ? 'Perfil que juega' : '', color: '#55ff55' }] }
-  }
 </script>
 
 {#if !instance}
@@ -179,26 +167,6 @@
   <AdvancedOptions bind:memoryMode bind:maxGb bind:javaMode bind:javaPath disabled={busy} onback={() => (sub = 'main')} onjava={() => (sub = 'jvm')} onrecommend={recommend} />
 {:else if sub === 'jvm'}
   <JavaTweaks instanceId={instance.id} level={optimization} bind:tweaks={jvmTweaks} bind:args={jvmArgs} disabled={busy} onback={() => (sub = 'advanced')} />
-{:else if sub === 'profile'}
-  <McScreen title="Perfil que juega">
-    <McList
-      items={accounts.list}
-      getId={(a) => a.id}
-      row={profileRow}
-      selectedId={profileId}
-      onselect={(a) => !busy && (profileId = a.id)}
-      onactivate={(a) => {
-        profileId = a.id
-        sub = 'main'
-      }}
-      x={-(bw >> 1)}
-      y={24}
-      w={bw}
-      h={gui.H - 88}
-      ariaLabel="Perfiles"
-    />
-    <McButton anchor="bottom" y={-28} label="Hecho" onclick={() => (sub = 'main')} />
-  </McScreen>
 {:else if sub === 'more'}
   <McScreen title="Más acciones">
     <McButton y={28} label="Duplicar" disabled={busy} onclick={duplicate} />
@@ -247,12 +215,7 @@
       />
       <McButton x={5} y={60} w={150} label="Icono: {iconLabel}" disabled={busy} onclick={() => (sub = 'icon')} />
 
-      {#if accounts.list.length <= 6}
-        <McCycle x={-155} y={84} w={150} label="Perfil" options={profileOptions} bind:value={profileId} disabled={busy} />
-      {:else}
-        <McButton x={-155} y={84} w={150} label="Perfil: {profileLabel}" disabled={busy} onclick={() => (sub = 'profile')} />
-      {/if}
-      <McCycle x={5} y={84} w={150} label="Rendimiento" options={PERFORMANCE_LEVELS} bind:value={optimization} disabled={busy} />
+      <McCycle x={-155} y={84} w={310} label="Rendimiento" options={PERFORMANCE_LEVELS} bind:value={optimization} disabled={busy} />
 
       <McButton x={-155} y={108} w={150} label="Opciones avanzadas..." disabled={busy} onclick={() => (sub = 'advanced')} />
       <McButton x={5} y={108} w={150} label="Más acciones..." onclick={() => (sub = 'more')} />

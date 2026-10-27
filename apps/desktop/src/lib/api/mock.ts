@@ -196,8 +196,6 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return 'LocalReady'
     }
     case 'accounts_remove': {
-      const using = instances.filter((i) => i.profileId === args.id).length
-      if (using > 0) throw `Este perfil lo usan ${using} instancia(s). Cambia el perfil de esas instancias antes de quitarlo.`
       accounts = accounts.filter((a) => a.id !== args.id)
       if (defaultId === args.id) defaultId = accounts[0]?.id ?? null
       return null
@@ -270,7 +268,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return {
         supported: !!inst && inst.loader !== 'vanilla',
         mods: mods.map(({ needsApi: _n, ...m }) => m),
-        missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, requires: 'Fabric API' }] : [],
+        missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, id: 'fabric-api', requires: 'Fabric API' }] : [],
       }
     }
     case 'mods_set_enabled': {
@@ -296,6 +294,15 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       ]
       const q = String(args.query ?? '').toLowerCase()
       return all.filter((h) => !q || h.title.toLowerCase().includes(q))
+    }
+    case 'mods_install_missing': {
+      const list = installedMods.get(args.id) ?? []
+      const needsApi = list.some((m) => m.enabled && m.needsApi) && !list.some((m) => m.enabled && m.name === 'Fabric API')
+      await sleep(400)
+      if (!needsApi) return { installed: [], unresolved: [] }
+      list.push({ fileName: 'fabric-api.jar', enabled: true, name: 'Fabric API', version: '1.0.0', description: null, size: 2100000, source: { projectId: 'P7dR8mSH', versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi: false })
+      installedMods.set(args.id, list)
+      return { installed: [{ projectId: 'P7dR8mSH', title: 'Fabric API', versionNumber: '1.0.0', file: 'fabric-api.jar', isDependency: true }], unresolved: [] }
     }
     case 'mods_install': {
       const list = installedMods.get(args.id) ?? []

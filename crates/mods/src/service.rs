@@ -3,6 +3,7 @@ use crate::{
     ensure_trusted_file_url, load_lock, pick_best_version, plan_install, save_lock, LockedMod, ModError,
     ModManager, ModVersion, ModrinthClient, ModrinthSource, PlannedMod, PreviousVersion, ProjectHit,
 };
+use crate::plan_missing;
 use artifact_store::{ArtifactIndex, ArtifactSource, ArtifactStore};
 use chrono::Utc;
 use download_manager::{DownloadManager, DownloadTask};
@@ -27,6 +28,15 @@ pub struct InstalledMod {
     pub file: String,
     /// `true` si se instalo porque otro mod lo necesita.
     pub is_dependency: bool,
+}
+
+/// Resultado de instalar lo que a los mods de una instancia les faltaba para funcionar.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DependencyReport {
+    pub installed: Vec<InstalledMod>,
+    /// Nombres de lo que no se pudo encontrar en Modrinth para esta version.
+    pub unresolved: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -117,6 +127,31 @@ impl ModsService {
         let tracked = tracked_projects(manager).await;
         let plan = plan_install(&self.source(target), project_id, &tracked).await?;
         self.install_plan(manager, plan, concurrency).await
+    }
+
+    /// Instala de una vez todo lo que los mods activos de la instancia piden y no esta: busca cada dependencia
+    /// en Modrinth (con las suyas), descarta las repetidas y las descarga en paralelo. Lo que no encuentra queda
+    /// en `unresolved`, sin impedir instalar el resto.
+    pub async fn install_missing(
+        &self,
+        manager: &ModManager,
+        target: InstanceTarget<'_>,
+        concurrency: usize,
+    ) -> Result<DependencyReport, ModError> {
+        let entries = manager.list().await?;
+        let mut ids: Vec<String> = ModManager::missing_dependencies(&entries).into_iter().map(|m| m.id).collect();
+        ids.sort();
+        ids.dedup();
+        if ids.is_empty() {
+            return Ok(DependencyReport::default());
+        }
+        let tracked = tracked_projects(manager).await;
+        let found = plan_missing(&self.source(target), &ids, &tracked).await;
+        let installed = if found.plan.is_empty() { Vec::new() } else { self.install_plan(manager, found.plan, concurrency).await? };
+        Ok(DependencyReport {
+            installed,
+            unresolved: found.unresolved.iter().map(|id| crate::friendly_dependency_name(id)).collect(),
+        })
     }
 
     pub async fn install_plan(

@@ -8,7 +8,6 @@ use identity_api::{
     ResolvedIdentity,
 };
 use identity_microsoft::{MicrosoftIdentityProvider, LOGIN_TIMEOUT};
-use instance_manager::InstanceRepository;
 use serde::Serialize;
 use std::sync::{Arc, RwLock};
 
@@ -143,13 +142,10 @@ impl Launcher {
         Ok(provider.refresh(&account).await?)
     }
 
-    /// Quita un perfil. Las instancias que lo usan se lo impiden: nunca quedan sin perfil en silencio.
+    /// Quita un perfil. Como el perfil elegido juega todas las instancias, si era ese pasa a ser el siguiente;
+    /// sin perfiles no se puede jugar (se pide crear uno), nunca se cambia a otra cuenta en silencio al lanzar.
     pub async fn accounts_remove(&self, id: &str) -> Result<(), LauncherError> {
         let account = self.accounts.get(id).await?.ok_or(LauncherError::AccountNotFound)?;
-        let using = self.instances.list().await?.into_iter().filter(|i| i.profile_id == id).count();
-        if using > 0 {
-            return Err(LauncherError::ProfileInUse(using));
-        }
 
         if let Some(provider) = self.registry.get(account.provider) {
             provider.logout(&account).await?;

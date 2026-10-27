@@ -59,3 +59,62 @@ it('un fallo de refresco conserva los datos previos y muestra el error', async (
   expect(store.error).toBe('Lectura fallida')
   expect(store.loading).toBe(false)
 })
+
+const missing = (): ModsOverview => ({ mods: [], supported: true, missingDependencies: [{ modName: 'Alpha', id: 'fabric-api', requires: 'Fabric API' }] })
+const fixed = (): ModsOverview => ({ mods: [], supported: true, missingDependencies: [] })
+
+it('si a un mod le falta otro, se instala solo una vez y se avisa', async () => {
+  const store = new ModsStore()
+  const list = vi.spyOn(api, 'modsList').mockResolvedValueOnce(missing()).mockResolvedValue(fixed())
+  const install = vi.spyOn(api, 'modsInstallMissing').mockResolvedValue({
+    installed: [{ projectId: 'P7dR8mSH', title: 'Fabric API', versionNumber: '1', file: 'fabric-api.jar', isDependency: true }],
+    unresolved: [],
+  })
+  store.open('a')
+  await flush()
+  await flush()
+  expect(install).toHaveBeenCalledTimes(1)
+  expect(store.notice).toContain('Fabric API')
+  expect(list).toHaveBeenCalledTimes(2)
+  // Aunque la lista siguiera incompleta no se reintenta en bucle.
+  list.mockResolvedValue(missing())
+  await store.load('a')
+  await flush()
+  expect(install).toHaveBeenCalledTimes(1)
+})
+
+it('sin internet la instalacion automatica no muestra un error', async () => {
+  const store = new ModsStore()
+  vi.spyOn(api, 'modsList').mockResolvedValue(missing())
+  vi.spyOn(api, 'modsInstallMissing').mockRejectedValue(new Error('Necesitas conexion a internet'))
+  store.open('a')
+  await flush()
+  await flush()
+  expect(store.error).toBeNull()
+  expect(store.busy).toBeNull()
+})
+
+it('lo que no se encuentra se cuenta aparte', async () => {
+  const store = new ModsStore()
+  vi.spyOn(api, 'modsList').mockResolvedValueOnce(missing()).mockResolvedValue(missing())
+  vi.spyOn(api, 'modsInstallMissing').mockResolvedValue({ installed: [], unresolved: ['Mod raro'] })
+  store.open('a')
+  await flush()
+  await flush()
+  expect(store.notice).toContain('No se encontró para tu versión: Mod raro')
+})
+
+it('agregar un mod a mano instala en el mismo paso lo que pide', async () => {
+  const store = new ModsStore()
+  vi.spyOn(api, 'modsList').mockResolvedValue(fixed())
+  vi.spyOn(api, 'modsAddLocal').mockResolvedValue({ fileName: 'a.jar', enabled: true, name: 'Alpha', version: '1', description: null, size: 1, source: null })
+  vi.spyOn(api, 'modsInstallMissing').mockResolvedValue({
+    installed: [{ projectId: 'P', title: 'Fabric API', versionNumber: '1', file: 'f.jar', isDependency: true }],
+    unresolved: [],
+  })
+  store.open('a')
+  await flush()
+  await store.addLocal('a')
+  expect(store.notice).toContain('Se agregó «Alpha»')
+  expect(store.notice).toContain('Fabric API')
+})

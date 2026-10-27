@@ -32,6 +32,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `dpack_import` | — | `Instance \| null` — abre el selector (`.7z`), valida el manifiesto y los hashes, y crea la instancia reutilizando los mods del almacen comun; si falla se deshace todo. Avance: `phase: 'import7z'` |
 | `store_summary` | — | `{ storeBytes, sharedBytes, reclaimableBytes }` — uso del almacen comun de mods; falla si hay una instancia en uso |
 | `store_cleanup` | — | `{ freedBytes }` — borra del almacen lo que ninguna instancia usa (con 24 h de gracia); se niega si hay un registro danado o algo en curso |
+| `mods_install_missing` | `id` | `{ installed: InstalledMod[], unresolved: string[] }` — instala de una vez las dependencias que faltan a los mods activos (busca en Modrinth, descarta repetidas, descarga en paralelo); lo no encontrado va en `unresolved` |
 | `modpacks_export` | `id` | `{ remoteFiles, bundledFiles } \| null` — pide donde guardar; no incluye mundos ni logs |
 | `mods_list` | `id` | `{ mods, missingDependencies, supported }` (`supported` = cualquier tipo salvo Vanilla; lee `fabric.mod.json`, `META-INF/neoforge.mods.toml` o `META-INF/mods.toml`) — cada mod: `fileName`, `enabled`, `name`, `version`, `description`, `size`, `source?` |
 | `mods_set_enabled` | `id`, `file`, `enabled` | `void` (renombra a `.jar.disabled`) |

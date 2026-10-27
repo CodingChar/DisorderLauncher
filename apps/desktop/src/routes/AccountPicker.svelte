@@ -102,7 +102,7 @@
       lines: [
         { text: a.label },
         { text: providerLabel[a.provider] },
-        active ? { text: 'Perfil activo', color: '#55ff55' } : { text: status ?? '', color: needsSignIn(a.id) ? '#ffaa00' : '#808080' },
+        active ? { text: 'Juega todas tus instancias', color: '#55ff55' } : { text: status ?? '', color: needsSignIn(a.id) ? '#ffaa00' : '#808080' },
       ],
     }
   }

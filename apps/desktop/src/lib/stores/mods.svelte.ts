@@ -1,5 +1,5 @@
 import { api } from '../api'
-import type { ModsOverview, ProjectHit, UpdateInfo } from '../types'
+import type { DependencyReport, ModsOverview, ProjectHit, UpdateInfo } from '../types'
 
 /** Estado de la pantalla de mods de una instancia. */
 export class ModsStore {
@@ -14,8 +14,11 @@ export class ModsStore {
   private context = 0
   private request = 0
   private instanceId: string | null = null
+  /** Instancias en las que ya se intento instalar dependencias desde que se abrio la pantalla (evita bucles). */
+  private triedDependencies = new Set<string>()
 
   open(instanceId: string) {
+    this.triedDependencies.clear()
     this.reset()
     this.instanceId = instanceId
     this.overview = this.cache.get(instanceId) ?? null
@@ -42,6 +45,36 @@ export class ModsStore {
     } finally {
       if (context === this.context && request === this.request) this.loading = false
     }
+    // Si a algun mod le falta otro, se instala solo: la persona no tiene que saber que existe.
+    if (context === this.context && request === this.request && this.overview?.supported && this.overview.missingDependencies.length > 0) {
+      void this.installMissing(instanceId)
+    }
+  }
+
+  /** Resumen para la persona de lo que se instalo y de lo que no se encontro. */
+  private dependencyMessage(report: DependencyReport): string | undefined {
+    const parts: string[] = []
+    if (report.installed.length > 0) {
+      parts.push(`Se instalaron solas las dependencias que faltaban: ${report.installed.map((m) => m.title).join(', ')}.`)
+    }
+    if (report.unresolved.length > 0) {
+      parts.push(`No se encontró para tu versión: ${report.unresolved.join(', ')}.`)
+    }
+    return parts.join(' ') || undefined
+  }
+
+  /** Instala de una vez lo que los mods de la instancia necesitan y no esta. Una sola vez por pantalla abierta. */
+  async installMissing(instanceId: string) {
+    if (this.triedDependencies.has(instanceId) || this.busy !== null) return
+    this.triedDependencies.add(instanceId)
+    return this.run(instanceId, 'deps', async () => {
+      // Es automatico: sin internet no se molesta con un error (la lista ya avisa de lo que falta).
+      try {
+        return this.dependencyMessage(await api.modsInstallMissing(instanceId))
+      } catch {
+        return undefined
+      }
+    })
   }
 
   reset() {
@@ -99,7 +132,11 @@ export class ModsStore {
   addLocal(id: string) {
     return this.run(id, 'add', async () => {
       const added = await api.modsAddLocal(id)
-      return added ? `Se agregó «${added.name}».` : undefined
+      if (!added) return undefined
+      // Un mod agregado a mano suele pedir otros (p. ej. Fabric API): se instalan en el mismo paso.
+      this.triedDependencies.delete(id)
+      const extra = await api.modsInstallMissing(id).then((r) => this.dependencyMessage(r), () => undefined)
+      return extra ? `Se agregó «${added.name}». ${extra}` : `Se agregó «${added.name}».`
     })
   }
 
@@ -152,7 +189,10 @@ export class ModsStore {
     return this.run(id, file, async () => {
       const result = await api.modsUpdate(id, file)
       if (context === this.context) this.updates = (this.updates ?? []).filter((u) => u.file !== file)
-      return `«${result.title}» se actualizó a la versión ${result.versionNumber}.`
+      // La version nueva puede pedir mods que la anterior no pedia.
+      const extra = await api.modsInstallMissing(id).then((r) => this.dependencyMessage(r), () => undefined)
+      const base = `«${result.title}» se actualizó a la versión ${result.versionNumber}.`
+      return extra ? `${base} ${extra}` : base
     })
   }
 

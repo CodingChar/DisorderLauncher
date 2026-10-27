@@ -112,6 +112,7 @@ pub fn run() {
       commands::mods_install,
       commands::mods_check_updates,
       commands::mods_update,
+      commands::mods_install_missing,
       commands::mods_rollback,
       commands::skins_list,
       commands::skins_import,

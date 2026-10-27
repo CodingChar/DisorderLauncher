@@ -139,3 +139,30 @@ async fn pinned_version_dependencies_are_resolved_by_version_id() {
     assert_eq!(ids(&plan), ["lib", "root"], "las dependencias opcionales e incompatibles no se instalan");
     assert_eq!(plan[0].version.id, "l-pinned");
 }
+
+#[tokio::test]
+async fn missing_dependencies_are_planned_together_without_repeats() {
+    let src = source(&[
+        ("fabric-api", vec![version("fabric-api", "fa1", "release", "2024-01-01T00:00:00Z", &["lib"])]),
+        ("cloth-config", vec![version("cloth-config", "cc1", "release", "2024-01-01T00:00:00Z", &["lib"])]),
+        ("lib", vec![version("lib", "l1", "release", "2024-01-01T00:00:00Z", &[])]),
+    ]);
+    // `fabric` y `cloth_config2` son los ids que declaran los mods; en Modrinth son `fabric-api` y `cloth-config`.
+    let ids = vec!["fabric".to_string(), "cloth_config2".to_string(), "no-existe".to_string()];
+    let found = mods::plan_missing(&src, &ids, &HashSet::new()).await;
+    assert_eq!(ids_of(&found.plan), vec!["lib", "fabric-api", "cloth-config"], "la dependencia comun va una sola vez");
+    assert_eq!(found.unresolved, vec!["no-existe".to_string()]);
+}
+
+#[tokio::test]
+async fn already_installed_projects_are_not_planned_again() {
+    let src = source(&[("fabric-api", vec![version("fabric-api", "fa1", "release", "2024-01-01T00:00:00Z", &[])])]);
+    let installed: HashSet<String> = ["fabric-api".to_string()].into();
+    let found = mods::plan_missing(&src, &["fabric".to_string()], &installed).await;
+    assert!(found.plan.is_empty());
+    assert!(found.unresolved.is_empty(), "ya esta instalado: no es un fallo");
+}
+
+fn ids_of(plan: &[mods::PlannedMod]) -> Vec<&str> {
+    plan.iter().map(|p| p.project_id.as_str()).collect()
+}

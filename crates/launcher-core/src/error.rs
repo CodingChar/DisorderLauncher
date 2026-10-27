@@ -59,9 +59,6 @@ pub enum LauncherError {
     #[error("Ya hay un inicio de sesion en curso.")]
     LoginInProgress,
 
-    #[error("Este perfil lo usan {0} instancia(s). Cambia el perfil de esas instancias antes de quitarlo.")]
-    ProfileInUse(usize),
-
     #[error("No se encontro el perfil.")]
     AccountNotFound,
 

@@ -279,6 +279,17 @@ impl Launcher {
         Ok(record)
     }
 
+    /// El perfil que juega: el elegido en el menu de Perfiles es el duenio de todas las instancias.
+    /// Solo si no hay ninguno elegido se recurre al que la instancia guardo al crearse.
+    pub(crate) async fn owner_account(&self, instance: &Instance) -> Result<AccountRecord, LauncherError> {
+        if let Some(default_id) = self.accounts.get_default().await? {
+            if let Some(account) = self.accounts.get(&default_id).await? {
+                return Ok(account);
+            }
+        }
+        self.accounts.get(&instance.profile_id).await?.ok_or(LauncherError::ProfileMissing)
+    }
+
     pub async fn accounts_set_default(&self, id: &str) -> Result<(), LauncherError> {
         match self.accounts.set_default(id).await {
             Err(account_storage::StorageError::NotFound(_)) => Err(LauncherError::ProfileMissing),
@@ -380,12 +391,9 @@ impl Launcher {
     ) -> Result<Instance, LauncherError> {
         let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
-        if let Some(profile_id) = &changes.profile_id {
-            self.accounts
-                .get(profile_id)
-                .await?
-                .ok_or(LauncherError::ProfileMissing)?;
-        }
+        // El perfil no es de cada instancia: lo elige el menu de Perfiles y vale para todas.
+        let mut changes = changes;
+        changes.profile_id = None;
         if let Some(JavaSelection::Path { path }) = &changes.java {
             if !java_runtime::java_executable(path).is_file() {
                 return Err(LauncherError::InvalidInput(
@@ -686,11 +694,7 @@ impl Launcher {
     pub async fn prepare_launch(&self, instance: &Instance) -> Result<LaunchPlan, LauncherError> {
         let id = instance.id.as_str();
 
-        let account = self
-            .accounts
-            .get(&instance.profile_id)
-            .await?
-            .ok_or(LauncherError::ProfileMissing)?;
+        let account = self.owner_account(instance).await?;
         // Un fallo de identidad se informa tal cual; nunca se degrada a perfil local.
         let provider = self
             .registry

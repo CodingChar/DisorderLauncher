@@ -298,6 +298,12 @@ pub async fn mods_update(state: State<'_, AppState>, id: String, file: String) -
   state.launcher.mods_update(&id, &file).await.map_err(user_message)
 }
 
+/// Instala las dependencias que faltan a los mods de la instancia (p. ej. Fabric API).
+#[tauri::command]
+pub async fn mods_install_missing(state: State<'_, AppState>, id: String) -> Result<mods::DependencyReport, String> {
+  state.launcher.mods_install_missing(&id).await.map_err(user_message)
+}
+
 #[tauri::command]
 pub async fn mods_rollback(state: State<'_, AppState>, id: String, file: String) -> Result<(), String> {
   state.launcher.mods_rollback(&id, &file).await.map_err(user_message)

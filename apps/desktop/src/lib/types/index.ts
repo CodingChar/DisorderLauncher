@@ -153,7 +153,6 @@ export interface RepairSummary {
 export interface InstanceChanges {
   name?: string
   minecraftVersion?: string
-  profileId?: string
   java?: JavaSelection
   memory?: MemoryPolicy
   /** Cadena vacia: vuelve al icono por defecto. */
@@ -199,7 +198,16 @@ export interface ModEntry {
 
 export interface MissingDependency {
   modName: string
+  /** Id del mod que falta, como lo declara el mod que lo pide. */
+  id: string
   requires: string
+}
+
+/** Resultado de instalar de una vez las dependencias que faltaban. */
+export interface DependencyReport {
+  installed: InstalledMod[]
+  /** Nombres de lo que no se encontro en Modrinth para esta version. */
+  unresolved: string[]
 }
 
 export interface ModsOverview {
