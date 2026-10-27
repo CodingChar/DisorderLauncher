@@ -17,6 +17,7 @@ members = [
     "crates/diagnostics",
     "crates/loaders",
     "crates/artifact-store",
+    "crates/dpack",
     "crates/mods",
     "crates/modpacks",
     "crates/themes",

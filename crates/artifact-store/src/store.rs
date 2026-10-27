@@ -202,3 +202,26 @@ impl ArtifactStore {
         Ok(out)
     }
 }
+
+impl ArtifactStore {
+    /// Mueve a su sitio un archivo del que ya se verifico el hash (p. ej. extraido de un paquete).
+    /// Si el almacen ya tenia ese contenido, el archivo sobra y se borra. `src` debe estar en el mismo volumen.
+    pub fn adopt_verified(&self, src: &Path, hash: &str) -> Result<bool, ArtifactError> {
+        let target = self.path_of(hash)?;
+        if target.is_file() {
+            let _ = fs::remove_file(src);
+            return Ok(false);
+        }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if fs::rename(src, &target).is_err() {
+            // Otro volumen: se copia y se borra el original.
+            let temp = self.temp_file()?;
+            fs::copy(src, temp.path())?;
+            temp.persist(&target).map_err(|e| e.error)?;
+            let _ = fs::remove_file(src);
+        }
+        Ok(true)
+    }
+}

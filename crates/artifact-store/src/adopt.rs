@@ -31,7 +31,8 @@ struct Candidate {
     mtime_ns: u64,
 }
 
-fn mtime_ns(meta: &fs::Metadata) -> u64 {
+/// Fecha de modificacion en nanosegundos desde la epoca (0 si no se conoce).
+pub fn mtime_ns(meta: &fs::Metadata) -> u64 {
     meta.modified()
         .ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())

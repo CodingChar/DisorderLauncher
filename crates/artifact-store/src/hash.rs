@@ -40,3 +40,26 @@ fn to_hex(bytes: &[u8]) -> String {
     }
     out
 }
+
+/// Hash incremental, para calcular el SHA-512 mientras se escribe un archivo.
+pub struct Sha512Hasher(Sha512);
+
+impl Sha512Hasher {
+    pub fn new() -> Self {
+        Self(Sha512::new())
+    }
+
+    pub fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    pub fn finalize_hex(self) -> String {
+        to_hex(&self.0.finalize())
+    }
+}
+
+impl Default for Sha512Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
