@@ -9,7 +9,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqu
 
 ## Almacen comun de mods y paquetes `.7z` (2026-10-27)
 
-✅ Cuatro fases. (1) `artifact-store`: objetos por SHA-512, hardlink/copia, adopcion perezosa y duplicar instancias sin copiar jars. (2) Instalar/actualizar mods via el almacen: un mod conocido no se descarga otra vez. (3) `dpack`: exportar/importar instancias `.7z` con manifiesto, verificacion de hashes y defensas contra rutas, enlaces y bombas. (4) Estadisticas y limpieza con gracia de 24 h, y tres herramientas nuevas en la pantalla Herramientas. Decisiones en `docs/adr/ADR-003_artifact_store_and_dpack.md`; contratos en `docs/IPC.md`.
+✅ Cuatro fases. (1) `artifact-store`: objetos por SHA-512, hardlink/copia, adopcion perezosa y duplicar instancias sin copiar jars. (2) Instalar/actualizar mods via el almacen: un mod conocido no se descarga otra vez. (3) `dpack`: exportar/importar instancias `.7z` con manifiesto, verificacion de hashes y defensas contra rutas, enlaces y bombas. (4) Estadisticas y limpieza bajo reserva exclusiva de las instancias, y tres herramientas nuevas en la pantalla Herramientas. Decisiones en `docs/adr/ADR-003_artifact_store_and_dpack.md`; contratos en `docs/IPC.md`.
 
 Aviso de «modo offline» de Crash Assistant: con un perfil Offline Gaming, al lanzar se pone `[piracy] enabled = false` en `config/crash_assistant/config.toml` de la instancia (si existe), con la opcion que el propio mod ofrece y conservando el resto del archivo (`crates/launcher-core/src/crash_assistant.rs`). Con Microsoft no se toca.
 

@@ -13,7 +13,7 @@ mod store;
 
 pub use adopt::{adopt_instance, is_shareable, mtime_ns, AdoptReport, STORE_DIRS};
 pub use error::ArtifactError;
-pub use gc::{gc, stats, GcReport, StoreStats, DEFAULT_GRACE};
+pub use gc::{gc, stats, GcReport, Grace, StoreStats, DEFAULT_GRACE};
 pub use hash::{hash_file, hash_reader, is_valid_hash, Sha512Hasher};
 pub use index::{ArtifactEntry, ArtifactIndex, ArtifactSource, INDEX_FILE};
 pub use store::{ArtifactStore, Ingested, Method, StoredObject};

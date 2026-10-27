@@ -5,8 +5,18 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-/// Gracia por defecto: un objeto recien llegado puede estar a punto de anotarse en una instancia.
-pub const DEFAULT_GRACE: Duration = Duration::from_secs(24 * 60 * 60);
+/// Esperas de la limpieza. La fecha de un objeto es la de su archivo, que puede ser muy antigua (un jar que ya
+/// existia y se enlazo al almacen), asi que NO sirve como "llegada reciente": la seguridad frente a una instalacion
+/// en curso la da quien llama (reserva todas las instancias antes de limpiar). `temp` si es fiable: los temporales
+/// se escriben al descargar.
+#[derive(Debug, Clone, Copy)]
+pub struct Grace {
+    pub objects: Duration,
+    pub temp: Duration,
+}
+
+/// Valores del launcher: los objetos sin uso se liberan ya; los temporales abandonados, pasadas 24 h.
+pub const DEFAULT_GRACE: Grace = Grace { objects: Duration::ZERO, temp: Duration::from_secs(24 * 60 * 60) };
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StoreStats {
@@ -53,7 +63,7 @@ fn is_old(modified: SystemTime, grace: Duration) -> bool {
     SystemTime::now().duration_since(modified).map(|age| age >= grace).unwrap_or(false)
 }
 
-pub fn stats(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> Result<StoreStats, ArtifactError> {
+pub fn stats(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Grace) -> Result<StoreStats, ArtifactError> {
     let refs = collect(game_dirs)?;
     let objects = store.list()?;
     let mut out = StoreStats { objects: objects.len(), ..Default::default() };
@@ -62,7 +72,7 @@ pub fn stats(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> R
         out.store_bytes += object.size;
         if refs.hashes.contains(&object.hash) {
             referenced_physical += object.size;
-        } else if is_old(object.modified, grace) {
+        } else if is_old(object.modified, grace.objects) {
             out.orphan_objects += 1;
             out.orphan_bytes += object.size;
         }
@@ -72,11 +82,11 @@ pub fn stats(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> R
 }
 
 /// Borra del almacen los objetos que ninguna instancia usa, pasada la gracia, y los temporales abandonados.
-pub fn gc(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> Result<GcReport, ArtifactError> {
+pub fn gc(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Grace) -> Result<GcReport, ArtifactError> {
     let refs = collect(game_dirs)?;
     let mut report = GcReport::default();
     for object in store.list()? {
-        if refs.hashes.contains(&object.hash) || !is_old(object.modified, grace) {
+        if refs.hashes.contains(&object.hash) || !is_old(object.modified, grace.objects) {
             continue;
         }
         match fs_safe::remove_file_blocking(&object.path) {
@@ -90,7 +100,7 @@ pub fn gc(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> Resu
     if let Ok(read) = fs::read_dir(store.tmp_dir()) {
         for entry in read.flatten() {
             let Ok(meta) = entry.metadata() else { continue };
-            if meta.is_file() && meta.modified().is_ok_and(|m| is_old(m, grace)) {
+            if meta.is_file() && meta.modified().is_ok_and(|m| is_old(m, grace.temp)) {
                 let size = meta.len();
                 if fs::remove_file(entry.path()).is_ok() {
                     report.freed_bytes += size;
@@ -105,6 +115,8 @@ pub fn gc(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> Resu
 mod tests {
     use super::*;
     use crate::{adopt_instance, ArtifactStore};
+
+    const NO_GRACE: Grace = Grace { objects: Duration::ZERO, temp: Duration::ZERO };
 
     fn setup() -> (tempfile::TempDir, ArtifactStore, PathBuf, PathBuf) {
         let tmp = tempfile::tempdir().unwrap();
@@ -130,16 +142,16 @@ mod tests {
         adopt(&store, &b);
         let dirs = vec![a.clone(), b.clone()];
 
-        let before = stats(&store, &dirs, Duration::ZERO).unwrap();
+        let before = stats(&store, &dirs, NO_GRACE).unwrap();
         assert_eq!((before.objects, before.store_bytes, before.shared_bytes, before.orphan_objects), (2, 1400, 1000, 0));
 
         // Se quita el mod exclusivo de A: queda sin uso. El compartido sigue en uso por B.
         fs::remove_file(a.join("mods/only-a.jar")).unwrap();
         adopt(&store, &a);
-        let orphaned = stats(&store, &dirs, Duration::ZERO).unwrap();
+        let orphaned = stats(&store, &dirs, NO_GRACE).unwrap();
         assert_eq!((orphaned.orphan_objects, orphaned.orphan_bytes), (1, 400));
 
-        let report = gc(&store, &dirs, Duration::ZERO).unwrap();
+        let report = gc(&store, &dirs, NO_GRACE).unwrap();
         assert_eq!((report.removed, report.freed_bytes), (1, 400));
         assert_eq!(store.list().unwrap().len(), 1);
         assert_eq!(fs::read(b.join("mods/shared.jar")).unwrap(), vec![1u8; 1000]);
@@ -149,20 +161,22 @@ mod tests {
         fs::remove_file(b.join("mods/shared.jar")).unwrap();
         adopt(&store, &a);
         adopt(&store, &b);
-        assert_eq!(gc(&store, &dirs, Duration::ZERO).unwrap().removed, 1);
+        assert_eq!(gc(&store, &dirs, NO_GRACE).unwrap().removed, 1);
         assert!(store.list().unwrap().is_empty());
     }
 
     #[test]
-    fn recent_objects_survive_the_grace_period() {
+    fn default_grace_frees_unused_objects_at_once_but_keeps_fresh_temp_files() {
         let (_tmp, store, a, _b) = setup();
         fs::write(a.join("mods/x.jar"), b"x").unwrap();
         adopt(&store, &a);
         fs::remove_file(a.join("mods/x.jar")).unwrap();
         adopt(&store, &a);
+        fs::write(store.tmp_dir().join("obj-en-curso.part"), vec![0u8; 10]).unwrap();
         let report = gc(&store, &[a], DEFAULT_GRACE).unwrap();
-        assert_eq!(report.removed, 0, "acaba de llegar: puede estar por anotarse");
-        assert_eq!(store.list().unwrap().len(), 1);
+        // La fecha de un objeto es la de su archivo (puede ser antigua): no hay espera por objeto.
+        assert_eq!(report.removed, 1);
+        assert!(store.tmp_dir().join("obj-en-curso.part").exists(), "una descarga reciente no se toca");
     }
 
     #[test]
@@ -174,8 +188,8 @@ mod tests {
             fs::create_dir_all(b.join(".disorder")).unwrap();
             fs::write(b.join(crate::INDEX_FILE), b"{ roto").unwrap();
         });
-        assert!(matches!(gc(&store, &[a.clone(), b.clone()], Duration::ZERO), Err(ArtifactError::UnreadableIndex)));
-        assert!(matches!(stats(&store, &[a, b], Duration::ZERO), Err(ArtifactError::UnreadableIndex)));
+        assert!(matches!(gc(&store, &[a.clone(), b.clone()], NO_GRACE), Err(ArtifactError::UnreadableIndex)));
+        assert!(matches!(stats(&store, &[a, b], NO_GRACE), Err(ArtifactError::UnreadableIndex)));
         assert_eq!(store.list().unwrap().len(), 1, "no se borro nada");
     }
 
@@ -183,7 +197,7 @@ mod tests {
     fn stale_temp_files_are_cleaned() {
         let (_tmp, store, a, _b) = setup();
         fs::write(store.tmp_dir().join("obj-abandonado.part"), vec![0u8; 50]).unwrap();
-        let report = gc(&store, &[a], Duration::ZERO).unwrap();
+        let report = gc(&store, &[a], NO_GRACE).unwrap();
         assert_eq!(report.freed_bytes, 50);
         assert!(!store.tmp_dir().join("obj-abandonado.part").exists());
     }

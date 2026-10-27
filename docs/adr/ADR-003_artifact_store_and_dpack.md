@@ -8,7 +8,7 @@ Cada instancia guardaba copias de sus mods; duplicar una instancia las copiaba o
 
 1. **Almacen por contenido** (`crates/artifact-store`). Los archivos inmutables (`.jar`/`.zip` de `mods/`, `resourcepacks/`, `shaderpacks/`) viven una vez en `<datos>/store/sha512/<2 hex>/<128 hex>`. Identidad = SHA-512 del contenido; el origen (Modrinth, local) es metadata aparte. `config/`, `saves/`, `options.txt` y logs son estado de la instancia y nunca se comparten.
 2. **La instancia sigue siendo una carpeta normal.** Minecraft y los loaders ven `mods/x.jar` como un archivo corriente: se *materializa* como hardlink al objeto y, si el volumen o el sistema de archivos no lo permiten, como copia. Toda escritura es temporal + rename, de modo que un hardlink nunca se edita en sitio.
-3. **Quien usa que** se guarda por instancia en `game/.disorder/artifacts.json` (ruta, SHA-512, tamano, fecha, origen). No hay base de datos ni contador de referencias central: la limpieza es *mark & sweep* leyendo esos registros, con 24 h de gracia para lo recien llegado, y se niega a borrar nada si algun registro es ilegible.
+3. **Quien usa que** se guarda por instancia en `game/.disorder/artifacts.json` (ruta, SHA-512, tamano, fecha, origen). No hay base de datos ni contador de referencias central: la limpieza es *mark & sweep* leyendo esos registros, reservando todas las instancias mientras limpia (sin instalaciones ni importaciones en curso) y borrando solo temporales abandonados de mas de 24 h; se niega a borrar nada si algun registro es ilegible.
 4. **Adopcion perezosa** de lo ya existente: al lanzar, al anadir un jar local y al exportar se incorporan los archivos nuevos o cambiados (cache por ruta+tamano+fecha, hash en streaming con hasta 4 hilos). No hay migracion masiva al arrancar.
 5. **Instalar un mod** (`ModsService::fetch`): si Modrinth declara un SHA-512 y el almacen lo tiene, no se descarga; si no, se descarga al almacen, se comprueba SHA-1 (como antes) y SHA-512 y se enlaza. Un SHA-512 que no coincide se rechaza sin dejar rastro.
 6. **Paquete portable** (`crates/dpack`): `.7z` estandar con `dpack-manifest.json` (version de formato, pack, Minecraft, loader, y por archivo ruta/tamano/SHA-512/origen). Autocontenido: los mods viajan dentro. No incluye cuentas, tokens, logs, capturas, `options.txt` ni `servers.dat`; los mundos solo si el usuario lo pide.
@@ -21,7 +21,7 @@ Cada instancia guardaba copias de sus mods; duplicar una instancia las copiaba o
 | Registro logico de artefactos | Sidecar por instancia, sin BD | Menos estado, a prueba de cierres inesperados, sin dependencias nuevas |
 | 7z con LZMA2 solido | Manifiesto y texto en bloques solidos LZMA2; `.jar`/`.zip`/imagenes con el coder COPY | Los jars ya estan comprimidos: recomprimirlos gasta CPU sin reducir tamano |
 | hardlink / reflink / copy | hardlink / copy | Reflink anade una dependencia y rutas imposibles de probar en NTFS; queda como mejora futura |
-| Refcount (§24) | Gracia de 24 h + lectura de registros | Evita carreras con instalaciones en curso sin un contador que pueda desincronizarse |
+| Refcount (§24) | Lectura de registros bajo reserva exclusiva | Evita carreras con instalaciones en curso sin un contador que pueda desincronizarse. Una gracia por fecha no sirve: la fecha de un objeto es la de su archivo, que puede ser antigua |
 
 ## Consecuencias
 
