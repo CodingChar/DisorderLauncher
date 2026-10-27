@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+fs-safe = { path = "../fs-safe" }
 minecraft-meta = { path = "../minecraft-meta" }
 minecraft-launch = { path = "../minecraft-launch" }
 download-manager = { path = "../download-manager" }

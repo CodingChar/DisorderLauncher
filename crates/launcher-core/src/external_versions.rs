@@ -521,15 +521,13 @@ impl Launcher {
             if let Some(jar) = &prepared.jar_source {
                 std::fs::copy(jar, &jar_dest)?;
             }
-            let part = json_path.with_extension("json.part");
-            std::fs::write(&part, body)?;
-            std::fs::rename(&part, &json_path)
+            fs_safe::write_atomic_blocking(&json_path, body)
         })
         .await
         .map_err(|_| LauncherError::Storage)?
         .map_err(|e| {
             tracing::error!(error = %e, "no se pudo importar la version personalizada");
-            LauncherError::Storage
+            LauncherError::from_io(&e)
         })
     }
 

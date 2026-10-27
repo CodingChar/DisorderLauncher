@@ -45,6 +45,7 @@ impl From<ModError> for LauncherError {
             ModError::NotAMod => Self::InvalidInput("Ese archivo no es un mod valido (Fabric, Quilt, Forge o NeoForge).".into()),
             ModError::InvalidFileName => Self::InvalidInput("Nombre de archivo no valido.".into()),
             ModError::NotFound => Self::InvalidInput("No se encontro ese mod.".into()),
+            ModError::Io(io) => Self::from_io(&io),
             _ => Self::Storage,
         }
     }

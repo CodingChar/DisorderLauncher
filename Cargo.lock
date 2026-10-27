@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "fs-safe",
  "identity-api",
  "serde",
  "serde_json",
@@ -94,6 +95,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 name = "artifact-store"
 version = "0.1.0"
 dependencies = [
+ "fs-safe",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1052,6 +1054,7 @@ dependencies = [
 name = "download-manager"
 version = "0.1.0"
 dependencies = [
+ "fs-safe",
  "reqwest 0.12.28",
  "sha1 0.10.7",
  "tempfile",
@@ -1067,6 +1070,7 @@ name = "dpack"
 version = "0.1.0"
 dependencies = [
  "artifact-store",
+ "fs-safe",
  "serde",
  "serde_json",
  "sevenz-rust2",
@@ -1341,6 +1345,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs-safe"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2157,6 +2170,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "fs-safe",
  "jvm-tuning",
  "serde",
  "serde_json",
@@ -2203,6 +2217,7 @@ name = "java-runtime"
 version = "0.1.0"
 dependencies = [
  "download-manager",
+ "fs-safe",
  "reqwest 0.12.28",
  "serde",
  "sha2 0.10.9",
@@ -2417,6 +2432,7 @@ dependencies = [
  "diagnostics",
  "download-manager",
  "dpack",
+ "fs-safe",
  "identity-api",
  "identity-local",
  "identity-microsoft",
@@ -2533,6 +2549,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "download-manager",
+ "fs-safe",
  "instance-manager",
  "minecraft-launch",
  "minecraft-meta",
@@ -2654,6 +2671,7 @@ dependencies = [
 name = "minecraft-meta"
 version = "0.1.0"
 dependencies = [
+ "fs-safe",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -2699,6 +2717,7 @@ name = "modpacks"
 version = "0.1.0"
 dependencies = [
  "download-manager",
+ "fs-safe",
  "instance-manager",
  "mods",
  "reqwest 0.12.28",
@@ -2722,6 +2741,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "download-manager",
+ "fs-safe",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4173,6 +4193,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
+ "fs-safe",
  "png 0.17.16",
  "serde",
  "serde_json",
@@ -4834,6 +4855,7 @@ dependencies = [
 name = "themes"
 version = "0.1.0"
 dependencies = [
+ "fs-safe",
  "serde",
  "serde_json",
  "tempfile",

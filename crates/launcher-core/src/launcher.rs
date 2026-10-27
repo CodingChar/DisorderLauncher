@@ -399,7 +399,32 @@ impl Launcher {
     pub async fn instances_delete(&self, id: &str) -> Result<(), LauncherError> {
         let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
-        Ok(self.instances.delete(id).await?)
+        self.instances.delete(id).await?;
+        // Si algun programa tenia archivos abiertos, la instancia ya no existe pero queda su carpeta:
+        // se termina de borrar en cuanto se libere, sin que la persona tenga que hacer nada.
+        self.finish_leftovers_later().await;
+        Ok(())
+    }
+
+    /// Reintenta cada pocos segundos (durante unos minutos) borrar las carpetas que quedaron a medias.
+    pub(crate) async fn finish_leftovers_later(&self) {
+        use instance_manager::FolderProblemKind;
+        let has_orphans = |problems: &[instance_manager::FolderProblem]| problems.iter().any(|p| matches!(p.kind, FolderProblemKind::Orphan));
+        if !self.instances.scan().await.is_ok_and(|p| has_orphans(&p)) {
+            return;
+        }
+        let repo = Arc::clone(&self.instances);
+        tokio::spawn(async move {
+            for _ in 0..60 {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                repo.remove_leftovers().await;
+                if !repo.scan().await.is_ok_and(|p| has_orphans(&p)) {
+                    tracing::info!("terminado de borrar las carpetas de instancias eliminadas");
+                    return;
+                }
+            }
+            tracing::warn!("quedan carpetas de instancias eliminadas con archivos en uso; se reintentara al abrir el launcher");
+        });
     }
 
     pub async fn instances_duplicate(&self, id: &str) -> Result<Instance, LauncherError> {
@@ -508,9 +533,7 @@ impl Launcher {
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await.map_err(MetaError::from)?;
         }
-        let part = path.with_extension("json.part");
-        tokio::fs::write(&part, &bytes).await.map_err(MetaError::from)?;
-        tokio::fs::rename(&part, &path).await.map_err(MetaError::from)?;
+        fs_safe::write_atomic(&path, &bytes).await.map_err(MetaError::from)?;
         Ok(descriptor)
     }
 

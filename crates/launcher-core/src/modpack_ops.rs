@@ -34,6 +34,7 @@ impl From<ModpackError> for LauncherError {
             ModpackError::DownloadFailures(_) | ModpackError::Download(_) => Self::Offline,
             ModpackError::Http(h) if crate::error::is_network(&h) => Self::Offline,
             ModpackError::Archive(_) => Self::InvalidInput("El modpack esta danado o no se puede abrir.".into()),
+            ModpackError::Io(io) => Self::from_io(&io),
             _ => Self::Storage,
         }
     }

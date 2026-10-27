@@ -18,9 +18,7 @@ pub(crate) fn silence_offline_notice(game_dir: &Path) -> io::Result<bool> {
         Err(e) => return Err(e),
     };
     let Some(updated) = disable_piracy_notice(&text) else { return Ok(false) };
-    let part = path.with_extension("toml.part");
-    std::fs::write(&part, updated)?;
-    std::fs::rename(&part, &path)?;
+    fs_safe::write_atomic_blocking(&path, updated)?;
     Ok(true)
 }
 

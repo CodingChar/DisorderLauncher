@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+fs-safe = { path = "../fs-safe" }
 artifact-store = { path = "../artifact-store" }
 download-manager = { path = "../download-manager" }
 async-trait = { workspace = true }

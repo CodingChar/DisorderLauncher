@@ -13,7 +13,8 @@ impl From<SkinError> for LauncherError {
         tracing::warn!(error = %e, "skin rechazada");
         match e {
             SkinError::NotFound => Self::InvalidInput("No se encontro esa skin.".into()),
-            SkinError::Io(_) | SkinError::Json(_) | SkinError::Encode => Self::Storage,
+            SkinError::Io(io) => Self::from_io(&io),
+            SkinError::Json(_) | SkinError::Encode => Self::Storage,
             other => Self::InvalidInput(sentence(&other.to_string())),
         }
     }

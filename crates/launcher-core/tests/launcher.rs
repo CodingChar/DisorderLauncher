@@ -1208,3 +1208,28 @@ async fn adoption_keeps_the_modrinth_origin_known_from_the_mod_lock() {
     );
     assert_eq!(index.entries["mods/privado.jar"].source, artifact_store::ArtifactSource::Local);
 }
+
+/// Un archivo que otro programa mantiene abierto (Java, el antivirus, la ventana de errores de un mod) no debe
+/// impedir eliminar una instancia: desaparece de la lista y la carpeta se termina de borrar al liberarse.
+#[cfg(windows)]
+#[tokio::test]
+async fn deleting_an_instance_survives_a_file_held_by_another_program() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let (_dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let inst = launcher.instances_create("Con juego abierto", "1.21", LoaderKind::Vanilla, None).await.unwrap();
+    let log = inst.game_dir.join("logs").join("latest.log");
+    std::fs::create_dir_all(log.parent().unwrap()).unwrap();
+    std::fs::write(&log, b"x").unwrap();
+    std::fs::write(inst.game_dir.join("options.txt"), b"x").unwrap();
+    let held = std::fs::OpenOptions::new().write(true).share_mode(3).open(&log).unwrap();
+
+    launcher.instances_delete(&inst.id).await.expect("no debe fallar por un archivo en uso");
+    assert!(launcher.instances_list().await.unwrap().is_empty());
+    assert!(!inst.game_dir.join("options.txt").exists(), "lo demas se borro");
+
+    drop(held);
+    let repo = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir());
+    assert_eq!(repo.remove_leftovers().await, 1);
+    assert!(!launcher.paths().instances_dir().join(&inst.id).exists());
+}

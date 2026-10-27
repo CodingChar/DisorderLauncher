@@ -250,16 +250,16 @@ impl ModsService {
         fs::create_dir_all(manager.backup_dir()).await?;
         let backup_name = format!("{}--{}", current.version_id, base);
         let backup_path = manager.backup_dir().join(&backup_name);
-        fs::rename(&old_path, &backup_path).await?;
+        fs_safe::rename(&old_path, &backup_path).await?;
 
         // 2. Descargar la nueva; si falla, devolver la anterior.
         if let Err(e) = self.fetch(manager, &[&prepared], 1).await {
-            let _ = fs::rename(&backup_path, &old_path).await;
+            let _ = fs_safe::rename(&backup_path, &old_path).await;
             return Err(e);
         }
         if !was_enabled {
             let active = manager.mods_dir().join(&prepared.file_name);
-            fs::rename(&active, manager.mods_dir().join(format!("{}{DISABLED_SUFFIX}", prepared.file_name))).await?;
+            fs_safe::rename(&active, manager.mods_dir().join(format!("{}{DISABLED_SUFFIX}", prepared.file_name))).await?;
         }
 
         // 3. Registrar, descartando una copia anterior mas vieja.
@@ -309,14 +309,14 @@ impl ModsService {
         validate_file_name(original)?;
 
         let (current_path, was_enabled) = find_on_disk(manager, base).ok_or(ModError::NotFound)?;
-        fs::remove_file(&current_path).await?;
+        fs_safe::remove_file(&current_path).await?;
 
         let restored = if was_enabled {
             original.to_string()
         } else {
             format!("{original}{DISABLED_SUFFIX}")
         };
-        fs::rename(&backup_path, manager.mods_dir().join(restored)).await?;
+        fs_safe::rename(&backup_path, manager.mods_dir().join(restored)).await?;
 
         lock.remove_file(base);
         lock.upsert(LockedMod {

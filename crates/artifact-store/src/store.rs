@@ -150,7 +150,7 @@ impl ArtifactStore {
                 Method::Copy
             }
         };
-        if let Err(e) = fs::rename(&staging, dest) {
+        if let Err(e) = fs_safe::rename_blocking(&staging, dest) {
             let _ = fs::remove_file(&staging);
             return Err(e.into());
         }
@@ -171,7 +171,7 @@ impl ArtifactStore {
     }
 
     pub fn remove(&self, hash: &str) -> Result<(), ArtifactError> {
-        match fs::remove_file(self.path_of(hash)?) {
+        match fs_safe::remove_file_blocking(self.path_of(hash)?) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(e.into()),
@@ -215,7 +215,7 @@ impl ArtifactStore {
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        if fs::rename(src, &target).is_err() {
+        if fs_safe::rename_blocking(src, &target).is_err() {
             // Otro volumen: se copia y se borra el original.
             let temp = self.temp_file()?;
             fs::copy(src, temp.path())?;

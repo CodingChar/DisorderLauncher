@@ -72,11 +72,9 @@ impl ThemeStore {
         }
         tokio::fs::create_dir_all(&self.custom_dir).await.map_err(|_| ThemeError::Io)?;
         let path = self.path_for(&theme.id);
-        let part = path.with_extension("json.part");
         // Se guarda la forma ya validada y normalizada, no los bytes recibidos.
         let normalized = serde_json::to_vec_pretty(&theme).map_err(|_| ThemeError::Io)?;
-        tokio::fs::write(&part, normalized).await.map_err(|_| ThemeError::Io)?;
-        tokio::fs::rename(&part, &path).await.map_err(|_| ThemeError::Io)?;
+        fs_safe::write_atomic(&path, normalized).await.map_err(|_| ThemeError::Io)?;
         Ok(theme)
     }
 

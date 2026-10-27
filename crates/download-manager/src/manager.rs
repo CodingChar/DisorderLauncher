@@ -260,7 +260,7 @@ async fn save_response(
                 });
             }
         }
-        fs::rename(&part_path, &task.dest).await?;
+        fs_safe::rename(&part_path, &task.dest).await?;
         Ok(())
     }.await;
     if result.is_err() {

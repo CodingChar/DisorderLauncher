@@ -34,7 +34,8 @@ impl From<DpackError> for LauncherError {
             DpackError::Mismatch(_) | DpackError::Missing(_) | DpackError::Archive(_) => {
                 invalid("El paquete esta danado o incompleto.")
             }
-            DpackError::Io(_) | DpackError::Store(_) => Self::Storage,
+            DpackError::Io(io) => Self::from_io(&io),
+            DpackError::Store(_) => Self::Storage,
         }
     }
 }

@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+fs-safe = { path = "../fs-safe" }
 download-manager = { path = "../download-manager" }
 mods = { path = "../mods" }
 instance-manager = { path = "../instance-manager" }

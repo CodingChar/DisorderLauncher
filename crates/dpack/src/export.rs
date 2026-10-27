@@ -159,7 +159,7 @@ pub fn export(request: &ExportRequest<'_>, dest: &Path, progress: &(dyn Fn(usize
     let part = dest.with_extension("7z.part");
     let result = write_archive(&part, &manifest, &items, progress);
     match result {
-        Ok(()) => fs::rename(&part, dest).map_err(|e| {
+        Ok(()) => fs_safe::rename_blocking(&part, dest).map_err(|e| {
             let _ = fs::remove_file(&part);
             DpackError::Io(e)
         })?,

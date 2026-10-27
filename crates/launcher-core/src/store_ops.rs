@@ -17,6 +17,7 @@ impl From<ArtifactError> for LauncherError {
             ArtifactError::UnreadableIndex => Self::InvalidInput(
                 "No se puede liberar espacio ahora: el registro de una instancia esta danado. Inicia esa instancia una vez e intentalo de nuevo.".into(),
             ),
+            ArtifactError::Io(io) => Self::from_io(&io),
             _ => Self::Storage,
         }
     }

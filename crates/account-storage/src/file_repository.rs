@@ -2,12 +2,9 @@ use crate::{AccountRepository, StorageError};
 use identity_api::AccountRecord;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+
 use std::sync::Mutex;
 use tokio::fs;
-
-/// Contador para dar a cada escritura su propio archivo temporal.
-static WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Version actual del formato de archivo de cuenta (`schemaVersion`).
 pub const ACCOUNT_SCHEMA_VERSION: u32 = 1;
@@ -102,7 +99,7 @@ impl FileAccountRepository {
 
     async fn quarantine(&self, path: &Path, file_name: &str) {
         let target = path.with_file_name(format!("{file_name}.corrupt"));
-        if fs::rename(path, &target).await.is_ok() {
+        if fs_safe::rename(path, &target).await.is_ok() {
             tracing::warn!(file = %file_name, "archivo de cuenta ilegible apartado como .corrupt");
             self.notify(StorageNotice::Quarantined { file_name: file_name.to_string() });
         }
@@ -117,17 +114,11 @@ impl FileAccountRepository {
     async fn write_unlocked(&self, record: &AccountRecord) -> Result<(), StorageError> {
         self.ensure_dir().await?;
         let path = self.account_path(&record.id)?;
-        let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
-        let part = path.with_extension(format!("json.{}-{seq}.part", std::process::id()));
         let mut value = serde_json::to_value(record)?;
         if let Some(object) = value.as_object_mut() {
             object.insert("schemaVersion".into(), ACCOUNT_SCHEMA_VERSION.into());
         }
-        fs::write(&part, serde_json::to_string_pretty(&value)?).await?;
-        if let Err(e) = fs::rename(&part, &path).await {
-            let _ = fs::remove_file(&part).await;
-            return Err(e.into());
-        }
+        fs_safe::write_atomic(&path, serde_json::to_string_pretty(&value)?).await?;
         Ok(())
     }
 }
@@ -229,13 +220,13 @@ impl AccountRepository for FileAccountRepository {
         let _guard = self.write_lock.lock().await;
         let path = self.account_path(id)?;
         if path.exists() {
-            fs::remove_file(&path).await?;
+            fs_safe::remove_file(&path).await?;
         }
         let default = self.get_default().await?;
         if default.as_deref() == Some(id) {
             let dp = self.default_path();
             if dp.exists() {
-                fs::remove_file(&dp).await?;
+                fs_safe::remove_file(&dp).await?;
             }
         }
         Ok(())
@@ -260,13 +251,7 @@ impl AccountRepository for FileAccountRepository {
             return Err(StorageError::NotFound(id.to_string()));
         }
         let _guard = self.write_lock.lock().await;
-        let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
-        let part = self.default_path().with_extension(format!("txt.{}-{seq}.part", std::process::id()));
-        fs::write(&part, id).await?;
-        if let Err(e) = fs::rename(&part, self.default_path()).await {
-            let _ = fs::remove_file(&part).await;
-            return Err(e.into());
-        }
+        fs_safe::write_atomic(self.default_path(), id).await?;
         Ok(())
     }
 }

@@ -79,7 +79,7 @@ pub fn gc(store: &ArtifactStore, game_dirs: &[PathBuf], grace: Duration) -> Resu
         if refs.hashes.contains(&object.hash) || !is_old(object.modified, grace) {
             continue;
         }
-        match fs::remove_file(&object.path) {
+        match fs_safe::remove_file_blocking(&object.path) {
             Ok(()) => {
                 report.removed += 1;
                 report.freed_bytes += object.size;

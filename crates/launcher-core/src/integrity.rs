@@ -101,8 +101,10 @@ impl Launcher {
             }
             match problem.kind {
                 FolderProblemKind::Orphan => {
-                    if self.instances.remove_orphan(&problem.id).await.unwrap_or(false) {
-                        report.issues.push(issue(&problem.id, "", IssueKind::LeftoverRemoved, true));
+                    match self.instances.remove_orphan(&problem.id).await {
+                        Ok(true) => report.issues.push(issue(&problem.id, "", IssueKind::LeftoverRemoved, true)),
+                        Ok(false) => {}
+                        Err(e) => tracing::warn!(instance = %problem.id, error = %e, "no se pudo quitar una carpeta sobrante"),
                     }
                 }
                 FolderProblemKind::Unreadable(detail) => {
@@ -111,6 +113,9 @@ impl Launcher {
                 }
             }
         }
+
+        // Lo que siga bloqueado (el juego o su ventana de errores abiertos) se reintenta en segundo plano.
+        self.finish_leftovers_later().await;
 
         for instance in self.instances.list().await? {
             if self.is_busy(&instance.id) {

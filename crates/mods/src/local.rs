@@ -130,7 +130,7 @@ impl ModManager {
         if !from.is_file() {
             return Err(ModError::NotFound);
         }
-        fs::rename(&from, self.mods_dir.join(&target)).await?;
+        fs_safe::rename(&from, self.mods_dir.join(&target)).await?;
         Ok(target)
     }
 
@@ -141,7 +141,7 @@ impl ModManager {
         if !path.is_file() {
             return Err(ModError::NotFound);
         }
-        fs::remove_file(&path).await?;
+        fs_safe::remove_file(&path).await?;
 
         let mut lock = load_lock(&self.lock_path()).await;
         if let Some(entry) = lock.remove_file(base) {
@@ -173,7 +173,7 @@ impl ModManager {
         let dest = self.mods_dir.join(&file_name);
         let part = self.mods_dir.join(format!("{file_name}.part"));
         fs::copy(source, &part).await?;
-        fs::rename(&part, &dest).await?;
+        fs_safe::rename(&part, &dest).await?;
 
         self.list()
             .await?

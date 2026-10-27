@@ -66,9 +66,7 @@ impl ArtifactIndex {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let part = path.with_extension("json.part");
-        fs::write(&part, serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?)?;
-        fs::rename(&part, &path)?;
+        fs_safe::write_atomic_blocking(&path, serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?)?;
         Ok(())
     }
 
