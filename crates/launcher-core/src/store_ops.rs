@@ -55,6 +55,43 @@ impl Launcher {
     pub(crate) async fn adopt_game_dir(&self, instance_id: &str, game_dir: &Path) {
         if let Err(e) = self.adopt_dir(instance_id, game_dir.to_path_buf()).await {
             tracing::warn!(instance = %instance_id, error = %e, "no se pudo compartir los archivos de la instancia");
+            return;
+        }
+        self.sync_mod_sources(game_dir).await;
+    }
+
+    /// Pasa a los registros de la instancia el origen que ya conoce `mods.json` (proyecto y version de Modrinth),
+    /// para que una exportacion conserve de donde vino cada mod. Un fallo solo se registra.
+    pub(crate) async fn sync_mod_sources(&self, game_dir: &Path) {
+        let lock = mods::load_lock(&mods::ModManager::new(game_dir).lock_file()).await;
+        if lock.mods.is_empty() {
+            return;
+        }
+        let game_dir = game_dir.to_path_buf();
+        let result = tokio::task::spawn_blocking(move || -> Result<(), ArtifactError> {
+            let mut index = artifact_store::ArtifactIndex::load(&game_dir);
+            let mut changed = false;
+            for locked in &lock.mods {
+                for rel in [format!("mods/{}", locked.file), format!("mods/{}.disabled", locked.file)] {
+                    let Some(entry) = index.entries.get(&rel) else { continue };
+                    if entry.source == artifact_store::ArtifactSource::Local {
+                        let source = artifact_store::ArtifactSource::Modrinth {
+                            project_id: locked.project_id.clone(),
+                            version_id: locked.version_id.clone(),
+                        };
+                        index.set_source(&rel, source);
+                        changed = true;
+                    }
+                }
+            }
+            if changed {
+                index.save(&game_dir)?;
+            }
+            Ok(())
+        })
+        .await;
+        if !matches!(result, Ok(Ok(()))) {
+            tracing::warn!("no se pudo anotar el origen de los mods");
         }
     }
 
@@ -114,7 +151,8 @@ impl Launcher {
         let _turn = self.mods_guard(instance_id).await;
         self.ensure_idle(instance_id)?;
         let instance = self.instances.get(instance_id).await?.ok_or(LauncherError::InstanceNotFound)?;
-        let report = self.adopt_dir(instance_id, instance.game_dir).await?;
+        let report = self.adopt_dir(instance_id, instance.game_dir.clone()).await?;
+        self.sync_mod_sources(&instance.game_dir).await;
         Ok(AdoptSummary { adopted: report.adopted, saved_bytes: report.saved_bytes })
     }
 }

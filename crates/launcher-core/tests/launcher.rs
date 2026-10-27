@@ -1090,3 +1090,121 @@ async fn storage_cleanup_frees_only_what_no_instance_uses() {
     assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 0);
     assert_eq!(std::fs::read(b.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![9u8; 2048]);
 }
+
+/// Flujo real del almacen comun y de los paquetes `.7z` sobre los datos de la app (con su Minecraft ya instalado):
+/// duplica una instancia con mods reales, adopta, exporta, importa y lanza la importada.
+/// `DISORDER_E2E_DATA=<datos de la app> DISORDER_E2E_INSTANCE=<id> DISORDER_E2E_OUT=<archivo.7z> cargo test -p launcher-core --test launcher -- --ignored --nocapture real_store_and_dpack_flow`
+#[tokio::test]
+#[ignore = "usa los datos reales de la app (DISORDER_E2E_DATA), requiere internet y abre Minecraft unos segundos"]
+async fn real_store_and_dpack_flow() {
+    let root = std::path::PathBuf::from(std::env::var("DISORDER_E2E_DATA").expect("DISORDER_E2E_DATA"));
+    let source_id = std::env::var("DISORDER_E2E_INSTANCE").expect("DISORDER_E2E_INSTANCE");
+    let out = std::path::PathBuf::from(std::env::var("DISORDER_E2E_OUT").expect("DISORDER_E2E_OUT"));
+    let events = Arc::new(Collector::default());
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(&root), events.clone()));
+
+    let source = launcher.instances_list().await.unwrap().into_iter().find(|i| i.id == source_id).expect("instancia");
+    let mods_of = |dir: &std::path::Path| -> std::collections::BTreeMap<String, Vec<u8>> {
+        std::fs::read_dir(dir.join("mods"))
+            .unwrap()
+            .flatten()
+            .filter(|e| e.path().is_file())
+            .map(|e| (e.file_name().to_string_lossy().into_owned(), std::fs::read(e.path()).unwrap()))
+            .collect()
+    };
+    let original = mods_of(&source.game_dir);
+    let logical: usize = original.values().map(|v| v.len()).sum();
+    println!("origen: {} mods, {} bytes", original.len(), logical);
+
+    // 1. Duplicar: los jars se enlazan, no se copian.
+    let t = std::time::Instant::now();
+    let copy = launcher.instances_duplicate(&source_id).await.unwrap();
+    println!("duplicar: {:?}", t.elapsed());
+    assert_eq!(mods_of(&copy.game_dir), original);
+
+    // 2. Adoptar ambas: un solo objeto fisico por mod.
+    let t = std::time::Instant::now();
+    let a = launcher.store_adopt_instance(&source_id).await.unwrap();
+    println!("adoptar origen: {:?} -> {a:?}", t.elapsed());
+    let t = std::time::Instant::now();
+    let again = launcher.store_adopt_instance(&source_id).await.unwrap();
+    println!("segunda pasada: {:?} -> {again:?}", t.elapsed());
+    assert_eq!(again.adopted, 0);
+    let b = launcher.store_adopt_instance(&copy.id).await.unwrap();
+    println!("adoptar copia: {b:?}");
+    let store = artifact_store::ArtifactStore::open(launcher.paths().store_dir()).unwrap();
+    let objects = store.list().unwrap();
+    println!("objetos en el almacen: {}", objects.len());
+    println!("resumen: {:?}", launcher.store_summary().await.unwrap());
+
+    // 3. Exportar y abrirlo como un 7z normal.
+    let t = std::time::Instant::now();
+    let summary = launcher.dpack_export(&source_id, &out, false).await.unwrap();
+    println!("exportar: {:?} -> {summary:?}, archivo {} bytes", t.elapsed(), std::fs::metadata(&out).unwrap().len());
+
+    // 4. Importar: nada nuevo en el almacen y contenido identico.
+    let before = store.list().unwrap().len();
+    let t = std::time::Instant::now();
+    let imported = launcher.dpack_import(&out).await.unwrap();
+    println!("importar: {:?} -> {} ({})", t.elapsed(), imported.name, imported.id);
+    assert_eq!(store.list().unwrap().len(), before, "los mods ya conocidos no se escriben otra vez");
+    assert_eq!(mods_of(&imported.game_dir), original);
+    println!("IMPORTED_ID={}", imported.id);
+    println!("COPY_ID={}", copy.id);
+
+    // 5. Lanzar la importada.
+    launcher.launch(&imported.id).await.unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(1500);
+    let first = loop {
+        {
+            let states = events.states.lock().unwrap();
+            if let Some(e) = states.iter().find(|e| matches!(e.state, LaunchState::Running { .. } | LaunchState::Failed { .. } | LaunchState::Exited { .. })) {
+                break e.state.clone();
+            }
+        }
+        assert!(std::time::Instant::now() < deadline, "timeout");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    println!("estado: {first:?}");
+    assert!(matches!(first, LaunchState::Running { .. }), "{first:?}");
+    tokio::time::sleep(Duration::from_secs(40)).await;
+    let output = events.output.lock().unwrap().join("\n");
+    let tail: Vec<&str> = output.lines().rev().take(25).collect();
+    println!("salida del juego (final):\n{}", tail.into_iter().rev().collect::<Vec<_>>().join("\n"));
+    let alive = events.states.lock().unwrap().iter().all(|e| !matches!(e.state, LaunchState::Exited { .. }));
+    let _ = launcher.stop(&imported.id);
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+    assert!(alive, "el juego se cerro solo antes de tiempo");
+    assert!(output.contains("Loading") || output.to_lowercase().contains("fabric"), "el juego debio cargar Fabric y sus mods");
+}
+
+#[tokio::test]
+async fn adoption_keeps_the_modrinth_origin_known_from_the_mod_lock() {
+    let (_dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let inst = launcher.instances_create("A", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    std::fs::write(inst.game_dir.join("mods").join("sodium.jar"), b"sodium").unwrap();
+    std::fs::write(inst.game_dir.join("mods").join("privado.jar"), b"privado").unwrap();
+    let manager = mods::ModManager::new(&inst.game_dir);
+    let mut lock = mods::ModLock::default();
+    lock.upsert(mods::LockedMod {
+        file: "sodium.jar".into(),
+        project_id: "AANobbMI".into(),
+        version_id: "ver1".into(),
+        version_number: "1.0".into(),
+        title: "Sodium".into(),
+        sha1: "aa".into(),
+        installed_at: chrono::Utc::now(),
+        dependency_of: None,
+        previous: None,
+    });
+    mods::save_lock(&manager.lock_file(), &lock).await.unwrap();
+
+    launcher.store_adopt_instance(&inst.id).await.unwrap();
+    let index = artifact_store::ArtifactIndex::load(&inst.game_dir);
+    assert_eq!(
+        index.entries["mods/sodium.jar"].source,
+        artifact_store::ArtifactSource::Modrinth { project_id: "AANobbMI".into(), version_id: "ver1".into() }
+    );
+    assert_eq!(index.entries["mods/privado.jar"].source, artifact_store::ArtifactSource::Local);
+}
