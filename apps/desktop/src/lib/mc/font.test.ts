@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitText, normalizeText, stringWidth, tailText, wrap } from './font'
+import { MORE_WIDTH, fitText, isTruncated, normalizeText, stringWidth, tailText, wrap } from './font'
 
 describe('stringWidth', () => {
   it('suma los anchos de FontRenderer', () => {
@@ -87,6 +87,20 @@ describe('wrap', () => {
 
   it('no añade puntos si el texto cabe en maxLines', () => {
     expect(wrap('hola mundo', 200, 2)).toEqual(['hola mundo'])
+  })
+})
+
+describe('textos acortados', () => {
+  it('isTruncated coincide con lo que BitmapText acortaria', () => {
+    expect(isTruncated('hola', 200)).toBe(false)
+    expect(isTruncated('hola', 0)).toBe(false)
+    const largo = 'texto bastante largo para no caber en una linea corta'
+    expect(isTruncated(largo, 60)).toBe(true)
+    expect(fitText(largo, 59).endsWith('...')).toBe(true)
+  })
+
+  it('la marca [+] cabe en su hueco', () => {
+    expect(stringWidth('[+]')).toBeLessThanOrEqual(MORE_WIDTH)
   })
 })
 

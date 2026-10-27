@@ -78,7 +78,9 @@
     if (running) out.push({ text: 'El juego está abierto. Cierra el juego para cambiar mods.', color: '#ffaa00', role: 'status' })
     for (const dep of overview?.missingDependencies ?? []) out.push({ text: `${dep.modName} necesita ${dep.requires}${mods.busy === 'deps' ? ': se está instalando.' : ' y no se encontró solo. Búscalo en «Buscar mods».'}`, color: '#ffaa00', role: 'alert' })
     if (tab === 'installed' && mods.updates !== null && mods.updates.length === 0) out.push({ text: 'Todos tus mods están al día.', color: '#808080', role: 'status' })
-    return out.slice(0, 2)
+    // Caben dos lineas: lo que sobra se junta en la segunda (con «[+]» para leerlo entero) en vez de perderse.
+    if (out.length <= 2) return out
+    return [out[0], { ...out[1], text: out.slice(1).map((m) => m.text).join(' ') }]
   })
 
   const modIcon = $derived(instance ? defaultIconFor(instance.loader) : undefined)

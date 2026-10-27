@@ -4,6 +4,7 @@
   import { playSfx } from './lib/audio/sfx'
   import { goBack, runBack, trackView } from './lib/mc/back'
   import McButton from './lib/mc/McButton.svelte'
+  import McDetailHost from './lib/mc/McDetailHost.svelte'
   import McDialog from './lib/mc/McDialog.svelte'
   import McLabel from './lib/mc/McLabel.svelte'
   import McScreen from './lib/mc/McScreen.svelte'
@@ -147,4 +148,5 @@
   {#if notices.length > 0 && !helpOpen}
     <McDialog title="Aviso" message={notices.join('\n')} scroll buttons={[{ label: 'Entendido', onclick: () => (notices = []) }]} onclose={() => (notices = [])} />
   {/if}
+  <McDetailHost />
 </McStage>

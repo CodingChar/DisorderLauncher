@@ -3,6 +3,9 @@
   import { playSfx } from '../audio/sfx'
   import BitmapText from './BitmapText.svelte'
   import McText from './McText.svelte'
+  import McMore from './McMore.svelte'
+  import { detail } from './detail.svelte'
+  import { MORE_WIDTH, fitText, isTruncated } from './font'
   import type { RowIconLayer, RowSpec } from './listTypes'
   import {
     LIST_PAD,
@@ -44,6 +47,8 @@
     followEnd?: boolean
     /** Solicita solo los recursos de las filas visibles (p. ej. miniaturas). */
     onvisible?: (items: T[]) => void
+    /** Filas acortadas: muestra «[+]» para ver la fila completa (desactivado en la propia ventana de detalles). */
+    expandable?: boolean
   }
 
   let {
@@ -65,6 +70,7 @@
     selectable = true,
     followEnd = false,
     onvisible,
+    expandable = true,
   }: Props = $props()
 
   const uid = $props.id()
@@ -141,6 +147,15 @@
   function onKey(event: KeyboardEvent) {
     if (event.ctrlKey || event.metaKey || event.altKey) return
     const keys: ListKey[] = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End']
+    // Espacio: ver completa la fila seleccionada si esta acortada.
+    if (event.key === ' ' && selectable && selectedIndex >= 0) {
+      const spec = row(items[selectedIndex])
+      if (rowTruncated(spec, layers(spec.icon).length ? 37 : 5)) {
+        event.preventDefault()
+        showDetails(spec)
+        return
+      }
+    }
     if (event.key === 'Enter' && selectable && selectedIndex >= 0) {
       event.preventDefault()
       onactivate?.(items[selectedIndex])
@@ -186,6 +201,14 @@
     return `${base};background-size:${layer.imageWidth * k}px auto;background-position:${-cx * k}px ${-cy * k}px`
   }
 
+  /** Alguna linea de la fila no cabe: se ofrece abrir la fila completa en una ventana. */
+  const rowTruncated = (spec: RowSpec, textX: number) => expandable && spec.lines.some((l) => l.text && isTruncated(l.text, rowWidth - textX - 2))
+
+  function showDetails(spec: RowSpec) {
+    const lines = spec.lines.map((l) => l.text).filter(Boolean)
+    detail.show(fitText(lines[0] ?? 'Detalles', 280), lines.join(String.fromCharCode(10)))
+  }
+
   const layers = (icon: RowSpec['icon']): RowIconLayer[] => (icon ? (Array.isArray(icon) ? icon : [icon]) : [])
   const optionText = (spec: RowSpec) => spec.lines.map((l) => l.text).filter(Boolean).join('. ')
 </script>
@@ -206,6 +229,7 @@
       {@const icon = layers(spec.icon)}
       {@const textX = icon.length ? 37 : 5}
       {@const offsets = lineOffsets(rowHeight, spec.lines.length)}
+      {@const more = rowTruncated(spec, textX)}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div
         class="mc-row"
@@ -226,9 +250,12 @@
         {/if}
         {#each spec.lines as line, i (i)}
           {#if line.text}
-            <div class="mc-row-text" style="left:{textX}px;top:{offsets[i]}px"><BitmapText text={line.text} color={line.color ?? (i === 0 ? '#ffffff' : '#808080')} max={rowWidth - textX - 2} sr={false} /></div>
+            <div class="mc-row-text" style="left:{textX}px;top:{offsets[i]}px"><BitmapText text={line.text} color={line.color ?? (i === 0 ? '#ffffff' : '#808080')} max={rowWidth - textX - 2 - (more ? MORE_WIDTH : 0)} sr={false} /></div>
           {/if}
         {/each}
+        {#if more}
+          <McMore style="left:{rowWidth - MORE_WIDTH - 1}px;top:{(rowHeight >> 1) - 5}px" label="Ver la fila completa" onclick={() => showDetails(spec)} />
+        {/if}
       </div>
     {/each}
   </div>

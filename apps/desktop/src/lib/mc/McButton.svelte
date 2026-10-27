@@ -1,6 +1,6 @@
 <script lang="ts">
   import BitmapText from './BitmapText.svelte'
-  import { fitText, stringWidth } from './font'
+  import { fitText, normalizeText, stringWidth } from './font'
   import { palette } from './palette.svelte'
   import { posStyle, type Anchor } from './pos'
   import { playSfx, resolveSound, type SoundChoice } from '../audio/sfx'
@@ -47,6 +47,7 @@
     onclick?.(event)
   }}
   aria-label={ariaLabel ?? label}
+  title={shown !== normalizeText(label) ? label : undefined}
   {...extra}
   onpointerenter={(event) => { hovered = true; if (!disabled) { playSfx('focus'); onintent?.() } if (typeof extra.onpointerenter === 'function') extra.onpointerenter(event) }}
   onpointerleave={(event) => { hovered = false; if (typeof extra.onpointerleave === 'function') extra.onpointerleave(event) }}

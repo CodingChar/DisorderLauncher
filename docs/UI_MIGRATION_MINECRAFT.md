@@ -99,3 +99,13 @@ Texturas y fuente inspiradas en Minecraft, © Mojang. DisorderLauncher no está 
 - `McButton` suena solo (`sound="auto"`): etiquetas Atras/Volver/Cancelar/Salir/Cerrar/Hecho/No -> `back`, el resto -> `click`. `sound="none"` lo silencia. `McList` (fila), `McIconGrid`, `McTabs` y `McToggle`/`McCycle` heredan el clic.
 - Esc: `App.svelte` y `McDialog` reproducen `back`.
 - Volumen: deslizador en Ajustes; se guarda en `localStorage` (`disorder.sfxVolume`).
+
+## Textos acortados: nunca se pierden (2026-10-27)
+
+Todo texto que no cabe se acorta con «...» **y** ofrece verlo entero:
+
+- `McText` con `maxLines`, `McLabel` con `max` y las filas de `McList` muestran una marca amarilla **`[+]`** al final de lo acortado (`McMore`). Pulsarla abre una ventana (`McDetailHost`, un `McDialog` con scroll) con el texto completo. En una lista, `Espacio` hace lo mismo con la fila seleccionada.
+- `McDialog` pasa solo a scroll cuando el mensaje no cabe, asi que sus mensajes nunca se cortan. Los dos sitios donde la marca no tiene sentido (el cuerpo del propio dialogo) la desactivan con `expandable={false}`.
+- `McButton` pone el texto completo como `title` (tooltip) cuando lo acorta.
+- En pantallas con espacio para dos avisos (Mods), lo que sobra se junta en la segunda linea con `[+]` en vez de descartarse.
+- Para mostrar un detalle desde codigo: `detail.show(titulo, texto)` (`lib/mc/detail.svelte.ts`).
