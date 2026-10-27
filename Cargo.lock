@@ -2416,6 +2416,7 @@ dependencies = [
  "credential-store",
  "diagnostics",
  "download-manager",
+ "dpack",
  "identity-api",
  "identity-local",
  "identity-microsoft",
