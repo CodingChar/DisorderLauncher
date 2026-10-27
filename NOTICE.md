@@ -20,4 +20,4 @@ Si eres titular de alguno de estos derechos y quieres que se retire, abre una in
 
 ## Dependencias
 
-Las dependencias de Rust (`Cargo.lock`) y de npm (`apps/desktop/package-lock.json`) conservan sus propias licencias. Los juegos y loaders que descarga el launcher (Minecraft, Fabric, Quilt, Forge, NeoForge, Modrinth, Adoptium) pertenecen a sus autores y se obtienen desde sus servidores oficiales.
+Entre ellas, [`sevenz-rust2`](https://github.com/hasenbanck/sevenz-rust2) (Apache-2.0) para leer y escribir paquetes `.7z`. Las dependencias de Rust (`Cargo.lock`) y de npm (`apps/desktop/package-lock.json`) conservan sus propias licencias. Los juegos y loaders que descarga el launcher (Minecraft, Fabric, Quilt, Forge, NeoForge, Modrinth, Adoptium) pertenecen a sus autores y se obtienen desde sus servidores oficiales.

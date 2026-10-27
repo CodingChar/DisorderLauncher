@@ -43,6 +43,7 @@ let mockThemes: any[] = [
     density: { uiScale: 1, compact: false }, effects: { shadowStrength: 0.2, animations: true } },
 ]
 const installedMods = new Map<string, any[]>()
+let storageReclaimable = 48_000_000
 const pendingUpdates = new Set<string>()
 let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null as string | null, microsoftClientId: null as string | null, javaPath: null as string | null }
 
@@ -353,6 +354,13 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
         await sleep(60)
       }
       return { files: 30, bytes: 48_000_000 }
+    }
+    case 'store_summary':
+      return { storeBytes: 312_000_000, sharedBytes: 640_000_000, reclaimableBytes: storageReclaimable }
+    case 'store_cleanup': {
+      const freed = storageReclaimable
+      storageReclaimable = 0
+      return { freedBytes: freed }
     }
     case 'dpack_import': {
       if (!defaultId) throw 'Primero crea un perfil para poder jugar.'

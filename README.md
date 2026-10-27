@@ -51,6 +51,7 @@ theme_examples/   JSON de temas de ejemplo
 13. [`12_TESTING_QA.md`](docs/spec/12_TESTING_QA.md) — testing y QA
 14. [`13_SPRINTS_AND_ROADMAP.md`](docs/spec/13_LONG_SPRINTS.md) — sprints, dependencias y roadmap
 15. [`ADR-001`](docs/adr/ADR-001_stack_and_references.md) — decisiones de stack y referencias
+    [`ADR-003`](docs/adr/ADR-003_artifact_store_and_dpack.md) — almacen comun de mods y paquetes `.7z`
 16. [`UI_MIGRATION_MINECRAFT`](docs/UI_MIGRATION_MINECRAFT.md) — interfaz estilo Minecraft 1.7.10: reglas, componentes, pantallas y verificacion
 
 ## Regla de autoridad

@@ -8,6 +8,8 @@ pub enum ArtifactError {
     InvalidHash,
     #[error("el archivo no esta en el almacen")]
     Missing,
+    #[error("no se puede leer el registro de archivos de una instancia")]
+    UnreadableIndex,
     #[error("el contenido no coincide con lo esperado")]
     Mismatch,
 }

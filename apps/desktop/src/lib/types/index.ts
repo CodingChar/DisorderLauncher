@@ -240,6 +240,13 @@ export interface LoaderVersion {
   stable: boolean
 }
 
+/** Uso del almacen comun de mods (bytes). */
+export interface StorageSummary {
+  storeBytes: number
+  sharedBytes: number
+  reclaimableBytes: number
+}
+
 /** Resultado de exportar una instancia como paquete .7z. */
 export interface DpackSummary {
   files: number

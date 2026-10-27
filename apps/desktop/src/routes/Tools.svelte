@@ -10,6 +10,7 @@
   import type { RowSpec } from '../lib/mc/listTypes'
   import { bandWidth } from '../lib/mc/pos'
   import { api } from '../lib/api'
+  import type { StorageSummary } from '../lib/types'
   import { FEATURES } from '../lib/features'
   import { findItemIcon } from '../lib/itemIcons'
   import { instances } from '../lib/stores/instances.svelte'
@@ -26,6 +27,14 @@
   let error = $state<string | null>(null)
   let notice = $state<string | null>(null)
   let selectedId = $state<string>('repair')
+  let storage = $state<StorageSummary | null>(null)
+
+  async function loadStorage() {
+    storage = await api.storeSummary().catch(() => null)
+  }
+  $effect(() => {
+    void loadStorage()
+  })
 
   async function run(action: () => Promise<string | void>) {
     if (working) return
@@ -74,6 +83,13 @@
       if (created) nav.go('home')
     })
 
+  const cleanStorage = () =>
+    run(async () => {
+      const { freedBytes } = await api.storeCleanup()
+      await loadStorage()
+      return freedBytes > 0 ? `Listo: se liberaron ${formatSize(freedBytes)}.` : 'No hay archivos sin uso que liberar ahora.'
+    })
+
   /** Tamano legible para personas: MB o GB, sin decimales de mas. */
   function formatSize(bytes: number): string {
     if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
@@ -88,14 +104,22 @@
     soon?: boolean
   }
 
-  const tools: Tool[] = [
+  const tools: Tool[] = $derived([
     { id: 'repair', icon: 'redstone', title: 'Reparar instancia', description: 'Comprueba los archivos de la instancia activa y vuelve a descargar lo que falte o esté dañado.' },
     { id: 'export', icon: 'ender-pearl', title: 'Exportar modpack', description: 'Guarda la instancia activa como un archivo .mrpack para compartirla. No incluye mundos ni registros.' },
     { id: 'import', icon: 'crafting-table', title: 'Importar modpack', description: 'Crea una instancia nueva a partir de un archivo .mrpack de Modrinth.' },
     { id: 'export7z', icon: 'diamond-pickaxe', title: 'Exportar instancia (.7z)', description: 'Guarda la instancia activa con todos sus mods en un solo archivo, para llevarla a otro equipo. No incluye mundos.' },
     { id: 'export7zWorlds', icon: 'grass-block', title: 'Exportar con mundos (.7z)', description: 'Igual que la anterior, pero también guarda tus mundos. Puede ocupar bastante más.' },
     { id: 'import7z', icon: 'diamond-sword', title: 'Importar instancia (.7z)', description: 'Crea una instancia nueva a partir de un archivo .7z exportado desde DisorderLauncher.' },
-  ]
+    {
+      id: 'storage',
+      icon: 'tnt',
+      title: 'Liberar espacio',
+      description: storage
+        ? `Ahorras ${formatSize(storage.sharedBytes)} al compartir mods entre instancias. Se pueden liberar ${formatSize(storage.reclaimableBytes)} sin uso.`
+        : 'Libera los archivos de mods que ya no usa ninguna instancia.',
+    },
+  ])
 
   /** Herramientas que todavia no existen: no se muestran (ver `FEATURES`) y, si se activan, nunca fingen funcionar. */
   const soon: Tool[] = [
@@ -133,6 +157,7 @@
     else if (selected.id === 'export7z') exportInstance(false)
     else if (selected.id === 'export7zWorlds') exportInstance(true)
     else if (selected.id === 'import7z') importInstance()
+    else if (selected.id === 'storage') cleanStorage()
   }
 </script>
 

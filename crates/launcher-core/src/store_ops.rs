@@ -2,7 +2,7 @@
 //! identicas compartan los mismos bytes en disco. La logica vive en el crate `artifact-store`.
 
 use crate::{InstallProgressEvent, Launcher, LauncherError};
-use artifact_store::{adopt_instance, AdoptReport, ArtifactError, ArtifactStore};
+use artifact_store::{adopt_instance, AdoptReport, ArtifactError, ArtifactStore, DEFAULT_GRACE};
 use instance_manager::InstanceRepository;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -14,6 +14,9 @@ impl From<ArtifactError> for LauncherError {
             ArtifactError::InvalidHash | ArtifactError::Mismatch => {
                 Self::InvalidInput("El archivo no coincide con lo esperado.".into())
             }
+            ArtifactError::UnreadableIndex => Self::InvalidInput(
+                "No se puede liberar espacio ahora: el registro de una instancia esta danado. Inicia esa instancia una vez e intentalo de nuevo.".into(),
+            ),
             _ => Self::Storage,
         }
     }
@@ -25,6 +28,21 @@ impl From<ArtifactError> for LauncherError {
 pub struct AdoptSummary {
     pub adopted: usize,
     pub saved_bytes: u64,
+}
+
+/// Uso del almacen comun, en lenguaje de personas: cuanto ocupa, cuanto se ahorra y cuanto se puede liberar.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageSummary {
+    pub store_bytes: u64,
+    pub shared_bytes: u64,
+    pub reclaimable_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupSummary {
+    pub freed_bytes: u64,
 }
 
 impl Launcher {
@@ -52,6 +70,43 @@ impl Launcher {
         .await
         .map_err(|_| LauncherError::Storage)?
         .map_err(Into::into)
+    }
+
+    /// Reserva todas las instancias (en orden fijo) y comprueba que nada se este instalando ni jugando:
+    /// ni las estadisticas ni la limpieza deben cruzarse con un cambio de mods.
+    async fn store_exclusive(&self) -> Result<(Vec<PathBuf>, Vec<tokio::sync::OwnedMutexGuard<()>>), LauncherError> {
+        let mut list = self.instances.list().await?;
+        list.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut guards = Vec::with_capacity(list.len());
+        for instance in &list {
+            guards.push(self.mods_guard(&instance.id).await);
+        }
+        if !self.running_guard().is_empty() {
+            return Err(LauncherError::InvalidInput(
+                "Cierra el juego y espera a que terminen las instalaciones para liberar espacio.".into(),
+            ));
+        }
+        Ok((list.into_iter().map(|i| i.game_dir).collect(), guards))
+    }
+
+    pub async fn store_summary(&self) -> Result<StorageSummary, LauncherError> {
+        let (dirs, _guards) = self.store_exclusive().await?;
+        let store = self.artifact_store()?;
+        let stats = tokio::task::spawn_blocking(move || artifact_store::stats(&store, &dirs, DEFAULT_GRACE))
+            .await
+            .map_err(|_| LauncherError::Storage)??;
+        Ok(StorageSummary { store_bytes: stats.store_bytes, shared_bytes: stats.shared_bytes, reclaimable_bytes: stats.orphan_bytes })
+    }
+
+    /// Libera los archivos del almacen que ya no usa ninguna instancia.
+    pub async fn store_cleanup(&self) -> Result<CleanupSummary, LauncherError> {
+        let (dirs, _guards) = self.store_exclusive().await?;
+        let store = self.artifact_store()?;
+        let report = tokio::task::spawn_blocking(move || artifact_store::gc(&store, &dirs, DEFAULT_GRACE))
+            .await
+            .map_err(|_| LauncherError::Storage)??;
+        tracing::info!(removed = report.removed, freed = report.freed_bytes, "limpieza del almacen");
+        Ok(CleanupSummary { freed_bytes: report.freed_bytes })
     }
 
     /// Pone al dia el almacen con los mods de una instancia (la reserva, igual que el resto de cambios de mods).

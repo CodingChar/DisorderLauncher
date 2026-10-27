@@ -70,6 +70,8 @@ pub fn run() {
       commands::modpacks_export,
       commands::dpack_export,
       commands::dpack_import,
+      commands::store_summary,
+      commands::store_cleanup,
       commands::mods_list,
       commands::mods_set_enabled,
       commands::mods_remove,

@@ -346,6 +346,18 @@ pub async fn modpacks_export(
   state.launcher.modpack_export(&id, &path).await.map(Some).map_err(user_message)
 }
 
+/// Cuánto ocupan los mods compartidos, cuánto se ahorra y cuánto se puede liberar.
+#[tauri::command]
+pub async fn store_summary(state: State<'_, AppState>) -> Result<launcher_core::StorageSummary, String> {
+  state.launcher.store_summary().await.map_err(user_message)
+}
+
+/// Libera los archivos que ya no usa ninguna instancia.
+#[tauri::command]
+pub async fn store_cleanup(state: State<'_, AppState>) -> Result<launcher_core::CleanupSummary, String> {
+  state.launcher.store_cleanup().await.map_err(user_message)
+}
+
 /// Pide dónde guardar el `.7z` y exporta la instancia con todos sus mods. `None` si el usuario cancela.
 /// El avance llega por `install://progress` (fase `export7z`).
 #[tauri::command]

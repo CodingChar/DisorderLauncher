@@ -1064,3 +1064,29 @@ async fn dpack_import_of_a_broken_file_creates_no_instance() {
     assert!(matches!(launcher.dpack_import(&junk).await, Err(LauncherError::InvalidInput(_))));
     assert!(launcher.instances_list().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn storage_cleanup_frees_only_what_no_instance_uses() {
+    let (_dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let a = launcher.instances_create("A", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    let b = launcher.instances_create("B", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    for inst in [&a, &b] {
+        std::fs::write(inst.game_dir.join("mods").join("sodium.jar"), vec![9u8; 2048]).unwrap();
+    }
+    std::fs::write(a.game_dir.join("mods").join("solo-a.jar"), vec![4u8; 100]).unwrap();
+    launcher.store_adopt_instance(&a.id).await.unwrap();
+    launcher.store_adopt_instance(&b.id).await.unwrap();
+
+    let summary = launcher.store_summary().await.unwrap();
+    assert_eq!((summary.store_bytes, summary.shared_bytes, summary.reclaimable_bytes), (2148, 2048, 0));
+    // Lo recien llegado esta en gracia: aunque ya no se use, todavia no se libera.
+    std::fs::remove_file(a.game_dir.join("mods").join("solo-a.jar")).unwrap();
+    launcher.store_adopt_instance(&a.id).await.unwrap();
+    assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 0);
+
+    // Borrar una instancia no toca los mods que otra sigue usando.
+    launcher.instances_delete(&a.id).await.unwrap();
+    assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 0);
+    assert_eq!(std::fs::read(b.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![9u8; 2048]);
+}
