@@ -57,6 +57,11 @@ impl ModManager {
         &self.mods_dir
     }
 
+    /// Carpeta de juego de la instancia (la que contiene `mods/`).
+    pub fn game_dir(&self) -> &Path {
+        self.mods_dir.parent().unwrap_or(&self.mods_dir)
+    }
+
     /// Archivo con el registro de origen de los mods instalados desde Modrinth.
     pub fn lock_file(&self) -> PathBuf {
         self.state_dir.join("mods.json")

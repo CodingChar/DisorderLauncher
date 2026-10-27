@@ -2698,6 +2698,7 @@ dependencies = [
 name = "mods"
 version = "0.1.0"
 dependencies = [
+ "artifact-store",
  "async-trait",
  "chrono",
  "download-manager",

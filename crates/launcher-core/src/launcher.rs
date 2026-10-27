@@ -100,7 +100,16 @@ impl Launcher {
 
         Self {
             loader_providers,
-            mods_service: mods::ModsService::new(http.clone()),
+            mods_service: {
+                let service = mods::ModsService::new(http.clone());
+                match artifact_store::ArtifactStore::open(paths.store_dir()) {
+                    Ok(store) => service.with_store(store),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "almacen comun no disponible: los mods se descargan por instancia");
+                        service
+                    }
+                }
+            },
             accounts: Arc::new(FileAccountRepository::new(paths.accounts_dir())),
             instances: Arc::new(FileInstanceRepository::new(paths.instances_dir())),
             java: JavaManager::new(http.clone(), paths.runtimes_dir()),

@@ -99,6 +99,9 @@ pub fn adopt_instance(
     let candidates = scan(game_dir);
     let mut report = AdoptReport::default();
 
+    // Un archivo renombrado (p. ej. desactivado) conserva el origen de su contenido.
+    let known_sources: std::collections::HashMap<String, ArtifactSource> =
+        index.entries.values().map(|e| (e.sha512.clone(), e.source.clone())).collect();
     let seen: BTreeSet<&str> = candidates.iter().map(|c| c.rel.as_str()).collect();
     let before = index.entries.len();
     index.entries.retain(|rel, _| seen.contains(rel.as_str()));
@@ -131,7 +134,7 @@ pub fn adopt_instance(
         let mtime = fs::metadata(&candidate.path).map(|m| mtime_ns(&m)).unwrap_or(candidate.mtime_ns);
         let source = match index.entries.get(&candidate.rel) {
             Some(prev) if prev.sha512 == hash => prev.source.clone(),
-            _ => ArtifactSource::Local,
+            _ => known_sources.get(&hash).cloned().unwrap_or(ArtifactSource::Local),
         };
         index.entries.insert(candidate.rel.clone(), ArtifactEntry { sha512: hash, size, mtime_ns: mtime, source });
         report.adopted += 1;
@@ -245,6 +248,19 @@ mod tests {
         let report = adopt_instance(&store, &game, &noop).unwrap();
         assert_eq!(report.removed, 1);
         assert!(ArtifactIndex::load(&game).entries.is_empty());
+    }
+
+    #[test]
+    fn renamed_file_keeps_its_known_source() {
+        let (_tmp, store, game) = setup();
+        fs::write(game.join("mods/a.jar"), b"contenido").unwrap();
+        adopt_instance(&store, &game, &noop).unwrap();
+        let hash = ArtifactIndex::load(&game).entries["mods/a.jar"].sha512.clone();
+        let source = ArtifactSource::Modrinth { project_id: "P".into(), version_id: "V".into() };
+        ArtifactIndex::record_file(&game, "mods/a.jar", &hash, source.clone()).unwrap();
+        fs::rename(game.join("mods/a.jar"), game.join("mods/a.jar.disabled")).unwrap();
+        adopt_instance(&store, &game, &noop).unwrap();
+        assert_eq!(ArtifactIndex::load(&game).entries["mods/a.jar.disabled"].source, source);
     }
 
     #[test]

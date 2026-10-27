@@ -72,6 +72,24 @@ impl ArtifactIndex {
         Ok(())
     }
 
+    /// Anota un archivo ya presente en la instancia (p. ej. recien materializado desde el almacen),
+    /// con su origen conocido. Lee tamano y fecha del propio archivo.
+    pub fn record_file(game_dir: &Path, rel_path: &str, sha512: &str, source: ArtifactSource) -> Result<(), ArtifactError> {
+        let meta = fs::metadata(game_dir.join(rel_path))?;
+        let mtime_ns = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0);
+        let mut index = Self::load(game_dir);
+        index.entries.insert(
+            rel_path.to_string(),
+            ArtifactEntry { sha512: sha512.to_string(), size: meta.len(), mtime_ns, source },
+        );
+        index.save(game_dir)
+    }
+
     pub fn set_source(&mut self, rel_path: &str, source: ArtifactSource) {
         if let Some(entry) = self.entries.get_mut(rel_path) {
             entry.source = source;
