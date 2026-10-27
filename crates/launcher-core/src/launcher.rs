@@ -692,6 +692,12 @@ impl Launcher {
 
         // Mods copiados a mano o heredados: pasan a compartir contenido con el almacen. Si falla, se juega igual.
         self.adopt_game_dir(id, &instance.game_dir).await;
+        // Con un perfil sin Microsoft, el aviso de «modo offline» de Crash Assistant solo estorba.
+        if account.provider == IdentityProviderKind::Local {
+            if let Err(e) = crate::crash_assistant::silence_offline_notice(&instance.game_dir) {
+                tracing::warn!(error = %e, "no se pudo ajustar la configuracion de Crash Assistant");
+            }
+        }
 
         let overlay = self.prepare_loader(instance, &data_dir, &java).await?;
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;

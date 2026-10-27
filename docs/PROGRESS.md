@@ -11,6 +11,8 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqu
 
 ✅ Cuatro fases. (1) `artifact-store`: objetos por SHA-512, hardlink/copia, adopcion perezosa y duplicar instancias sin copiar jars. (2) Instalar/actualizar mods via el almacen: un mod conocido no se descarga otra vez. (3) `dpack`: exportar/importar instancias `.7z` con manifiesto, verificacion de hashes y defensas contra rutas, enlaces y bombas. (4) Estadisticas y limpieza con gracia de 24 h, y tres herramientas nuevas en la pantalla Herramientas. Decisiones en `docs/adr/ADR-003_artifact_store_and_dpack.md`; contratos en `docs/IPC.md`.
 
+Aviso de «modo offline» de Crash Assistant: con un perfil Offline Gaming, al lanzar se pone `[piracy] enabled = false` en `config/crash_assistant/config.toml` de la instancia (si existe), con la opcion que el propio mod ofrece y conservando el resto del archivo (`crates/launcher-core/src/crash_assistant.rs`). Con Microsoft no se toca.
+
 ## Reforma visual anterior (maqueta `DisorderLauncherUI`) — reemplazada
 
 ✅ Completada el 2026-10-17. La interfaz de `apps/desktop` sustituye al diseno anterior por el de la maqueta `DisorderLauncherUI/` (barra lateral, centro de sesion con consola real, Mis instancias, Explorar, Herramientas, Perfiles, Skins, Ajustes, tema azul oscuro incluido). Reglas, mapa y pendientes en [`UI_MIGRATION.md`](UI_MIGRATION.md): **leelo antes de tocar `apps/desktop/src`**. No cambia contratos IPC ni logica de negocio.

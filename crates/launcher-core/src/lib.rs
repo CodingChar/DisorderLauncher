@@ -1,3 +1,4 @@
+mod crash_assistant;
 mod crash_hints;
 mod dpack_ops;
 mod error;
