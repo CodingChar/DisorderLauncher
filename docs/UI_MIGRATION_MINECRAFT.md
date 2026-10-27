@@ -1,8 +1,8 @@
 # Interfaz estilo Minecraft 1.7.10 (maqueta → `apps/desktop`)
 
 > **Si eres otro chat/agente: lee este archivo antes de tocar `apps/desktop/src`.**
-> Esta migración **reemplaza** la reforma anterior (`docs/UI_MIGRATION.md`, estilo moderno). Origen visual: la maqueta `maqueta/`
-> (menús de Minecraft 1.7.10) y la guía `PORTING_TO_DISORDERLAUNCHER.md`. Estado: **migrada** (2026-10-18).
+> Esta migración **reemplaza** la reforma anterior. Origen visual: la maqueta `maqueta/`
+> (menús de Minecraft 1.7.10). Estado: **migrada** (2026-10-18).
 
 ## Qué cambió y qué NO
 

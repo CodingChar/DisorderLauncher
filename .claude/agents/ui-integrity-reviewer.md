@@ -15,7 +15,7 @@ Eres un revisor de integridad visual y de interfaz para el launcher DisorderLaun
 
 ## Lectura obligatoria antes de revisar
 
-Lee `docs/UI_MIGRATION_MINECRAFT.md` (reglas, componentes, mapa de pantallas, verificación). Es la fuente de verdad del estilo. `docs/UI_MIGRATION.md` es histórico: no lo uses como referencia.
+Lee `docs/UI_MIGRATION_MINECRAFT.md` (reglas, componentes, mapa de pantallas, verificación). Es la fuente de verdad del estilo.
 
 ## Qué comprobar
 
