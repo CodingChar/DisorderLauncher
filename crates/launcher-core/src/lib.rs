@@ -1,4 +1,5 @@
 mod crash_hints;
+mod dpack_ops;
 mod error;
 mod events;
 mod external_versions;
@@ -19,6 +20,7 @@ mod store_ops;
 mod themes_ops;
 mod version_catalog;
 
+pub use dpack_ops::*;
 pub use error::*;
 pub use events::*;
 pub use external_versions::{default_minecraft_dir, display_version, ExternalKind, ExternalScan, ExternalVersion, CUSTOM_PREFIX};

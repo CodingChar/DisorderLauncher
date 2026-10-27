@@ -40,7 +40,8 @@ pub fn mtime_ns(meta: &fs::Metadata) -> u64 {
         .unwrap_or(0)
 }
 
-fn is_shareable(name: &str) -> bool {
+/// Archivos que se comparten por contenido: jar y zip (y su version desactivada).
+pub fn is_shareable(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     !name.starts_with('.') && [".jar", ".jar.disabled", ".zip", ".zip.disabled"].iter().any(|ext| lower.ends_with(ext))
 }

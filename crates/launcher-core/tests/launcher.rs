@@ -15,10 +15,13 @@ const NO_NETWORK: &str = "http://127.0.0.1:1/version_manifest_v2.json";
 struct Collector {
     states: Mutex<Vec<LaunchStateEvent>>,
     output: Mutex<Vec<String>>,
+    progress: Mutex<Vec<InstallProgressEvent>>,
 }
 
 impl LauncherEvents for Collector {
-    fn install_progress(&self, _: InstallProgressEvent) {}
+    fn install_progress(&self, event: InstallProgressEvent) {
+        self.progress.lock().unwrap().push(event);
+    }
     fn launch_state(&self, event: LaunchStateEvent) {
         self.states.lock().unwrap().push(event);
     }
@@ -1009,4 +1012,55 @@ async fn adoption_shares_identical_mods_between_instances_and_duplicates() {
     let copy = launcher.instances_duplicate(&a.id).await.unwrap();
     assert_eq!(std::fs::read(copy.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![9u8; 2048]);
     assert_eq!(launcher.store_adopt_instance(&copy.id).await.unwrap().adopted, 0, "el indice copiado sigue valido");
+}
+
+#[tokio::test]
+async fn dpack_roundtrip_reuses_the_store_and_leaves_personal_state_out() {
+    let (dir, launcher, events) = launcher();
+    fake_installation(&launcher, dir.path());
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let source = launcher.instances_create("Mi pack", "1.99", LoaderKind::Vanilla, None).await.unwrap();
+    let game = &source.game_dir;
+    std::fs::write(game.join("mods").join("sodium.jar"), vec![5u8; 4096]).unwrap();
+    std::fs::write(game.join("mods").join("privado.jar"), vec![6u8; 512]).unwrap();
+    std::fs::create_dir_all(game.join("config")).unwrap();
+    std::fs::write(game.join("config").join("sodium.toml"), b"quality = 2\n").unwrap();
+    std::fs::create_dir_all(game.join("saves").join("Mundo")).unwrap();
+    std::fs::write(game.join("saves").join("Mundo").join("level.dat"), b"mundo").unwrap();
+    std::fs::write(game.join("options.txt"), b"fov:90").unwrap();
+
+    let out = dir.path().join("pack.7z");
+    let summary = launcher.dpack_export(&source.id, &out, false).await.unwrap();
+    assert_eq!(summary.files, 3, "dos mods y una config; sin mundos ni options");
+    assert!(out.is_file());
+    assert!(events.progress.lock().unwrap().iter().any(|e| e.phase == "export7z"));
+
+    let store = artifact_store::ArtifactStore::open(launcher.paths().store_dir()).unwrap();
+    let before = store.list().unwrap().len();
+    assert_eq!(before, 2, "la exportacion adopta los mods de la instancia");
+
+    let imported = launcher.dpack_import(&out).await.unwrap();
+    assert_ne!(imported.id, source.id);
+    assert_eq!(imported.name, "Mi pack");
+    assert_eq!(std::fs::read(imported.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![5u8; 4096]);
+    assert_eq!(std::fs::read(imported.game_dir.join("mods").join("privado.jar")).unwrap(), vec![6u8; 512]);
+    assert_eq!(std::fs::read(imported.game_dir.join("config").join("sodium.toml")).unwrap(), b"quality = 2\n");
+    assert!(!imported.game_dir.join("saves").join("Mundo").exists());
+    assert!(!imported.game_dir.join("options.txt").exists());
+    assert_eq!(store.list().unwrap().len(), before, "los mods ya conocidos no crean objetos nuevos");
+    assert!(events.progress.lock().unwrap().iter().any(|e| e.phase == "import7z"));
+    // El indice queda listo: adoptar de nuevo no tiene nada que hacer.
+    assert_eq!(launcher.store_adopt_instance(&imported.id).await.unwrap().adopted, 0);
+    assert!(!imported.game_dir.join(".disorder").join("import.pending").exists());
+}
+
+#[tokio::test]
+async fn dpack_import_of_a_broken_file_creates_no_instance() {
+    let (dir, launcher, _) = launcher();
+    fake_installation(&launcher, dir.path());
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let junk = dir.path().join("roto.7z");
+    std::fs::write(&junk, b"esto no es un paquete").unwrap();
+    assert!(matches!(launcher.dpack_import(&junk).await, Err(LauncherError::InvalidInput(_))));
+    assert!(launcher.instances_list().await.unwrap().is_empty());
 }

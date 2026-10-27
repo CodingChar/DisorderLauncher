@@ -10,7 +10,7 @@ mod hash;
 mod index;
 mod store;
 
-pub use adopt::{adopt_instance, mtime_ns, AdoptReport, STORE_DIRS};
+pub use adopt::{adopt_instance, is_shareable, mtime_ns, AdoptReport, STORE_DIRS};
 pub use error::ArtifactError;
 pub use hash::{hash_file, hash_reader, is_valid_hash, Sha512Hasher};
 pub use index::{ArtifactEntry, ArtifactIndex, ArtifactSource, INDEX_FILE};
