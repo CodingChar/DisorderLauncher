@@ -681,6 +681,9 @@ impl Launcher {
 
         self.sync_profile_skin(instance, &descriptor, &account).await;
 
+        // Mods copiados a mano o heredados: pasan a compartir contenido con el almacen. Si falla, se juega igual.
+        self.adopt_game_dir(id, &instance.game_dir).await;
+
         let overlay = self.prepare_loader(instance, &data_dir, &java).await?;
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;
 

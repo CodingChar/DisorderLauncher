@@ -368,17 +368,36 @@ fn validate_id(id: &str) -> Result<(), InstanceError> {
     Ok(())
 }
 
+/// Carpetas cuyos archivos son inmutables (jar/zip) y se pueden compartir entre instancias.
+const SHARED_DIRS: [&str; 3] = ["mods", "resourcepacks", "shaderpacks"];
+
+fn is_shareable_file(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    [".jar", ".jar.disabled", ".zip", ".zip.disabled"].iter().any(|ext| lower.ends_with(ext))
+}
+
 /// Copia recursiva. Ignora enlaces simbolicos para no escapar del directorio de la instancia.
 fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    copy_tree(from, to, false)
+}
+
+/// En las carpetas compartidas los jar/zip se enlazan (hardlink) en vez de copiarse: duplicar una
+/// instancia no gasta disco extra para sus mods. Si el sistema de archivos no lo permite, se copian.
+fn copy_tree(from: &Path, to: &Path, shared: bool) -> std::io::Result<()> {
     std::fs::create_dir_all(to)?;
     for entry in std::fs::read_dir(from)? {
         let entry = entry?;
         let kind = entry.file_type()?;
         let dest = to.join(entry.file_name());
         if kind.is_dir() {
-            copy_dir(&entry.path(), &dest)?;
+            let name = entry.file_name();
+            let is_shared = !shared && SHARED_DIRS.iter().any(|d| name.to_str() == Some(d));
+            copy_tree(&entry.path(), &dest, is_shared)?;
         } else if kind.is_file() {
-            std::fs::copy(entry.path(), dest)?;
+            let linkable = shared && entry.file_name().to_str().is_some_and(is_shareable_file);
+            if !(linkable && std::fs::hard_link(entry.path(), &dest).is_ok()) {
+                std::fs::copy(entry.path(), dest)?;
+            }
         }
     }
     Ok(())
@@ -751,6 +770,23 @@ mod tests {
         assert!(copy.game_dir.join("options.txt").is_file());
         assert!(repo.get(&inst.id).await.unwrap().is_some());
         assert_eq!(repo.list().await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn duplicate_shares_jars_but_never_mutable_state() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("Original")).await.unwrap();
+        std::fs::write(inst.game_dir.join("mods").join("a.jar"), b"jar").unwrap();
+        std::fs::create_dir_all(inst.game_dir.join("config")).unwrap();
+        std::fs::write(inst.game_dir.join("config").join("a.toml"), b"v=1").unwrap();
+
+        let copy = repo.duplicate(&inst.id).await.unwrap();
+        // Cambiar el estado de la copia no toca el original (config nunca se enlaza).
+        std::fs::write(copy.game_dir.join("config").join("a.toml"), b"v=2").unwrap();
+        assert_eq!(std::fs::read(inst.game_dir.join("config").join("a.toml")).unwrap(), b"v=1");
+        // Borrar el jar original no afecta a la copia.
+        std::fs::remove_file(inst.game_dir.join("mods").join("a.jar")).unwrap();
+        assert_eq!(std::fs::read(copy.game_dir.join("mods").join("a.jar")).unwrap(), b"jar");
     }
 
     #[tokio::test]

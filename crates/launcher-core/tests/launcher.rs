@@ -983,3 +983,30 @@ async fn real_modpack_import_and_launch() {
     wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
     assert!(alive, "el juego se cerro solo antes de tiempo");
 }
+
+#[tokio::test]
+async fn adoption_shares_identical_mods_between_instances_and_duplicates() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let a = launcher.instances_create("A", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    let b = launcher.instances_create("B", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    for inst in [&a, &b] {
+        std::fs::write(inst.game_dir.join("mods").join("sodium.jar"), vec![9u8; 2048]).unwrap();
+    }
+
+    let first = launcher.store_adopt_instance(&a.id).await.unwrap();
+    let second = launcher.store_adopt_instance(&b.id).await.unwrap();
+    assert_eq!((first.adopted, first.saved_bytes), (1, 0));
+    assert_eq!((second.adopted, second.saved_bytes), (1, 2048));
+    // Segunda pasada: nada que hacer.
+    assert_eq!(launcher.store_adopt_instance(&a.id).await.unwrap().adopted, 0);
+
+    let objects = artifact_store::ArtifactStore::open(launcher.paths().store_dir()).unwrap().list().unwrap();
+    assert_eq!(objects.len(), 1, "un solo objeto fisico para ambas instancias");
+
+    // El almacen vive bajo la raiz de datos, nunca dentro de una instancia.
+    assert!(launcher.paths().store_dir().starts_with(dir.path()));
+    let copy = launcher.instances_duplicate(&a.id).await.unwrap();
+    assert_eq!(std::fs::read(copy.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![9u8; 2048]);
+    assert_eq!(launcher.store_adopt_instance(&copy.id).await.unwrap().adopted, 0, "el indice copiado sigue valido");
+}

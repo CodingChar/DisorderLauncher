@@ -17,6 +17,7 @@ download-manager = { path = "../download-manager" }
 instance-manager = { path = "../instance-manager" }
 jvm-tuning = { path = "../jvm-tuning" }
 loaders = { path = "../loaders" }
+artifact-store = { path = "../artifact-store" }
 mods = { path = "../mods" }
 modpacks = { path = "../modpacks" }
 themes = { path = "../themes" }

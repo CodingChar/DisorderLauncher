@@ -16,6 +16,7 @@ members = [
     "crates/launcher-core",
     "crates/diagnostics",
     "crates/loaders",
+    "crates/artifact-store",
     "crates/mods",
     "crates/modpacks",
     "crates/themes",

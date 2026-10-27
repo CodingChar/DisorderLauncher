@@ -109,7 +109,9 @@ impl Launcher {
         self.ensure_idle(instance_id)?;
         let (instance, manager) = self.mod_context(instance_id).await?;
         Self::require_mod_support(&instance)?;
-        Ok(manager.add_local(source).await?)
+        let entry = manager.add_local(source).await?;
+        self.adopt_game_dir(instance_id, &instance.game_dir).await;
+        Ok(entry)
     }
 
     pub async fn mods_search(&self, instance_id: &str, query: &str, page: u32) -> Result<Vec<ProjectHit>, LauncherError> {

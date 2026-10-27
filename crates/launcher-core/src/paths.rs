@@ -40,6 +40,12 @@ impl LauncherPaths {
         self.root.join("minecraft")
     }
 
+    /// Almacen comun de artefactos inmutables (mods, packs). Bajo la misma raiz que las instancias
+    /// para que casi siempre compartan volumen y se puedan enlazar sin copiar.
+    pub fn store_dir(&self) -> PathBuf {
+        self.root.join("store")
+    }
+
     pub fn runtimes_dir(&self) -> PathBuf {
         self.root.join("runtimes")
     }

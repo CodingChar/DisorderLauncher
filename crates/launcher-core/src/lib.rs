@@ -15,6 +15,7 @@ mod registry;
 mod settings;
 mod skin_pack;
 mod skins_ops;
+mod store_ops;
 mod themes_ops;
 mod version_catalog;
 
@@ -32,4 +33,5 @@ pub use paths::*;
 pub use recommendation::Recommendation;
 pub use registry::*;
 pub use settings::*;
+pub use store_ops::*;
 pub use version_catalog::{CatalogSource, VersionCatalog};
