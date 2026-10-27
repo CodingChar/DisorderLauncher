@@ -346,6 +346,47 @@ pub async fn modpacks_export(
   state.launcher.modpack_export(&id, &path).await.map(Some).map_err(user_message)
 }
 
+/// Pide dónde guardar el `.7z` y exporta la instancia con todos sus mods. `None` si el usuario cancela.
+/// El avance llega por `install://progress` (fase `export7z`).
+#[tauri::command]
+pub async fn dpack_export(
+  app: tauri::AppHandle,
+  state: State<'_, AppState>,
+  id: String,
+  include_worlds: bool,
+) -> Result<Option<launcher_core::DpackExportSummary>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let name = state
+    .launcher
+    .instances_list()
+    .await
+    .map_err(user_message)?
+    .into_iter()
+    .find(|i| i.id == id)
+    .map(|i| i.name)
+    .unwrap_or_else(|| "instancia".to_string());
+  let picked = app
+    .dialog()
+    .file()
+    .add_filter("Instancia de DisorderLauncher", &["7z"])
+    .set_file_name(format!("{name}.7z"))
+    .blocking_save_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo usar esa ubicación.".to_string())?;
+  state.launcher.dpack_export(&id, &path, include_worlds).await.map(Some).map_err(user_message)
+}
+
+/// Abre el selector de un `.7z` exportado y crea la instancia. `None` si el usuario cancela.
+/// El avance llega por `install://progress` (fase `import7z`).
+#[tauri::command]
+pub async fn dpack_import(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Option<Instance>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app.dialog().file().add_filter("Instancia de DisorderLauncher", &["7z"]).blocking_pick_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  state.launcher.dpack_import(&path).await.map(Some).map_err(user_message)
+}
+
 #[tauri::command]
 pub async fn themes_list(state: State<'_, AppState>) -> Result<Vec<themes::ThemeEntry>, String> {
   Ok(state.launcher.themes_list().await)

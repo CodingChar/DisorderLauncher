@@ -28,6 +28,8 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `instances_stop` | `id` | `void` |
 | `instances_repair` | `id` | `{ found, fixed, remaining }` — verifica hashes y redescarga lo danado |
 | `modpacks_import` | — | `Instance \| null` — abre el selector (`.mrpack`), crea la instancia y descarga sus archivos; si falla se deshace todo. Avance: `install://progress` con `phase: 'modpack'` |
+| `dpack_export` | `id`, `includeWorlds` | `{ files, bytes } \| null` — pide donde guardar el `.7z` (manifiesto + mods incluidos, sin cuentas ni logs; mundos solo si `includeWorlds`). Avance: `install://progress` con `phase: 'export7z'` |
+| `dpack_import` | — | `Instance \| null` — abre el selector (`.7z`), valida el manifiesto y los hashes, y crea la instancia reutilizando los mods del almacen comun; si falla se deshace todo. Avance: `phase: 'import7z'` |
 | `modpacks_export` | `id` | `{ remoteFiles, bundledFiles } \| null` — pide donde guardar; no incluye mundos ni logs |
 | `mods_list` | `id` | `{ mods, missingDependencies, supported }` (`supported` = cualquier tipo salvo Vanilla; lee `fabric.mod.json`, `META-INF/neoforge.mods.toml` o `META-INF/mods.toml`) — cada mod: `fileName`, `enabled`, `name`, `version`, `description`, `size`, `source?` |
 | `mods_set_enabled` | `id`, `file`, `enabled` | `void` (renombra a `.jar.disabled`) |

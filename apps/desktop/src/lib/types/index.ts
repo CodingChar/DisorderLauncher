@@ -111,6 +111,9 @@ export type InstallPhase =
   | 'metadata'
   | 'loader'
   | 'modpack'
+  | 'adopt'
+  | 'export7z'
+  | 'import7z'
   | 'client'
   | 'libraries'
   | 'assetIndex'
@@ -235,6 +238,12 @@ export interface UpdateInfo {
 export interface LoaderVersion {
   version: string
   stable: boolean
+}
+
+/** Resultado de exportar una instancia como paquete .7z. */
+export interface DpackSummary {
+  files: number
+  bytes: number
 }
 
 export interface ExportSummary {

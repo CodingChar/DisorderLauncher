@@ -68,6 +68,8 @@ pub fn run() {
       commands::instances_recommendation,
       commands::modpacks_import,
       commands::modpacks_export,
+      commands::dpack_export,
+      commands::dpack_import,
       commands::mods_list,
       commands::mods_set_enabled,
       commands::mods_remove,

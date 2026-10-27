@@ -61,6 +61,25 @@
       if (created) nav.go('home')
     })
 
+  const exportInstance = (includeWorlds: boolean) =>
+    run(async () => {
+      if (!instance) return
+      const summary = await instances.exportDpack(instance.id, includeWorlds)
+      return summary ? `Instancia guardada: ${summary.files} archivos (${formatSize(summary.bytes)}).` : undefined
+    })
+
+  const importInstance = () =>
+    run(async () => {
+      const created = await instances.importDpack()
+      if (created) nav.go('home')
+    })
+
+  /** Tamano legible para personas: MB o GB, sin decimales de mas. */
+  function formatSize(bytes: number): string {
+    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+    return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`
+  }
+
   interface Tool {
     id: string
     icon: string
@@ -73,6 +92,9 @@
     { id: 'repair', icon: 'redstone', title: 'Reparar instancia', description: 'Comprueba los archivos de la instancia activa y vuelve a descargar lo que falte o esté dañado.' },
     { id: 'export', icon: 'ender-pearl', title: 'Exportar modpack', description: 'Guarda la instancia activa como un archivo .mrpack para compartirla. No incluye mundos ni registros.' },
     { id: 'import', icon: 'crafting-table', title: 'Importar modpack', description: 'Crea una instancia nueva a partir de un archivo .mrpack de Modrinth.' },
+    { id: 'export7z', icon: 'diamond-pickaxe', title: 'Exportar instancia (.7z)', description: 'Guarda la instancia activa con todos sus mods en un solo archivo, para llevarla a otro equipo. No incluye mundos.' },
+    { id: 'export7zWorlds', icon: 'grass-block', title: 'Exportar con mundos (.7z)', description: 'Igual que la anterior, pero también guarda tus mundos. Puede ocupar bastante más.' },
+    { id: 'import7z', icon: 'diamond-sword', title: 'Importar instancia (.7z)', description: 'Crea una instancia nueva a partir de un archivo .7z exportado desde DisorderLauncher.' },
   ]
 
   /** Herramientas que todavia no existen: no se muestran (ver `FEATURES`) y, si se activan, nunca fingen funcionar. */
@@ -99,7 +121,7 @@
   const canRun = $derived.by(() => {
     if (selected.soon || working) return false
     if (selected.id === 'repair') return !!instance && !busy
-    if (selected.id === 'export') return !!instance
+    if (selected.id === 'export' || selected.id === 'export7z' || selected.id === 'export7zWorlds') return !!instance && !busy
     return true
   })
 
@@ -108,6 +130,9 @@
     if (selected.id === 'repair') repair()
     else if (selected.id === 'export') exportPack()
     else if (selected.id === 'import') importPack()
+    else if (selected.id === 'export7z') exportInstance(false)
+    else if (selected.id === 'export7zWorlds') exportInstance(true)
+    else if (selected.id === 'import7z') importInstance()
   }
 </script>
 
@@ -116,7 +141,9 @@
   <McList items={list} getId={(t) => t.id} {row} bind:selectedId onactivate={execute} x={-(bw >> 1)} y={34} w={bw} h={gui.H - 118} ariaLabel="Herramientas" />
 
   {#if working && instances.importPercent !== null}
-    <McProgress percent={instances.importPercent} label="Importando modpack" x={-155} w={310} y={gui.H - 64} />
+    <McProgress percent={instances.importPercent} label={instances.importLabel} x={-155} w={310} y={gui.H - 64} />
+  {:else if working && instances.exportPercent !== null}
+    <McProgress percent={instances.exportPercent} label="Guardando la instancia" x={-155} w={310} y={gui.H - 64} />
   {/if}
   {#if error}
     <McText text={error} x={-155} y={gui.H - 78} w={310} color="#ff5555" maxLines={2} role="alert" />

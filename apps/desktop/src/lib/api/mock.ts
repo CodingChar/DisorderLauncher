@@ -347,6 +347,25 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
     }
     case 'modpacks_export':
       return { remoteFiles: 12, bundledFiles: 5 }
+    case 'dpack_export': {
+      for (let i = 0; i <= 10; i++) {
+        emit('install://progress', { instanceId: args.id, phase: 'export7z', completed: i * 3, total: 30 })
+        await sleep(60)
+      }
+      return { files: 30, bytes: 48_000_000 }
+    }
+    case 'dpack_import': {
+      if (!defaultId) throw 'Primero crea un perfil para poder jugar.'
+      const id = `inst_${++counter}`
+      for (let i = 0; i <= 10; i++) {
+        emit('install://progress', { instanceId: id, phase: 'import7z', completed: i * 3, total: 30 })
+        await sleep(80)
+      }
+      const now = new Date().toISOString()
+      const inst: Instance = { id, name: 'Instancia importada', minecraftVersion: '1.21.1', loader: 'fabric', loaderVersion: '0.16.10', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, optimization: 'off', jvmTweaks: [], jvmArgs: '', createdAt: now, updatedAt: now }
+      instances = [...instances, inst]
+      return inst
+    }
     case 'skins_list':
       return mockSkins.map((s) => s.asset)
     case 'skins_import': {
