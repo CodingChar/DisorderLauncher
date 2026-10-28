@@ -153,7 +153,7 @@ fn walk(root: &Path, relative: &Path, skip: &HashSet<String>, out: &mut Vec<Stri
 fn without_generated_skin_pack(options: &str) -> String {
     let mut out: Vec<String> = Vec::new();
     for line in options.lines() {
-        // `incompatibleResourcePacks` lo anota el launcher junto a `resourcePacks` (ver `skin_pack.rs`).
+        // Versiones anteriores del launcher tambien anotaban el pack en `incompatibleResourcePacks`.
         let list = ["resourcePacks:", "incompatibleResourcePacks:"]
             .into_iter()
             .find_map(|key| line.strip_prefix(key).map(|rest| (key, rest)));

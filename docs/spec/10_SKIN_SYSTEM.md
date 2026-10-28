@@ -95,8 +95,9 @@ Por que una skin deja de cargar (todo cubierto y con test):
   en 26.x el juego exige `min_format`/`max_format` y descarta el pack si declara
   `supported_formats` por encima del formato 64. Un pack descartado se borra de `options.txt`.
   Cada epoca declara solo lo suyo (`PackFormat::Single` / `PackFormat::Ranged`).
-- **Formato mal supuesto.** `options.txt` tambien lleva `incompatibleResourcePacks`: lo que
-  este ahi no se retira aunque el juego lo crea de otra version (perfiles propios, snapshots).
+- **Pack en `incompatibleResourcePacks`.** Si `options.txt` lista ahi el pack y el juego lo ve
+  compatible, lo saca de la lista y NO lo activa en ese arranque (visto en 26.3). El launcher no lo
+  anota y limpia la entrada si una version anterior la dejo.
 - **Version no reconocida** (`26.x`, snapshots, ids propios): se resuelve por la fecha de publicacion
   y, sin ella, se trata como la version mas reciente.
 - **Carpeta, prefijo y textura por epoca**: ver la tabla del modulo (`texturepacks/` + `skin:` hasta

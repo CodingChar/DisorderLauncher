@@ -16,8 +16,8 @@
 //!
 //! `pack.mcmeta` tambien cambia (ver [`PackFormat`]): hasta 1.21.8 lleva `pack_format`; desde 1.21.9 y
 //! en 26.x solo `min_format`/`max_format`. Mezclar ambos hace que el juego descarte el pack y que
-//! la skin no cargue. Ademas, el pack se anota en `incompatibleResourcePacks` (1.13+) para que ni un
-//! formato mal supuesto lo retire de `options.txt`.
+//! la skin no cargue. El pack tampoco debe estar en `incompatibleResourcePacks`: el juego lo saca de
+//! esa lista y no lo activa en ese arranque.
 //!
 //! Con el formato equivocado el juego lee otras filas de la imagen y la skin sale cortada y con
 //! partes vacias, por eso la imagen se adapta a la version antes de empaquetarla.
@@ -328,12 +328,11 @@ fn update_options(current: &str, entry: &str, enable: bool) -> String {
     update_list_option(current, "resourcePacks:", entry, enable)
 }
 
-/// Desde 1.16 el juego retira de `resourcePacks` los packs que le parecen de otra version salvo que
-/// esten en `incompatibleResourcePacks` (es lo que anota cuando el jugador acepta activar uno asi). Se
-/// anota el nuestro para que un `pack_format` mal supuesto (perfil propio, snapshot, version nueva
-/// con otro esquema) nunca le quite la skin al jugador. Las versiones antiguas ignoran la linea.
-fn update_incompatible_option(current: &str, entry: &str, enable: bool) -> String {
-    update_list_option(current, "incompatibleResourcePacks:", entry, enable)
+/// Quita el pack de `incompatibleResourcePacks`. NO debe estar ahi: si el juego encuentra en esa lista
+/// un pack que ya es compatible, lo saca de la lista ("now compatible") y ese arranque no lo activa,
+/// asi que la skin no carga. Una version anterior del launcher lo anotaba; se limpia.
+fn forget_incompatible(current: &str, entry: &str) -> String {
+    update_list_option(current, "incompatibleResourcePacks:", entry, false)
 }
 
 /// Anade o quita `entry` de una linea `<clave>["a","b"]` de `options.txt`. Las demas lineas no se tocan.
@@ -473,16 +472,13 @@ pub(crate) async fn sync(
                 }
                 Scheme::ResourcePack | Scheme::ResourcePackFile => {
                     let mut updated = update_options(&current, &entry, true);
-                    if scheme == Scheme::ResourcePackFile {
-                        if current.is_empty() {
-                            updated = updated.replace(
-                                &format!("[\"{entry}\"]"),
-                                &format!("[\"vanilla\",\"{entry}\"]"),
-                            );
-                        }
-                        updated = update_incompatible_option(&updated, &entry, true);
+                    if scheme == Scheme::ResourcePackFile && current.is_empty() {
+                        updated = updated.replace(
+                            &format!("[\"{entry}\"]"),
+                            &format!("[\"vanilla\",\"{entry}\"]"),
+                        );
                     }
-                    updated
+                    forget_incompatible(&updated, &entry)
                 }
             };
             write_atomic(&pack_path, &build_pack(&png, target)?).await?;
@@ -494,9 +490,7 @@ pub(crate) async fn sync(
                 let updated = match scheme {
                     Scheme::TexturePack => update_texture_option(&current, &entry, false).0,
                     Scheme::ResourcePack => update_options(&current, &entry, false),
-                    Scheme::ResourcePackFile => {
-                        update_incompatible_option(&update_options(&current, &entry, false), &entry, false)
-                    }
+                    Scheme::ResourcePackFile => forget_incompatible(&update_options(&current, &entry, false), &entry),
                 };
                 write_if_changed(&options_path, &current, updated).await?;
             }
@@ -773,14 +767,29 @@ mod tests {
         sync(dir.path(), target("1.21.1"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
-            "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\n\
-             incompatibleResourcePacks:[\"file/DisorderLauncher-skin.zip\"]\n"
+            "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\n"
         );
-        // Retirar la skin deja las dos listas como estaban.
-        sync(dir.path(), target("1.21.1"), None).await.unwrap();
+    }
+
+    /// Con el pack en `incompatibleResourcePacks` el juego lo saca de la lista y NO lo activa ese
+    /// arranque (visto en 26.3): una version anterior del launcher lo dejaba ahi.
+    #[tokio::test]
+    async fn a_stale_incompatible_entry_is_cleaned_so_the_game_activates_the_pack() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("options.txt"),
+            "resourcePacks:[\"vanilla\"]\nincompatibleResourcePacks:[\"file/DisorderLauncher-skin.zip\",\"file/otro.zip\"]\n",
+        )
+        .unwrap();
+        sync(dir.path(), target("26.3"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
-            "resourcePacks:[\"vanilla\"]\nincompatibleResourcePacks:[]\n"
+            "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\nincompatibleResourcePacks:[\"file/otro.zip\"]\n"
+        );
+        sync(dir.path(), target("26.3"), None).await.unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
+            "resourcePacks:[\"vanilla\"]\nincompatibleResourcePacks:[\"file/otro.zip\"]\n"
         );
     }
 
