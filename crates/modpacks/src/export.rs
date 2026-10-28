@@ -153,13 +153,17 @@ fn walk(root: &Path, relative: &Path, skip: &HashSet<String>, out: &mut Vec<Stri
 fn without_generated_skin_pack(options: &str) -> String {
     let mut out: Vec<String> = Vec::new();
     for line in options.lines() {
-        if let Some(rest) = line.strip_prefix("resourcePacks:") {
+        // `incompatibleResourcePacks` lo anota el launcher junto a `resourcePacks` (ver `skin_pack.rs`).
+        let list = ["resourcePacks:", "incompatibleResourcePacks:"]
+            .into_iter()
+            .find_map(|key| line.strip_prefix(key).map(|rest| (key, rest)));
+        if let Some((key, rest)) = list {
             if let Ok(packs) = serde_json::from_str::<Vec<String>>(rest) {
                 let kept: Vec<String> = packs
                     .into_iter()
                     .filter(|p| p != GENERATED_SKIN_PACK && p.strip_prefix("file/") != Some(GENERATED_SKIN_PACK))
                     .collect();
-                out.push(format!("resourcePacks:{}", serde_json::to_string(&kept).unwrap_or_else(|_| "[]".into())));
+                out.push(format!("{key}{}", serde_json::to_string(&kept).unwrap_or_else(|_| "[]".into())));
                 continue;
             }
         }
@@ -227,10 +231,10 @@ mod tests {
 
     #[test]
     fn options_lose_the_generated_skin_pack_but_keep_everything_else() {
-        let options = "fov:1\nresourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\",\"file/mio.zip\"]\nskin:DisorderLauncher-skin.zip\n";
+        let options = "fov:1\nresourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\",\"file/mio.zip\"]\nincompatibleResourcePacks:[\"file/DisorderLauncher-skin.zip\"]\nskin:DisorderLauncher-skin.zip\n";
         assert_eq!(
             without_generated_skin_pack(options),
-            "fov:1\nresourcePacks:[\"vanilla\",\"file/mio.zip\"]\nskin:Default\n"
+            "fov:1\nresourcePacks:[\"vanilla\",\"file/mio.zip\"]\nincompatibleResourcePacks:[]\nskin:Default\n"
         );
         assert_eq!(without_generated_skin_pack("skin:Faithful.zip\n"), "skin:Faithful.zip\n");
     }

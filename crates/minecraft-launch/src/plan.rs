@@ -269,7 +269,7 @@ fn build_classpath(
             }
             None => return,
         };
-        let path = libraries_dir.join(&relative);
+        let path = normalized(&libraries_dir.join(&relative));
         if !classpath.contains(&path) {
             classpath.push(path);
         }
@@ -283,8 +283,37 @@ fn build_classpath(
         push(lib);
     }
 
-    classpath.push(client_jar);
+    classpath.push(normalized(&client_jar));
     classpath
+}
+
+/// Ruta tal como la ve Java al cargar la clase: un unico separador, sin enlaces ni redirecciones.
+///
+/// Fabric Loader compara las entradas del classpath con el origen real de sus propias clases para
+/// saber que jars son suyos (loader, Mixin, ASM). Si la carpeta de datos esta tras un enlace, una
+/// unidad `subst`, una redireccion de `AppData` (apps empaquetadas en MSIX) o un nombre corto, no
+/// coinciden y Knot carga Mixin y el loader una segunda vez: todos los mods fallan con
+/// `ClassCastException` entre los cargadores `knot` y `app`. Comprobado con Fabric Loader 0.20.1 en
+/// 26.3: con la ruta canonica el juego arranca.
+fn normalized(path: &Path) -> PathBuf {
+    let lexical: PathBuf = path.components().collect();
+    match std::fs::canonicalize(&lexical) {
+        Ok(real) => strip_verbatim(real),
+        // Aun no existe (se valida despues con `validate`): se deja la ruta limpia.
+        Err(_) => lexical,
+    }
+}
+
+/// `\\?\C:\x` -> `C:\x` y `\\?\UNC\srv\x` -> `\\srv\x`: Java y el resto del mundo no esperan el prefijo.
+fn strip_verbatim(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => PathBuf::from(rest),
+        _ => path,
+    }
 }
 
 /// Devuelve (jvm, game) sin sustituir. Soporta el formato moderno (`arguments`) y el
@@ -344,4 +373,35 @@ fn strip_classpath_args(args: Vec<String>) -> Vec<String> {
         out.push(arg);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verbatim_prefix_is_removed_but_only_when_safe() {
+        let strip = |s: &str| strip_verbatim(PathBuf::from(s)).to_string_lossy().into_owned();
+        assert_eq!(strip(r"\\?\C:\Users\a\b.jar"), r"C:\Users\a\b.jar");
+        assert_eq!(strip(r"\\?\UNC\srv\share\b.jar"), r"\\srv\share\b.jar");
+        assert_eq!(strip(r"C:\plain\b.jar"), r"C:\plain\b.jar");
+        // Otros espacios verbatim (p. ej. dispositivos) no se tocan.
+        assert_eq!(strip(r"\\?\Volume{1}\b.jar"), r"\\?\Volume{1}\b.jar");
+    }
+
+    #[test]
+    fn classpath_entries_resolve_to_the_real_path_with_a_single_separator() {
+        let dir = tempfile::tempdir().unwrap();
+        let jar = dir.path().join("libs").join("a.jar");
+        std::fs::create_dir_all(jar.parent().unwrap()).unwrap();
+        std::fs::write(&jar, b"x").unwrap();
+        let messy = dir.path().join("libs/../libs").join("a.jar");
+        let real = normalized(&messy);
+        assert!(real.is_file());
+        assert!(!real.to_string_lossy().starts_with(r"\?\"));
+        assert!(!real.components().any(|c| matches!(c, std::path::Component::ParentDir)));
+        // Un archivo que aun no existe se conserva (la validacion es posterior).
+        let missing = dir.path().join("nope").join("b.jar");
+        assert_eq!(normalized(&missing), missing);
+    }
 }

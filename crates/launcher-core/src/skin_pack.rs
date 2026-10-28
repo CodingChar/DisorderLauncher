@@ -14,6 +14,11 @@
 //! | 1.8 - 1.12       | `resourcepacks/`| `resourcePacks:["<archivo>"]`       | `steve/alex` 64x64   |
 //! | 1.13+            | `resourcepacks/`| `resourcePacks:["file/<archivo>"]`  | `steve/alex` 64x64   |
 //!
+//! `pack.mcmeta` tambien cambia (ver [`PackFormat`]): hasta 1.21.8 lleva `pack_format`; desde 1.21.9 y
+//! en 26.x solo `min_format`/`max_format`. Mezclar ambos hace que el juego descarte el pack y que
+//! la skin no cargue. Ademas, el pack se anota en `incompatibleResourcePacks` (1.13+) para que ni un
+//! formato mal supuesto lo retire de `options.txt`.
+//!
 //! Con el formato equivocado el juego lee otras filas de la imagen y la skin sale cortada y con
 //! partes vacias, por eso la imagen se adapta a la version antes de empaquetarla.
 //!
@@ -77,19 +82,65 @@ fn is_ancient(v: &str) -> bool {
     ["rd-", "c0.", "inf-", "in-", "a1.", "b1."].iter().any(|p| v.starts_with(p))
 }
 
+/// Como declara un resource pack para que versiones sirve (`pack.mcmeta`).
+///
+/// Desde 25w31a (1.21.9) el juego exige `min_format` y `max_format` y rechaza, sin cargarlo, un pack
+/// que declare `supported_formats` por encima del formato 64 sin ellos. Un pack rechazado se retira
+/// de `options.txt` y el jugador ve la skin por defecto. Antes de esa version, en cambio, solo
+/// existe `pack_format`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PackFormat {
+    /// Un unico numero (hasta 1.21.8).
+    Single(u32),
+    /// Un rango abierto por arriba (desde 1.21.9, 26.x y las que aun no existen).
+    Ranged,
+}
+
+/// Primer formato de resource pack que se declara con rango.
+const RANGED_MIN_FORMAT: u32 = 65;
+/// Techo del rango: el pack sirve tambien para las versiones que aun no existen.
+const RANGED_MAX_FORMAT: u32 = 999;
+
 /// Que espera el juego de una skin: donde va el pack, como se activa y que formato de textura lee.
 /// Es la unica pieza que cambia al aparecer una epoca nueva del juego.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SkinTarget {
     scheme: Scheme,
     layout: SkinLayout,
-    pack_format: u32,
+    pack_format: PackFormat,
 }
 
 /// Primera fecha (AAAA-MM-DD) de cada epoca. Solo se usa cuando el id de la version no se reconoce.
 const RESOURCE_PACKS_SINCE: &str = "2013-06-13"; // snapshot 13w24a
 const MODERN_LAYOUT_SINCE: &str = "2014-09-02"; // 1.8
 const FILE_PREFIX_SINCE: &str = "2018-07-18"; // 1.13
+const RANGED_FORMAT_SINCE: &str = "2025-07-29"; // snapshot 25w31a
+
+/// Fecha de salida de cada version -> su formato de resource pack. Un snapshot sin formato conocido
+/// toma el de la version que prepara.
+const FORMAT_RELEASES: &[(&str, u32)] = &[
+    ("2014-09-02", 1), // 1.8
+    ("2016-02-29", 2), // 1.9
+    ("2016-11-14", 3), // 1.11
+    ("2018-07-18", 4), // 1.13
+    ("2019-12-10", 5), // 1.15
+    ("2020-08-11", 6), // 1.16.2
+    ("2021-06-08", 7), // 1.17
+    ("2021-11-30", 8), // 1.18
+    ("2022-06-07", 9), // 1.19
+    ("2022-12-07", 12), // 1.19.3
+    ("2023-03-14", 13), // 1.19.4
+    ("2023-06-07", 15), // 1.20
+    ("2023-09-21", 18), // 1.20.2
+    ("2023-12-05", 22), // 1.20.3
+    ("2024-04-23", 32), // 1.20.5
+    ("2024-06-13", 34), // 1.21
+    ("2024-10-22", 42), // 1.21.2
+    ("2024-12-03", 46), // 1.21.4
+    ("2025-03-25", 55), // 1.21.5
+    ("2025-06-17", 63), // 1.21.6
+    ("2025-06-30", 64), // 1.21.7
+];
 
 impl SkinTarget {
     /// Epoca de una version. `ids` son los identificadores a probar en orden (la version base primero:
@@ -102,7 +153,11 @@ impl SkinTarget {
             .find_map(|id| classify_id(id))
             .or_else(|| release_time.and_then(classify_date))
             .unwrap_or((Scheme::ResourcePackFile, SkinLayout::Modern));
-        let pack_format = ids.iter().find_map(|id| pack_format(id)).unwrap_or(34);
+        let pack_format = ids
+            .iter()
+            .find_map(|id| pack_format(id))
+            .or_else(|| release_time.and_then(format_by_date))
+            .unwrap_or(PackFormat::Ranged);
         Self { scheme, layout, pack_format }
     }
 }
@@ -147,10 +202,24 @@ fn classify_date(release_time: &str) -> Option<(Scheme, SkinLayout)> {
     Some((scheme, layout))
 }
 
-/// `pack_format` de un resource pack para esa version. Es informativo: `supported_formats` evita el aviso.
-fn pack_format(version: &str) -> Option<u32> {
+/// Version de la era `26.x` (el juego paso a numerarse por ano): `26.1`, `26.3.1`, `26.1-snapshot-2`...
+fn is_year_release(v: &str) -> bool {
+    let mut parts = v.splitn(2, '.');
+    let major = parts.next().filter(|m| m.len() == 2 && m.bytes().all(|b| b.is_ascii_digit()));
+    major.and_then(|m| m.parse::<u32>().ok()).is_some_and(|m| m >= 26) && parts.next().is_some()
+}
+
+/// Formato de resource pack de esa version. `None` si el id no dice la version (se prueba con la fecha).
+fn pack_format(version: &str) -> Option<PackFormat> {
+    if is_year_release(version) {
+        return Some(PackFormat::Ranged);
+    }
+    if let Some((year, week)) = parse_snapshot(version) {
+        // 25w31a es el primer snapshot con `min_format`/`max_format`.
+        return ((year, week) >= (25, 31)).then_some(PackFormat::Ranged);
+    }
     let (minor, patch) = parse_release(version)?;
-    Some(match (minor, patch) {
+    let single = match (minor, patch) {
         (..=8, _) => 1,
         (9..=10, _) => 2,
         (11..=12, _) => 3,
@@ -167,8 +236,45 @@ fn pack_format(version: &str) -> Option<u32> {
         (20, 3..=4) => 22,
         (20, _) => 32,
         (21, 0..=1) => 34,
-        _ => 34,
-    })
+        (21, 2..=3) => 42,
+        (21, 4) => 46,
+        (21, 5) => 55,
+        (21, 6) => 63,
+        (21, 7..=8) => 64,
+        // 1.21.9 en adelante (y una hipotetica 1.22): formato con rango.
+        _ => return Some(PackFormat::Ranged),
+    };
+    Some(PackFormat::Single(single))
+}
+
+/// Formato por fecha de publicacion, para ids que no se reconocen (snapshots viejos, versiones propias).
+fn format_by_date(release_time: &str) -> Option<PackFormat> {
+    let day = release_time.get(..10)?;
+    if !day.as_bytes().iter().all(|b| b.is_ascii_digit() || *b == b'-') {
+        return None;
+    }
+    if day >= RANGED_FORMAT_SINCE {
+        return Some(PackFormat::Ranged);
+    }
+    let upcoming = FORMAT_RELEASES.iter().find(|(date, _)| *date > day);
+    Some(PackFormat::Single(upcoming.map_or(64, |(_, f)| *f)))
+}
+
+/// Contenido de `pack.mcmeta`. Cada juego valida lo suyo y descarta el pack entero si no le cuadra,
+/// asi que se declara solo lo que entiende la epoca (ver [`PackFormat`]).
+fn pack_mcmeta(format: PackFormat) -> String {
+    let mut pack = serde_json::Map::new();
+    match format {
+        PackFormat::Single(n) => {
+            pack.insert("pack_format".into(), n.into());
+        }
+        PackFormat::Ranged => {
+            pack.insert("min_format".into(), RANGED_MIN_FORMAT.into());
+            pack.insert("max_format".into(), RANGED_MAX_FORMAT.into());
+        }
+    }
+    pack.insert("description".into(), PACK_DESCRIPTION.into());
+    serde_json::json!({ "pack": pack }).to_string()
 }
 
 /// Texturas que sustituye en un resource pack: las clasicas (hasta 1.20.1) y las de la carpeta
@@ -205,14 +311,8 @@ fn build_pack(png: &[u8], target: SkinTarget) -> std::io::Result<Vec<u8>> {
             zip.write_all(png)?;
         }
         Scheme::ResourcePack | Scheme::ResourcePackFile => {
-            // `supported_formats` (1.20.2+) evita el aviso de «pack para otra version» en las
-            // versiones nuevas; las antiguas ignoran la clave.
-            let mcmeta = format!(
-                "{{\"pack\":{{\"pack_format\":{},\"supported_formats\":{{\"min_inclusive\":1,\"max_inclusive\":999}},\"description\":\"{PACK_DESCRIPTION}\"}}}}",
-                target.pack_format
-            );
             zip.start_file("pack.mcmeta", options).map_err(zip_error)?;
-            zip.write_all(mcmeta.as_bytes())?;
+            zip.write_all(pack_mcmeta(target.pack_format).as_bytes())?;
             for path in resource_pack_textures() {
                 zip.start_file(path, options).map_err(zip_error)?;
                 zip.write_all(png)?;
@@ -225,17 +325,30 @@ fn build_pack(png: &[u8], target: SkinTarget) -> std::io::Result<Vec<u8>> {
 /// Devuelve el contenido de `options.txt` con el pack activado (`enable`) o retirado de
 /// `resourcePacks`. Las demas lineas no se tocan.
 fn update_options(current: &str, entry: &str, enable: bool) -> String {
+    update_list_option(current, "resourcePacks:", entry, enable)
+}
+
+/// Desde 1.16 el juego retira de `resourcePacks` los packs que le parecen de otra version salvo que
+/// esten en `incompatibleResourcePacks` (es lo que anota cuando el jugador acepta activar uno asi). Se
+/// anota el nuestro para que un `pack_format` mal supuesto (perfil propio, snapshot, version nueva
+/// con otro esquema) nunca le quite la skin al jugador. Las versiones antiguas ignoran la linea.
+fn update_incompatible_option(current: &str, entry: &str, enable: bool) -> String {
+    update_list_option(current, "incompatibleResourcePacks:", entry, enable)
+}
+
+/// Anade o quita `entry` de una linea `<clave>["a","b"]` de `options.txt`. Las demas lineas no se tocan.
+fn update_list_option(current: &str, key: &str, entry: &str, enable: bool) -> String {
     let mut lines: Vec<String> = current.lines().map(str::to_string).collect();
-    let idx = lines.iter().position(|l| l.starts_with("resourcePacks:"));
+    let idx = lines.iter().position(|l| l.starts_with(key));
     let mut packs: Vec<String> = idx
-        .and_then(|i| serde_json::from_str(&lines[i]["resourcePacks:".len()..]).ok())
+        .and_then(|i| serde_json::from_str(&lines[i][key.len()..]).ok())
         .unwrap_or_default();
     packs.retain(|p| p != entry);
     if enable {
         packs.push(entry.to_string()); // al final = prioridad mas alta
     }
     let line = format!(
-        "resourcePacks:{}",
+        "{key}{}",
         serde_json::to_string(&packs).unwrap_or_else(|_| "[]".into())
     );
     match idx {
@@ -360,11 +473,14 @@ pub(crate) async fn sync(
                 }
                 Scheme::ResourcePack | Scheme::ResourcePackFile => {
                     let mut updated = update_options(&current, &entry, true);
-                    if scheme == Scheme::ResourcePackFile && current.is_empty() {
-                        updated = updated.replace(
-                            &format!("[\"{entry}\"]"),
-                            &format!("[\"vanilla\",\"{entry}\"]"),
-                        );
+                    if scheme == Scheme::ResourcePackFile {
+                        if current.is_empty() {
+                            updated = updated.replace(
+                                &format!("[\"{entry}\"]"),
+                                &format!("[\"vanilla\",\"{entry}\"]"),
+                            );
+                        }
+                        updated = update_incompatible_option(&updated, &entry, true);
                     }
                     updated
                 }
@@ -377,7 +493,10 @@ pub(crate) async fn sync(
             if exists {
                 let updated = match scheme {
                     Scheme::TexturePack => update_texture_option(&current, &entry, false).0,
-                    Scheme::ResourcePack | Scheme::ResourcePackFile => update_options(&current, &entry, false),
+                    Scheme::ResourcePack => update_options(&current, &entry, false),
+                    Scheme::ResourcePackFile => {
+                        update_incompatible_option(&update_options(&current, &entry, false), &entry, false)
+                    }
                 };
                 write_if_changed(&options_path, &current, updated).await?;
             }
@@ -449,9 +568,53 @@ mod tests {
             let t = target(version);
             assert_eq!((t.scheme, t.layout), (expected_scheme, expected_layout), "{version}");
         }
-        assert_eq!(target("1.12.2").pack_format, 3);
-        assert_eq!(target("1.20.1").pack_format, 15);
-        assert_eq!(target("1.21.1").pack_format, 34);
+    }
+
+    #[test]
+    fn pack_formats_follow_the_game_version() {
+        use PackFormat::{Ranged, Single};
+        let cases = [
+            ("1.8", Single(1)),
+            ("1.12.2", Single(3)),
+            ("1.20.1", Single(15)),
+            ("1.20.4", Single(22)),
+            ("1.21.1", Single(34)),
+            ("1.21.3", Single(42)),
+            ("1.21.4", Single(46)),
+            ("1.21.5", Single(55)),
+            ("1.21.8", Single(64)),
+            ("1.21.9", Ranged),
+            ("1.21.11", Ranged),
+            ("1.21.9-pre1", Ranged),
+            ("26.1", Ranged),
+            ("26.3", Ranged),
+            ("26.1-snapshot-2", Ranged),
+            ("25w31a", Ranged),
+        ];
+        for (version, expected) in cases {
+            assert_eq!(target(version).pack_format, expected, "{version}");
+        }
+        // Snapshot semanal viejo: el formato de la version que prepara, segun su fecha.
+        let by_date = |id: &str, d: &str| SkinTarget::resolve(&[id], Some(d)).pack_format;
+        assert_eq!(by_date("24w10a", "2024-03-06T00:00:00+00:00"), Single(32));
+        assert_eq!(by_date("25w20a", "2025-05-14T00:00:00+00:00"), Single(63));
+        assert_eq!(by_date("25w45a", "2025-11-04T00:00:00+00:00"), Ranged);
+        // Sin id ni fecha: la era mas reciente.
+        assert_eq!(SkinTarget::resolve(&["rareza"], None).pack_format, Ranged);
+    }
+
+    /// El juego descarta el pack entero si `pack.mcmeta` no le cuadra: cada epoca declara lo suyo.
+    #[test]
+    fn mcmeta_declares_only_what_each_era_understands() {
+        let parse = |f| serde_json::from_str::<serde_json::Value>(&pack_mcmeta(f)).unwrap()["pack"].clone();
+        let old = parse(PackFormat::Single(34));
+        assert_eq!(old["pack_format"], 34);
+        assert!(old.get("supported_formats").is_none(), "1.21.9+ lo rechaza junto a rangos altos");
+        assert!(old.get("min_format").is_none());
+        let new = parse(PackFormat::Ranged);
+        assert_eq!((new["min_format"].as_u64(), new["max_format"].as_u64()), (Some(65), Some(999)));
+        assert!(new.get("pack_format").is_none() && new.get("supported_formats").is_none());
+        assert!(!new["description"].as_str().unwrap().is_empty());
     }
 
     #[test]
@@ -532,7 +695,6 @@ mod tests {
         let pack = dir.path().join("resourcepacks").join(PACK_FILE);
         let mcmeta = String::from_utf8(read_entry(&pack, "pack.mcmeta")).unwrap();
         assert!(mcmeta.contains("\"pack_format\":3"));
-        assert!(mcmeta.contains("supported_formats"));
         serde_json::from_str::<serde_json::Value>(&mcmeta).unwrap();
         assert_eq!(size(&read_entry(&pack, "assets/minecraft/textures/entity/steve.png")), (64, 64));
         assert_eq!(size(&read_entry(&pack, "assets/minecraft/textures/entity/alex.png")), (64, 64));
@@ -611,8 +773,36 @@ mod tests {
         sync(dir.path(), target("1.21.1"), profile(64)).await.unwrap();
         assert_eq!(
             std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
-            "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\n"
+            "resourcePacks:[\"vanilla\",\"file/DisorderLauncher-skin.zip\"]\n\
+             incompatibleResourcePacks:[\"file/DisorderLauncher-skin.zip\"]\n"
         );
+        // Retirar la skin deja las dos listas como estaban.
+        sync(dir.path(), target("1.21.1"), None).await.unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("options.txt")).unwrap(),
+            "resourcePacks:[\"vanilla\"]\nincompatibleResourcePacks:[]\n"
+        );
+    }
+
+    /// El caso del informe: en 1.21.9+ y 26.x el pack con `supported_formats` se descartaba.
+    #[tokio::test]
+    async fn recent_versions_get_a_ranged_mcmeta_and_the_new_player_textures() {
+        for version in ["1.21.9", "1.21.11", "26.1", "26.3"] {
+            let dir = tempfile::tempdir().unwrap();
+            sync(dir.path(), target(version), profile(64)).await.unwrap();
+            let pack = dir.path().join("resourcepacks").join(PACK_FILE);
+            let mcmeta: serde_json::Value =
+                serde_json::from_slice(&read_entry(&pack, "pack.mcmeta")).unwrap();
+            assert_eq!(mcmeta["pack"]["min_format"], 65, "{version}");
+            assert_eq!(mcmeta["pack"]["max_format"], 999, "{version}");
+            assert!(mcmeta["pack"].get("supported_formats").is_none(), "{version}");
+            for kind in ["wide", "slim"] {
+                for name in ["steve", "alex", "ari", "efe", "kai", "makena", "noor", "sunny", "zuri"] {
+                    let path = format!("assets/minecraft/textures/entity/player/{kind}/{name}.png");
+                    assert_eq!(size(&read_entry(&pack, &path)), (64, 64), "{version} {path}");
+                }
+            }
+        }
     }
 
     #[tokio::test]
