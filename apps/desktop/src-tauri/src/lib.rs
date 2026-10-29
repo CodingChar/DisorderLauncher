@@ -4,12 +4,38 @@ mod state;
 
 use tauri::Manager;
 
+/// Registro en `<logs>/DisorderLauncher.log`. Si pasa de 2 MB se aparta como `.old` (solo se guarda uno).
+/// Nunca incluye tokens: los servicios del core no los registran.
+fn init_file_logging(dir: &std::path::Path) {
+  const MAX_BYTES: u64 = 2 * 1024 * 1024;
+  if std::fs::create_dir_all(dir).is_err() {
+    return;
+  }
+  let path = dir.join("DisorderLauncher.log");
+  if std::fs::metadata(&path).is_ok_and(|m| m.len() > MAX_BYTES) {
+    let _ = std::fs::rename(&path, dir.join("DisorderLauncher.log.old"));
+  }
+  let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) else { return };
+  let _ = tracing::subscriber::set_global_default(
+    tracing_subscriber::fmt()
+      .with_target(false)
+      .with_ansi(false)
+      .with_writer(std::sync::Mutex::new(file))
+      .finish(),
+  );
+  tracing::info!(version = env!("CARGO_PKG_VERSION"), "DisorderLauncher iniciado");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   // Los servicios del core usan `tracing`; nunca registran tokens (ver redaccion en launch).
   // `set_global_default` (y no `try_init`) para no registrar el puente tracing->log, que chocaria con
   // `tauri_plugin_log` en modo desarrollo (dos loggers globales = panico al iniciar).
-  let _ = tracing::subscriber::set_global_default(tracing_subscriber::fmt().with_target(false).finish());
+  // En desarrollo los registros van a la consola; en la version instalada no hay consola, asi que se
+  // guardan en un archivo (ver `init_file_logging`) para poder saber por que fallo algo.
+  if cfg!(debug_assertions) {
+    let _ = tracing::subscriber::set_global_default(tracing_subscriber::fmt().with_target(false).finish());
+  }
 
   tauri::Builder::default()
     // Una sola ventana: abrir el launcher otra vez solo trae al frente la que ya existe
@@ -30,6 +56,12 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+      }
+
+      if !cfg!(debug_assertions) {
+        if let Ok(dir) = app.path().app_log_dir() {
+          init_file_logging(&dir);
+        }
       }
 
       let data_dir = app.path().app_data_dir()?;
@@ -68,6 +100,10 @@ pub fn run() {
       commands::instances_recommendation,
       commands::modpacks_import,
       commands::modpacks_export,
+      commands::dpack_export,
+      commands::dpack_import,
+      commands::store_summary,
+      commands::store_cleanup,
       commands::mods_list,
       commands::mods_set_enabled,
       commands::mods_remove,
@@ -76,6 +112,7 @@ pub fn run() {
       commands::mods_install,
       commands::mods_check_updates,
       commands::mods_update,
+      commands::mods_install_missing,
       commands::mods_rollback,
       commands::skins_list,
       commands::skins_import,

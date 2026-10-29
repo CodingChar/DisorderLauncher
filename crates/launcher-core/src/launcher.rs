@@ -100,7 +100,16 @@ impl Launcher {
 
         Self {
             loader_providers,
-            mods_service: mods::ModsService::new(http.clone()),
+            mods_service: {
+                let service = mods::ModsService::new(http.clone());
+                match artifact_store::ArtifactStore::open(paths.store_dir()) {
+                    Ok(store) => service.with_store(store),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "almacen comun no disponible: los mods se descargan por instancia");
+                        service
+                    }
+                }
+            },
             accounts: Arc::new(FileAccountRepository::new(paths.accounts_dir())),
             instances: Arc::new(FileInstanceRepository::new(paths.instances_dir())),
             java: JavaManager::new(http.clone(), paths.runtimes_dir()),
@@ -270,6 +279,17 @@ impl Launcher {
         Ok(record)
     }
 
+    /// El perfil que juega: el elegido en el menu de Perfiles es el duenio de todas las instancias.
+    /// Solo si no hay ninguno elegido se recurre al que la instancia guardo al crearse.
+    pub(crate) async fn owner_account(&self, instance: &Instance) -> Result<AccountRecord, LauncherError> {
+        if let Some(default_id) = self.accounts.get_default().await? {
+            if let Some(account) = self.accounts.get(&default_id).await? {
+                return Ok(account);
+            }
+        }
+        self.accounts.get(&instance.profile_id).await?.ok_or(LauncherError::ProfileMissing)
+    }
+
     pub async fn accounts_set_default(&self, id: &str) -> Result<(), LauncherError> {
         match self.accounts.set_default(id).await {
             Err(account_storage::StorageError::NotFound(_)) => Err(LauncherError::ProfileMissing),
@@ -371,12 +391,9 @@ impl Launcher {
     ) -> Result<Instance, LauncherError> {
         let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
-        if let Some(profile_id) = &changes.profile_id {
-            self.accounts
-                .get(profile_id)
-                .await?
-                .ok_or(LauncherError::ProfileMissing)?;
-        }
+        // El perfil no es de cada instancia: lo elige el menu de Perfiles y vale para todas.
+        let mut changes = changes;
+        changes.profile_id = None;
         if let Some(JavaSelection::Path { path }) = &changes.java {
             if !java_runtime::java_executable(path).is_file() {
                 return Err(LauncherError::InvalidInput(
@@ -390,7 +407,32 @@ impl Launcher {
     pub async fn instances_delete(&self, id: &str) -> Result<(), LauncherError> {
         let _turn = self.mods_guard(id).await;
         self.ensure_idle(id)?;
-        Ok(self.instances.delete(id).await?)
+        self.instances.delete(id).await?;
+        // Si algun programa tenia archivos abiertos, la instancia ya no existe pero queda su carpeta:
+        // se termina de borrar en cuanto se libere, sin que la persona tenga que hacer nada.
+        self.finish_leftovers_later().await;
+        Ok(())
+    }
+
+    /// Reintenta cada pocos segundos (durante unos minutos) borrar las carpetas que quedaron a medias.
+    pub(crate) async fn finish_leftovers_later(&self) {
+        use instance_manager::FolderProblemKind;
+        let has_orphans = |problems: &[instance_manager::FolderProblem]| problems.iter().any(|p| matches!(p.kind, FolderProblemKind::Orphan));
+        if !self.instances.scan().await.is_ok_and(|p| has_orphans(&p)) {
+            return;
+        }
+        let repo = Arc::clone(&self.instances);
+        tokio::spawn(async move {
+            for _ in 0..60 {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                repo.remove_leftovers().await;
+                if !repo.scan().await.is_ok_and(|p| has_orphans(&p)) {
+                    tracing::info!("terminado de borrar las carpetas de instancias eliminadas");
+                    return;
+                }
+            }
+            tracing::warn!("quedan carpetas de instancias eliminadas con archivos en uso; se reintentara al abrir el launcher");
+        });
     }
 
     pub async fn instances_duplicate(&self, id: &str) -> Result<Instance, LauncherError> {
@@ -499,9 +541,7 @@ impl Launcher {
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await.map_err(MetaError::from)?;
         }
-        let part = path.with_extension("json.part");
-        tokio::fs::write(&part, &bytes).await.map_err(MetaError::from)?;
-        tokio::fs::rename(&part, &path).await.map_err(MetaError::from)?;
+        fs_safe::write_atomic(&path, &bytes).await.map_err(MetaError::from)?;
         Ok(descriptor)
     }
 
@@ -654,11 +694,7 @@ impl Launcher {
     pub async fn prepare_launch(&self, instance: &Instance) -> Result<LaunchPlan, LauncherError> {
         let id = instance.id.as_str();
 
-        let account = self
-            .accounts
-            .get(&instance.profile_id)
-            .await?
-            .ok_or(LauncherError::ProfileMissing)?;
+        let account = self.owner_account(instance).await?;
         // Un fallo de identidad se informa tal cual; nunca se degrada a perfil local.
         let provider = self
             .registry
@@ -680,6 +716,15 @@ impl Launcher {
         let java = self.select_java(instance, &descriptor).await?;
 
         self.sync_profile_skin(instance, &descriptor, &account).await;
+
+        // Mods copiados a mano o heredados: pasan a compartir contenido con el almacen. Si falla, se juega igual.
+        self.adopt_game_dir(id, &instance.game_dir).await;
+        // Con un perfil sin Microsoft, el aviso de «modo offline» de Crash Assistant solo estorba.
+        if account.provider == IdentityProviderKind::Local {
+            if let Err(e) = crate::crash_assistant::silence_offline_notice(&instance.game_dir) {
+                tracing::warn!(error = %e, "no se pudo ajustar la configuracion de Crash Assistant");
+            }
+        }
 
         let overlay = self.prepare_loader(instance, &data_dir, &java).await?;
         let game_assets_dir = self.sync_instance_resources(instance, &install_plan, &data_dir).await?;

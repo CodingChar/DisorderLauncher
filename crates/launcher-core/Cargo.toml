@@ -14,9 +14,12 @@ minecraft-install = { path = "../minecraft-install" }
 minecraft-launch = { path = "../minecraft-launch" }
 java-runtime = { path = "../java-runtime" }
 download-manager = { path = "../download-manager" }
+dpack = { path = "../dpack" }
+fs-safe = { path = "../fs-safe" }
 instance-manager = { path = "../instance-manager" }
 jvm-tuning = { path = "../jvm-tuning" }
 loaders = { path = "../loaders" }
+artifact-store = { path = "../artifact-store" }
 mods = { path = "../mods" }
 modpacks = { path = "../modpacks" }
 themes = { path = "../themes" }

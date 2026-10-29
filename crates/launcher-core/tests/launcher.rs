@@ -15,10 +15,13 @@ const NO_NETWORK: &str = "http://127.0.0.1:1/version_manifest_v2.json";
 struct Collector {
     states: Mutex<Vec<LaunchStateEvent>>,
     output: Mutex<Vec<String>>,
+    progress: Mutex<Vec<InstallProgressEvent>>,
 }
 
 impl LauncherEvents for Collector {
-    fn install_progress(&self, _: InstallProgressEvent) {}
+    fn install_progress(&self, event: InstallProgressEvent) {
+        self.progress.lock().unwrap().push(event);
+    }
     fn launch_state(&self, event: LaunchStateEvent) {
         self.states.lock().unwrap().push(event);
     }
@@ -310,7 +313,7 @@ async fn real_vanilla_install_launch_and_stop() {
 }
 
 #[tokio::test]
-async fn instance_crud_validates_profile_and_java() {
+async fn instance_crud_validates_java_and_ignores_per_instance_profile() {
     let (dir, launcher, _) = launcher();
     let first = launcher.accounts_create_local("David").await.unwrap();
     let second = launcher.accounts_create_local("Alex").await.unwrap();
@@ -329,10 +332,8 @@ async fn instance_crud_validates_profile_and_java() {
         )
         .await
         .unwrap();
-    assert_eq!((updated.name.as_str(), updated.profile_id.as_str()), ("Renombrada", second.id.as_str()));
-
-    let bad_profile = instance_manager::InstanceUpdate { profile_id: Some("acc_local_nope".into()), ..Default::default() };
-    assert!(matches!(launcher.instances_update(&instance.id, bad_profile).await, Err(LauncherError::ProfileMissing)));
+    // El perfil no se elige por instancia: lo decide el menu de Perfiles y esa orden se ignora.
+    assert_eq!((updated.name.as_str(), updated.profile_id.as_str()), ("Renombrada", first.id.as_str()));
 
     let bad_java = instance_manager::InstanceUpdate {
         java: Some(JavaSelection::Path { path: dir.path().join("no-java") }),
@@ -982,4 +983,272 @@ async fn real_modpack_import_and_launch() {
     let _ = launcher.stop(&instance.id);
     wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
     assert!(alive, "el juego se cerro solo antes de tiempo");
+}
+
+#[tokio::test]
+async fn adoption_shares_identical_mods_between_instances_and_duplicates() {
+    let (dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let a = launcher.instances_create("A", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    let b = launcher.instances_create("B", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    for inst in [&a, &b] {
+        std::fs::write(inst.game_dir.join("mods").join("sodium.jar"), vec![9u8; 2048]).unwrap();
+    }
+
+    let first = launcher.store_adopt_instance(&a.id).await.unwrap();
+    let second = launcher.store_adopt_instance(&b.id).await.unwrap();
+    assert_eq!((first.adopted, first.saved_bytes), (1, 0));
+    assert_eq!((second.adopted, second.saved_bytes), (1, 2048));
+    // Segunda pasada: nada que hacer.
+    assert_eq!(launcher.store_adopt_instance(&a.id).await.unwrap().adopted, 0);
+
+    let objects = artifact_store::ArtifactStore::open(launcher.paths().store_dir()).unwrap().list().unwrap();
+    assert_eq!(objects.len(), 1, "un solo objeto fisico para ambas instancias");
+
+    // El almacen vive bajo la raiz de datos, nunca dentro de una instancia.
+    assert!(launcher.paths().store_dir().starts_with(dir.path()));
+    let copy = launcher.instances_duplicate(&a.id).await.unwrap();
+    assert_eq!(std::fs::read(copy.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![9u8; 2048]);
+    assert_eq!(launcher.store_adopt_instance(&copy.id).await.unwrap().adopted, 0, "el indice copiado sigue valido");
+}
+
+#[tokio::test]
+async fn dpack_roundtrip_reuses_the_store_and_leaves_personal_state_out() {
+    let (dir, launcher, events) = launcher();
+    fake_installation(&launcher, dir.path());
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let source = launcher.instances_create("Mi pack", "1.99", LoaderKind::Vanilla, None).await.unwrap();
+    let game = &source.game_dir;
+    std::fs::write(game.join("mods").join("sodium.jar"), vec![5u8; 4096]).unwrap();
+    std::fs::write(game.join("mods").join("privado.jar"), vec![6u8; 512]).unwrap();
+    std::fs::create_dir_all(game.join("config")).unwrap();
+    std::fs::write(game.join("config").join("sodium.toml"), b"quality = 2\n").unwrap();
+    std::fs::create_dir_all(game.join("saves").join("Mundo")).unwrap();
+    std::fs::write(game.join("saves").join("Mundo").join("level.dat"), b"mundo").unwrap();
+    std::fs::write(game.join("options.txt"), b"fov:90").unwrap();
+
+    let out = dir.path().join("pack.7z");
+    let summary = launcher.dpack_export(&source.id, &out, false).await.unwrap();
+    assert_eq!(summary.files, 3, "dos mods y una config; sin mundos ni options");
+    assert!(out.is_file());
+    assert!(events.progress.lock().unwrap().iter().any(|e| e.phase == "export7z"));
+
+    let store = artifact_store::ArtifactStore::open(launcher.paths().store_dir()).unwrap();
+    let before = store.list().unwrap().len();
+    assert_eq!(before, 2, "la exportacion adopta los mods de la instancia");
+
+    let imported = launcher.dpack_import(&out).await.unwrap();
+    assert_ne!(imported.id, source.id);
+    assert_eq!(imported.name, "Mi pack");
+    assert_eq!(std::fs::read(imported.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![5u8; 4096]);
+    assert_eq!(std::fs::read(imported.game_dir.join("mods").join("privado.jar")).unwrap(), vec![6u8; 512]);
+    assert_eq!(std::fs::read(imported.game_dir.join("config").join("sodium.toml")).unwrap(), b"quality = 2\n");
+    assert!(!imported.game_dir.join("saves").join("Mundo").exists());
+    assert!(!imported.game_dir.join("options.txt").exists());
+    assert_eq!(store.list().unwrap().len(), before, "los mods ya conocidos no crean objetos nuevos");
+    assert!(events.progress.lock().unwrap().iter().any(|e| e.phase == "import7z"));
+    // El indice queda listo: adoptar de nuevo no tiene nada que hacer.
+    assert_eq!(launcher.store_adopt_instance(&imported.id).await.unwrap().adopted, 0);
+    assert!(!imported.game_dir.join(".disorder").join("import.pending").exists());
+}
+
+#[tokio::test]
+async fn dpack_import_of_a_broken_file_creates_no_instance() {
+    let (dir, launcher, _) = launcher();
+    fake_installation(&launcher, dir.path());
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let junk = dir.path().join("roto.7z");
+    std::fs::write(&junk, b"esto no es un paquete").unwrap();
+    assert!(matches!(launcher.dpack_import(&junk).await, Err(LauncherError::InvalidInput(_))));
+    assert!(launcher.instances_list().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn storage_cleanup_frees_only_what_no_instance_uses() {
+    let (_dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let a = launcher.instances_create("A", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    let b = launcher.instances_create("B", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    for inst in [&a, &b] {
+        std::fs::write(inst.game_dir.join("mods").join("sodium.jar"), vec![9u8; 2048]).unwrap();
+    }
+    std::fs::write(a.game_dir.join("mods").join("solo-a.jar"), vec![4u8; 100]).unwrap();
+    launcher.store_adopt_instance(&a.id).await.unwrap();
+    launcher.store_adopt_instance(&b.id).await.unwrap();
+
+    let summary = launcher.store_summary().await.unwrap();
+    assert_eq!((summary.store_bytes, summary.shared_bytes, summary.reclaimable_bytes), (2148, 2048, 0));
+    // Lo recien llegado esta en gracia: aunque ya no se use, todavia no se libera.
+    std::fs::remove_file(a.game_dir.join("mods").join("solo-a.jar")).unwrap();
+    launcher.store_adopt_instance(&a.id).await.unwrap();
+    assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 0);
+
+    // Borrar una instancia no toca los mods que otra sigue usando.
+    launcher.instances_delete(&a.id).await.unwrap();
+    assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 0);
+    assert_eq!(std::fs::read(b.game_dir.join("mods").join("sodium.jar")).unwrap(), vec![9u8; 2048]);
+}
+
+/// Flujo real del almacen comun y de los paquetes `.7z` sobre los datos de la app (con su Minecraft ya instalado):
+/// duplica una instancia con mods reales, adopta, exporta, importa y lanza la importada.
+/// `DISORDER_E2E_DATA=<datos de la app> DISORDER_E2E_INSTANCE=<id> DISORDER_E2E_OUT=<archivo.7z> cargo test -p launcher-core --test launcher -- --ignored --nocapture real_store_and_dpack_flow`
+#[tokio::test]
+#[ignore = "usa los datos reales de la app (DISORDER_E2E_DATA), requiere internet y abre Minecraft unos segundos"]
+async fn real_store_and_dpack_flow() {
+    let root = std::path::PathBuf::from(std::env::var("DISORDER_E2E_DATA").expect("DISORDER_E2E_DATA"));
+    let source_id = std::env::var("DISORDER_E2E_INSTANCE").expect("DISORDER_E2E_INSTANCE");
+    let out = std::path::PathBuf::from(std::env::var("DISORDER_E2E_OUT").expect("DISORDER_E2E_OUT"));
+    let events = Arc::new(Collector::default());
+    let launcher = Arc::new(Launcher::new(LauncherPaths::new(&root), events.clone()));
+
+    let source = launcher.instances_list().await.unwrap().into_iter().find(|i| i.id == source_id).expect("instancia");
+    let mods_of = |dir: &std::path::Path| -> std::collections::BTreeMap<String, Vec<u8>> {
+        std::fs::read_dir(dir.join("mods"))
+            .unwrap()
+            .flatten()
+            .filter(|e| e.path().is_file())
+            .map(|e| (e.file_name().to_string_lossy().into_owned(), std::fs::read(e.path()).unwrap()))
+            .collect()
+    };
+    let original = mods_of(&source.game_dir);
+    let logical: usize = original.values().map(|v| v.len()).sum();
+    println!("origen: {} mods, {} bytes", original.len(), logical);
+
+    // 1. Duplicar: los jars se enlazan, no se copian.
+    let t = std::time::Instant::now();
+    let copy = launcher.instances_duplicate(&source_id).await.unwrap();
+    println!("duplicar: {:?}", t.elapsed());
+    assert_eq!(mods_of(&copy.game_dir), original);
+
+    // 2. Adoptar ambas: un solo objeto fisico por mod.
+    let t = std::time::Instant::now();
+    let a = launcher.store_adopt_instance(&source_id).await.unwrap();
+    println!("adoptar origen: {:?} -> {a:?}", t.elapsed());
+    let t = std::time::Instant::now();
+    let again = launcher.store_adopt_instance(&source_id).await.unwrap();
+    println!("segunda pasada: {:?} -> {again:?}", t.elapsed());
+    assert_eq!(again.adopted, 0);
+    let b = launcher.store_adopt_instance(&copy.id).await.unwrap();
+    println!("adoptar copia: {b:?}");
+    let store = artifact_store::ArtifactStore::open(launcher.paths().store_dir()).unwrap();
+    let objects = store.list().unwrap();
+    println!("objetos en el almacen: {}", objects.len());
+    println!("resumen: {:?}", launcher.store_summary().await.unwrap());
+
+    // 3. Exportar y abrirlo como un 7z normal.
+    let t = std::time::Instant::now();
+    let summary = launcher.dpack_export(&source_id, &out, false).await.unwrap();
+    println!("exportar: {:?} -> {summary:?}, archivo {} bytes", t.elapsed(), std::fs::metadata(&out).unwrap().len());
+
+    // 4. Importar: nada nuevo en el almacen y contenido identico.
+    let before = store.list().unwrap().len();
+    let t = std::time::Instant::now();
+    let imported = launcher.dpack_import(&out).await.unwrap();
+    println!("importar: {:?} -> {} ({})", t.elapsed(), imported.name, imported.id);
+    assert_eq!(store.list().unwrap().len(), before, "los mods ya conocidos no se escriben otra vez");
+    assert_eq!(mods_of(&imported.game_dir), original);
+    println!("IMPORTED_ID={}", imported.id);
+    println!("COPY_ID={}", copy.id);
+
+    // 5. Lanzar la importada.
+    launcher.launch(&imported.id).await.unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(1500);
+    let first = loop {
+        {
+            let states = events.states.lock().unwrap();
+            if let Some(e) = states.iter().find(|e| matches!(e.state, LaunchState::Running { .. } | LaunchState::Failed { .. } | LaunchState::Exited { .. })) {
+                break e.state.clone();
+            }
+        }
+        assert!(std::time::Instant::now() < deadline, "timeout");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    println!("estado: {first:?}");
+    assert!(matches!(first, LaunchState::Running { .. }), "{first:?}");
+    tokio::time::sleep(Duration::from_secs(40)).await;
+    let output = events.output.lock().unwrap().join("\n");
+    let tail: Vec<&str> = output.lines().rev().take(25).collect();
+    println!("salida del juego (final):\n{}", tail.into_iter().rev().collect::<Vec<_>>().join("\n"));
+    let alive = events.states.lock().unwrap().iter().all(|e| !matches!(e.state, LaunchState::Exited { .. }));
+    let _ = launcher.stop(&imported.id);
+    wait_for_state(&events, |s| matches!(s, LaunchState::Exited { .. })).await;
+    assert!(alive, "el juego se cerro solo antes de tiempo");
+    assert!(output.contains("Loading") || output.to_lowercase().contains("fabric"), "el juego debio cargar Fabric y sus mods");
+}
+
+#[tokio::test]
+async fn adoption_keeps_the_modrinth_origin_known_from_the_mod_lock() {
+    let (_dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let inst = launcher.instances_create("A", "1.21", LoaderKind::Fabric, Some("0.16.0".into())).await.unwrap();
+    std::fs::write(inst.game_dir.join("mods").join("sodium.jar"), b"sodium").unwrap();
+    std::fs::write(inst.game_dir.join("mods").join("privado.jar"), b"privado").unwrap();
+    let manager = mods::ModManager::new(&inst.game_dir);
+    let mut lock = mods::ModLock::default();
+    lock.upsert(mods::LockedMod {
+        file: "sodium.jar".into(),
+        project_id: "AANobbMI".into(),
+        version_id: "ver1".into(),
+        version_number: "1.0".into(),
+        title: "Sodium".into(),
+        sha1: "aa".into(),
+        installed_at: chrono::Utc::now(),
+        dependency_of: None,
+        previous: None,
+    });
+    mods::save_lock(&manager.lock_file(), &lock).await.unwrap();
+
+    launcher.store_adopt_instance(&inst.id).await.unwrap();
+    let index = artifact_store::ArtifactIndex::load(&inst.game_dir);
+    assert_eq!(
+        index.entries["mods/sodium.jar"].source,
+        artifact_store::ArtifactSource::Modrinth { project_id: "AANobbMI".into(), version_id: "ver1".into() }
+    );
+    assert_eq!(index.entries["mods/privado.jar"].source, artifact_store::ArtifactSource::Local);
+}
+
+/// Un archivo que otro programa mantiene abierto (Java, el antivirus, la ventana de errores de un mod) no debe
+/// impedir eliminar una instancia: desaparece de la lista y la carpeta se termina de borrar al liberarse.
+#[cfg(windows)]
+#[tokio::test]
+async fn deleting_an_instance_survives_a_file_held_by_another_program() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let (_dir, launcher, _) = launcher();
+    launcher.accounts_create_local("Steve").await.unwrap();
+    let inst = launcher.instances_create("Con juego abierto", "1.21", LoaderKind::Vanilla, None).await.unwrap();
+    let log = inst.game_dir.join("logs").join("latest.log");
+    std::fs::create_dir_all(log.parent().unwrap()).unwrap();
+    std::fs::write(&log, b"x").unwrap();
+    std::fs::write(inst.game_dir.join("options.txt"), b"x").unwrap();
+    let held = std::fs::OpenOptions::new().write(true).share_mode(3).open(&log).unwrap();
+
+    launcher.instances_delete(&inst.id).await.expect("no debe fallar por un archivo en uso");
+    assert!(launcher.instances_list().await.unwrap().is_empty());
+    assert!(!inst.game_dir.join("options.txt").exists(), "lo demas se borro");
+
+    drop(held);
+    let repo = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir());
+    assert_eq!(repo.remove_leftovers().await, 1);
+    assert!(!launcher.paths().instances_dir().join(&inst.id).exists());
+}
+
+#[tokio::test]
+async fn the_selected_profile_plays_every_instance() {
+    let (dir, launcher, _) = launcher();
+    let jre = fake_installation(&launcher, dir.path());
+    launcher.accounts_create_local("David").await.unwrap();
+    let alex = launcher.accounts_create_local("Alex").await.unwrap();
+    // Se crea con David (el predeterminado de entonces) y despues se elige a Alex en Perfiles.
+    let instance = launcher.instances_create("Base", "1.99", LoaderKind::Vanilla, None).await.unwrap();
+    let repo = instance_manager::FileInstanceRepository::new(launcher.paths().instances_dir());
+    let instance = repo
+        .update(&instance.id, instance_manager::InstanceUpdate { java: Some(JavaSelection::Path { path: jre }), ..Default::default() })
+        .await
+        .unwrap();
+    launcher.accounts_set_default(&alex.id).await.unwrap();
+
+    let plan = launcher.prepare_launch(&instance).await.unwrap();
+    let args = plan.game_args.join(" ");
+    assert!(args.contains("Alex"), "juega con el perfil elegido, no con el de la creacion: {args}");
+    assert!(!args.contains("David"));
 }

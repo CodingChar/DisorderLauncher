@@ -34,10 +34,8 @@ pub async fn save_manifest_cache(
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).await?;
     }
-    let part = path.with_extension("json.part");
     let data = serde_json::to_string_pretty(manifest)?;
-    fs::write(&part, &data).await?;
-    fs::rename(&part, path).await?;
+    fs_safe::write_atomic(path, data).await?;
     Ok(())
 }
 

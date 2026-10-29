@@ -401,9 +401,7 @@ async fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
-    let part = path.with_extension("zip.part");
-    tokio::fs::write(&part, bytes).await?;
-    tokio::fs::rename(&part, path).await
+    fs_safe::write_atomic(path, bytes).await
 }
 
 async fn write_if_changed(path: &Path, current: &str, updated: String) -> std::io::Result<()> {

@@ -13,7 +13,7 @@ Los temas JSON solo cambian el tinte del fondo y el color de resalte del texto (
 
 ## Sistema anterior (historico)
 
-Lo que sigue en este documento describe el diseno moderno anterior (maqueta `DisorderLauncherUI/`, `docs/UI_MIGRATION.md`, tokens de `app.css`):
+Lo que sigue en este documento describe el diseno moderno anterior (maqueta `DisorderLauncherUI/`, tokens de `app.css`):
 ya no se aplica a la interfaz. Se conserva como referencia de intenciones (accesibilidad, claridad, lenguaje no tecnico), que siguen vigentes.
 Referencia historica: `reference/disorderlaucher_reference.html`.
 

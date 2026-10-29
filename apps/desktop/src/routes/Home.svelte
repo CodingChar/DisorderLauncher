@@ -24,7 +24,8 @@
   const session = $derived(instance ? sessions.get(instance.id) : undefined)
   const busy = $derived(instance ? sessions.isBusy(instance.id) : false)
   const running = $derived(session?.phase === 'running')
-  const profile = $derived((instance && accounts.list.find((a) => a.id === instance.profileId)) || accounts.current)
+  // El perfil elegido en Perfiles juega todas las instancias.
+  const profile = $derived(accounts.current)
 
   const percent = $derived.by(() => {
     const p = session?.progress

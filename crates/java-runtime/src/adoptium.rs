@@ -116,7 +116,7 @@ pub async fn download_and_extract_runtime(
     file.write_all(&bytes).await?;
     file.flush().await?;
     drop(file);
-    fs::rename(&part_path, &archive_path).await?;
+    fs_safe::rename(&part_path, &archive_path).await?;
 
     let extract_dir = runtimes_dir.join(format!("jre-{}", major));
     extract_archive(&archive_path, &extract_dir).await?;

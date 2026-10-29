@@ -75,9 +75,13 @@ Una instancia puede sobrescribirlo.
 
 ## 7. Portable instances
 
-Futuro:
-- manifest;
-- mods/configs;
-- saves opcionales.
+Implementado (ver `docs/adr/ADR-003_artifact_store_and_dpack.md`):
+- `.7z` estandar con `dpack-manifest.json` (version de formato, Minecraft, loader, archivos con SHA-512 y origen);
+- mods/configs/resourcepacks/shaderpacks/kubejs; mundos solo si el usuario lo pide;
+- sin cuentas, tokens, logs ni rutas absolutas.
 
 Nunca empacar binarios de Minecraft como si fueran contenido propio.
+
+## 8. Almacen comun de mods
+
+`<datos>/store/sha512/<2 hex>/<hash>` guarda una sola vez los `.jar`/`.zip` inmutables de `mods/`, `resourcepacks/` y `shaderpacks/`. Cada instancia los ve como archivos normales (hardlink, o copia si el volumen no lo permite) y anota lo que usa en `game/.disorder/artifacts.json`. El estado mutable (`config/`, `saves/`, `options.txt`, logs) nunca se comparte. La limpieza solo borra objetos que ninguna instancia usa, y solo con todas las instancias reservadas (sin juego, instalaciones ni importaciones en curso).

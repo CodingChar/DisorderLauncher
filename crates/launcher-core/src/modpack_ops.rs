@@ -34,12 +34,13 @@ impl From<ModpackError> for LauncherError {
             ModpackError::DownloadFailures(_) | ModpackError::Download(_) => Self::Offline,
             ModpackError::Http(h) if crate::error::is_network(&h) => Self::Offline,
             ModpackError::Archive(_) => Self::InvalidInput("El modpack esta danado o no se puede abrir.".into()),
+            ModpackError::Io(io) => Self::from_io(&io),
             _ => Self::Storage,
         }
     }
 }
 
-const GIB: u64 = 1024 * 1024 * 1024;
+pub(crate) const GIB: u64 = 1024 * 1024 * 1024;
 
 /// Espacio a reservar para importar: lo que pesan los archivos del modpack (con margen para overrides y
 /// archivos temporales) mas lo que ocupa instalar Minecraft y su loader si aun no estan.
@@ -100,19 +101,7 @@ impl Launcher {
                 "Este modpack necesita Minecraft {minecraft_version}, que no esta disponible."
             )));
         }
-        let needed = required_space_bytes(&index);
-        // La enumeracion de discos es bloqueante (y lenta con unidades de red o opticas): fuera del runtime.
-        let instances_dir = self.paths().instances_dir();
-        let free = tokio::task::spawn_blocking(move || free_space_bytes(&instances_dir)).await.ok().flatten();
-        if let Some(free) = free {
-            if free < needed {
-                return Err(LauncherError::InvalidInput(format!(
-                    "No hay espacio suficiente en el disco: se necesitan unos {} GB libres y hay {}.",
-                    needed.div_ceil(GIB),
-                    free / GIB
-                )));
-            }
-        }
+        self.ensure_free_space(required_space_bytes(&index)).await?;
 
         let instance = self
             .instances
@@ -145,6 +134,21 @@ impl Launcher {
                 }
                 Err(e)
             }
+        }
+    }
+
+    /// Falla pronto y con un mensaje claro si el disco de las instancias no tiene `needed` bytes libres.
+    pub(crate) async fn ensure_free_space(&self, needed: u64) -> Result<(), LauncherError> {
+        // La enumeracion de discos es bloqueante (y lenta con unidades de red o opticas): fuera del runtime.
+        let instances_dir = self.paths().instances_dir();
+        let free = tokio::task::spawn_blocking(move || free_space_bytes(&instances_dir)).await.ok().flatten();
+        match free {
+            Some(free) if free < needed => Err(LauncherError::InvalidInput(format!(
+                "No hay espacio suficiente en el disco: se necesitan unos {} GB libres y hay {}.",
+                needed.div_ceil(GIB),
+                free / GIB
+            ))),
+            _ => Ok(()),
         }
     }
 
@@ -186,6 +190,11 @@ impl Launcher {
                 (!name.contains('/') && name.ends_with(".jar")).then(|| (name.to_string(), f.hashes.sha1.clone()))
             })
             .collect();
+        self.register_known_mods(instance, files).await;
+    }
+
+    /// `files` son (nombre en `mods/`, SHA-1). Es opcional: sin red, los mods quedan como locales.
+    pub(crate) async fn register_known_mods(&self, instance: &Instance, files: Vec<(String, String)>) {
         if files.is_empty() {
             return;
         }

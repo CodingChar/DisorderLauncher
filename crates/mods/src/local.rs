@@ -37,6 +37,8 @@ pub struct ModSource {
 #[serde(rename_all = "camelCase")]
 pub struct MissingDependency {
     pub mod_name: String,
+    /// Id del mod que falta tal como lo declara el mod que lo pide (p. ej. `fabric-api`).
+    pub id: String,
     /// Nombre legible de lo que falta (p. ej. "Fabric API").
     pub requires: String,
 }
@@ -55,6 +57,11 @@ impl ModManager {
 
     pub fn mods_dir(&self) -> &Path {
         &self.mods_dir
+    }
+
+    /// Carpeta de juego de la instancia (la que contiene `mods/`).
+    pub fn game_dir(&self) -> &Path {
+        self.mods_dir.parent().unwrap_or(&self.mods_dir)
     }
 
     /// Archivo con el registro de origen de los mods instalados desde Modrinth.
@@ -125,7 +132,7 @@ impl ModManager {
         if !from.is_file() {
             return Err(ModError::NotFound);
         }
-        fs::rename(&from, self.mods_dir.join(&target)).await?;
+        fs_safe::rename(&from, self.mods_dir.join(&target)).await?;
         Ok(target)
     }
 
@@ -136,7 +143,7 @@ impl ModManager {
         if !path.is_file() {
             return Err(ModError::NotFound);
         }
-        fs::remove_file(&path).await?;
+        fs_safe::remove_file(&path).await?;
 
         let mut lock = load_lock(&self.lock_path()).await;
         if let Some(entry) = lock.remove_file(base) {
@@ -168,7 +175,7 @@ impl ModManager {
         let dest = self.mods_dir.join(&file_name);
         let part = self.mods_dir.join(format!("{file_name}.part"));
         fs::copy(source, &part).await?;
-        fs::rename(&part, &dest).await?;
+        fs_safe::rename(&part, &dest).await?;
 
         self.list()
             .await?
@@ -193,6 +200,7 @@ impl ModManager {
                 if !provided.contains(required.as_str()) {
                     missing.push(MissingDependency {
                         mod_name: entry.name.clone(),
+                        id: required.clone(),
                         requires: friendly_dependency_name(required),
                     });
                 }
@@ -379,7 +387,7 @@ displayName = \"Cloth\"
         make_mod(m.mods_dir(), "b.jar", r#"{"id":"b","name":"Beta","depends":{"a":"*"}}"#);
 
         let missing = ModManager::missing_dependencies(&m.list().await.unwrap());
-        assert_eq!(missing, vec![MissingDependency { mod_name: "Alpha".into(), requires: "Fabric API".into() }]);
+        assert_eq!(missing, vec![MissingDependency { mod_name: "Alpha".into(), id: "fabric-api".into(), requires: "Fabric API".into() }]);
 
         make_mod(m.mods_dir(), "fabric-api.jar", r#"{"id":"fabric-api","name":"Fabric API"}"#);
         assert!(ModManager::missing_dependencies(&m.list().await.unwrap()).is_empty());

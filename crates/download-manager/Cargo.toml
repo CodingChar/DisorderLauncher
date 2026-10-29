@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+fs-safe = { path = "../fs-safe" }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }

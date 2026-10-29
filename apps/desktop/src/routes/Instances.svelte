@@ -35,14 +35,12 @@
 
   function row(i: Instance): RowSpec {
     const running = sessions.get(i.id)?.phase === 'running'
-    const profile = accounts.list.find((a) => a.id === i.profileId)
     const icon = findItemIcon(i.icon) ?? defaultIconFor(i.loader)
     return {
       icon: icon ? { src: icon.src } : undefined,
       lines: [
         { text: running ? `${i.name}  (En marcha)` : i.name, color: running ? '#55ff55' : '#ffffff' },
         { text: `${versionLabel(i.minecraftVersion)} · ${loaderName(i.loader)}` },
-        { text: profile ? `Perfil: ${profile.label}` : '' },
       ],
     }
   }
@@ -65,6 +63,8 @@
   />
   {#if anyBusy}
     <McText text="Hay una instancia en marcha. Cuando termine podrás iniciar otra." x={-155} y={gui.H - 66} w={310} align="center" color="#808080" role="status" />
+  {:else if accounts.current}
+    <McText text={`Juegas como «${accounts.current.label}» (se cambia en Perfiles)`} x={-155} y={gui.H - 66} w={310} align="center" color="#808080" maxLines={1} />
   {/if}
 
   <McButton anchor="bottom" x={-154} y={-52} w={150} label="Jugar seleccionada" disabled={!canPlay} onclick={() => selected && play(selected.id)} />

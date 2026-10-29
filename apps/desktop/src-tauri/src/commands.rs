@@ -298,6 +298,12 @@ pub async fn mods_update(state: State<'_, AppState>, id: String, file: String) -
   state.launcher.mods_update(&id, &file).await.map_err(user_message)
 }
 
+/// Instala las dependencias que faltan a los mods de la instancia (p. ej. Fabric API).
+#[tauri::command]
+pub async fn mods_install_missing(state: State<'_, AppState>, id: String) -> Result<mods::DependencyReport, String> {
+  state.launcher.mods_install_missing(&id).await.map_err(user_message)
+}
+
 #[tauri::command]
 pub async fn mods_rollback(state: State<'_, AppState>, id: String, file: String) -> Result<(), String> {
   state.launcher.mods_rollback(&id, &file).await.map_err(user_message)
@@ -344,6 +350,59 @@ pub async fn modpacks_export(
   let Some(file) = picked else { return Ok(None) };
   let path = file.into_path().map_err(|_| "No se pudo usar esa ubicación.".to_string())?;
   state.launcher.modpack_export(&id, &path).await.map(Some).map_err(user_message)
+}
+
+/// Cuánto ocupan los mods compartidos, cuánto se ahorra y cuánto se puede liberar.
+#[tauri::command]
+pub async fn store_summary(state: State<'_, AppState>) -> Result<launcher_core::StorageSummary, String> {
+  state.launcher.store_summary().await.map_err(user_message)
+}
+
+/// Libera los archivos que ya no usa ninguna instancia.
+#[tauri::command]
+pub async fn store_cleanup(state: State<'_, AppState>) -> Result<launcher_core::CleanupSummary, String> {
+  state.launcher.store_cleanup().await.map_err(user_message)
+}
+
+/// Pide dónde guardar el `.7z` y exporta la instancia con todos sus mods. `None` si el usuario cancela.
+/// El avance llega por `install://progress` (fase `export7z`).
+#[tauri::command]
+pub async fn dpack_export(
+  app: tauri::AppHandle,
+  state: State<'_, AppState>,
+  id: String,
+  include_worlds: bool,
+) -> Result<Option<launcher_core::DpackExportSummary>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let name = state
+    .launcher
+    .instances_list()
+    .await
+    .map_err(user_message)?
+    .into_iter()
+    .find(|i| i.id == id)
+    .map(|i| i.name)
+    .unwrap_or_else(|| "instancia".to_string());
+  let picked = app
+    .dialog()
+    .file()
+    .add_filter("Instancia de DisorderLauncher", &["7z"])
+    .set_file_name(format!("{name}.7z"))
+    .blocking_save_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo usar esa ubicación.".to_string())?;
+  state.launcher.dpack_export(&id, &path, include_worlds).await.map(Some).map_err(user_message)
+}
+
+/// Abre el selector de un `.7z` exportado y crea la instancia. `None` si el usuario cancela.
+/// El avance llega por `install://progress` (fase `import7z`).
+#[tauri::command]
+pub async fn dpack_import(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Option<Instance>, String> {
+  use tauri_plugin_dialog::DialogExt;
+  let picked = app.dialog().file().add_filter("Instancia de DisorderLauncher", &["7z"]).blocking_pick_file();
+  let Some(file) = picked else { return Ok(None) };
+  let path = file.into_path().map_err(|_| "No se pudo leer el archivo elegido.".to_string())?;
+  state.launcher.dpack_import(&path).await.map(Some).map_err(user_message)
 }
 
 #[tauri::command]

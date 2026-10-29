@@ -87,11 +87,9 @@ pub async fn save_lock(path: &Path, lock: &ModLock) -> Result<(), ModError> {
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
-    let part = path.with_extension("json.part");
     let mut lock = lock.clone();
     lock.schema_version = SCHEMA_VERSION;
-    tokio::fs::write(&part, serde_json::to_string_pretty(&lock)?).await?;
-    tokio::fs::rename(&part, path).await?;
+    fs_safe::write_atomic(path, serde_json::to_string_pretty(&lock)?).await?;
     Ok(())
 }
 

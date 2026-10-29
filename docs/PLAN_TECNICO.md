@@ -650,7 +650,6 @@ Eventos Tauri: `install://progress`, `launch://stdout`, `launch://stderr`, `laun
 - `invoke('accounts_list')`, `invoke('accounts_create_local', { name })`, etc.
 - Listeners para eventos de progreso.
 
-**Referencia visual**: la maqueta `DisorderLauncherUI/` (ver `docs/UI_MIGRATION.md`); anterior: `docs/reference/disorderlauncher_reference.html`
 
 ---
 

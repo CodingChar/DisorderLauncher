@@ -21,13 +21,18 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `instances_create` | `name`, `version`, `loader?`, `loaderVersion?` | `Instance` (perfil predeterminado). `loader`: `vanilla` (por defecto), `fabric`, `quilt`, `forge` o `neoforge`; sin `loaderVersion` se usa la ultima estable |
 | `loaders_supported` | — | `LoaderKind[]` (siempre incluye `vanilla`) |
 | `loaders_list_versions` | `loader`, `minecraftVersion` | `{ version, stable }[]` |
-| `instances_update` | `id`, `changes` | `Instance` — `changes` (todos opcionales): `name`, `minecraftVersion`, `profileId`, `java` (`{mode:'auto'}` o `{mode:'path', path}`), `memory` (`{mode:'auto'}` o `{mode:'fixed', minMb, maxMb}`) |
+| `instances_update` | `id`, `changes` | `Instance` — `changes` (todos opcionales): `name`, `minecraftVersion`, `java` (`{mode:'auto'}` o `{mode:'path', path}`), `memory` (`{mode:'auto'}` o `{mode:'fixed', minMb, maxMb}`) | (`profileId` se ignora: el perfil elegido en Perfiles juega todas las instancias)
 | `instances_delete` | `id` | `void` (borra la instancia y su carpeta) |
 | `instances_duplicate` | `id` | `Instance` (copia los archivos del juego) |
 | `instances_launch` | `id` | `void` — inicia en segundo plano; el avance llega por eventos |
 | `instances_stop` | `id` | `void` |
 | `instances_repair` | `id` | `{ found, fixed, remaining }` — verifica hashes y redescarga lo danado |
 | `modpacks_import` | — | `Instance \| null` — abre el selector (`.mrpack`), crea la instancia y descarga sus archivos; si falla se deshace todo. Avance: `install://progress` con `phase: 'modpack'` |
+| `dpack_export` | `id`, `includeWorlds` | `{ files, bytes } \| null` — pide donde guardar el `.7z` (manifiesto + mods incluidos, sin cuentas ni logs; mundos solo si `includeWorlds`). Avance: `install://progress` con `phase: 'export7z'` |
+| `dpack_import` | — | `Instance \| null` — abre el selector (`.7z`), valida el manifiesto y los hashes, y crea la instancia reutilizando los mods del almacen comun; si falla se deshace todo. Avance: `phase: 'import7z'` |
+| `store_summary` | — | `{ storeBytes, sharedBytes, reclaimableBytes }` — uso del almacen comun de mods; falla si hay una instancia en uso |
+| `store_cleanup` | — | `{ freedBytes }` — borra del almacen lo que ninguna instancia usa (solo lo que ninguna instancia usa; no se ejecuta con una instancia en uso); se niega si hay un registro danado o algo en curso |
+| `mods_install_missing` | `id` | `{ installed: InstalledMod[], unresolved: string[] }` — instala de una vez las dependencias que faltan a los mods activos (busca en Modrinth, descarta repetidas, descarga en paralelo); lo no encontrado va en `unresolved` |
 | `modpacks_export` | `id` | `{ remoteFiles, bundledFiles } \| null` — pide donde guardar; no incluye mundos ni logs |
 | `mods_list` | `id` | `{ mods, missingDependencies, supported }` (`supported` = cualquier tipo salvo Vanilla; lee `fabric.mod.json`, `META-INF/neoforge.mods.toml` o `META-INF/mods.toml`) — cada mod: `fileName`, `enabled`, `name`, `version`, `description`, `size`, `source?` |
 | `mods_set_enabled` | `id`, `file`, `enabled` | `void` (renombra a `.jar.disabled`) |

@@ -247,7 +247,7 @@ async fn failed_logins_and_cancellation_report_state_and_release_the_slot() {
 }
 
 #[tokio::test]
-async fn profiles_in_use_cannot_be_removed_and_removal_forgets_secrets() {
+async fn removing_the_profile_hands_every_instance_to_the_next_one_and_forgets_secrets() {
     let server = FakeServer::start().await;
     server.happy_chain("refresh-1");
     let env = env_with(Some(&server));
@@ -256,11 +256,12 @@ async fn profiles_in_use_cannot_be_removed_and_removal_forgets_secrets() {
     let steve = env.launcher.accounts_create_local("Steve").await.unwrap();
     let instance = instance_for(&env, &account_id).await;
 
-    assert!(matches!(env.launcher.accounts_remove(&account_id).await, Err(LauncherError::ProfileInUse(1))));
     assert!(env.store.get_secret(&format!("ms-refresh-{account_id}")).await.unwrap().is_some());
 
-    env.launcher.instances_delete(&instance.id).await.unwrap();
+    // El perfil elegido juega todas las instancias: quitarlo no depende de ellas.
     env.launcher.accounts_remove(&account_id).await.unwrap();
+    assert_eq!(env.launcher.instances_list().await.unwrap().len(), 1, "la instancia sigue ahi");
+    let _ = instance;
     assert_eq!(env.store.get_secret(&format!("ms-refresh-{account_id}")).await.unwrap(), None);
     let remaining = env.launcher.accounts_list().await.unwrap();
     assert_eq!(remaining.len(), 1);

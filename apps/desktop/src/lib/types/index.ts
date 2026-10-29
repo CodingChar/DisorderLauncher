@@ -111,6 +111,9 @@ export type InstallPhase =
   | 'metadata'
   | 'loader'
   | 'modpack'
+  | 'adopt'
+  | 'export7z'
+  | 'import7z'
   | 'client'
   | 'libraries'
   | 'assetIndex'
@@ -150,7 +153,6 @@ export interface RepairSummary {
 export interface InstanceChanges {
   name?: string
   minecraftVersion?: string
-  profileId?: string
   java?: JavaSelection
   memory?: MemoryPolicy
   /** Cadena vacia: vuelve al icono por defecto. */
@@ -196,7 +198,16 @@ export interface ModEntry {
 
 export interface MissingDependency {
   modName: string
+  /** Id del mod que falta, como lo declara el mod que lo pide. */
+  id: string
   requires: string
+}
+
+/** Resultado de instalar de una vez las dependencias que faltaban. */
+export interface DependencyReport {
+  installed: InstalledMod[]
+  /** Nombres de lo que no se encontro en Modrinth para esta version. */
+  unresolved: string[]
 }
 
 export interface ModsOverview {
@@ -235,6 +246,19 @@ export interface UpdateInfo {
 export interface LoaderVersion {
   version: string
   stable: boolean
+}
+
+/** Uso del almacen comun de mods (bytes). */
+export interface StorageSummary {
+  storeBytes: number
+  sharedBytes: number
+  reclaimableBytes: number
+}
+
+/** Resultado de exportar una instancia como paquete .7z. */
+export interface DpackSummary {
+  files: number
+  bytes: number
 }
 
 export interface ExportSummary {

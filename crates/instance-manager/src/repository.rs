@@ -123,14 +123,13 @@ impl FileInstanceRepository {
         let dir = self.instance_dir(&instance.id)?;
         fs::create_dir_all(&dir).await?;
         let path = dir.join("instance.json");
-        let part = dir.join("instance.json.part");
         let data = serde_json::to_string_pretty(&InstanceFile::from_instance(instance))?;
-        fs::write(&part, data).await?;
         // Copia del guardado anterior (si era valido) para poder recuperarse de un archivo danado.
         if self.read_file(&instance.id, &dir, &path).await.is_ok_and(|found| found.is_some()) {
             let _ = fs::copy(&path, dir.join(BACKUP_FILE)).await;
         }
-        fs::rename(&part, &path).await?;
+        // Atomico y con reintentos: el antivirus puede tener el archivo bloqueado un instante.
+        fs_safe::write_atomic(&path, data).await?;
         Ok(())
     }
 
@@ -176,11 +175,23 @@ impl FileInstanceRepository {
         if self.read(id).await.ok().flatten().is_some() {
             return Ok(false);
         }
-        match fs::remove_dir_all(self.instance_dir(id)?).await {
-            Ok(()) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(e.into()),
+        let dir = self.instance_dir(id)?;
+        if !dir.exists() {
+            return Ok(false);
         }
+        Ok(fs_safe::remove_tree(&dir).await?.is_removed())
+    }
+
+    /// Termina de borrar las carpetas sobrantes de instancias ya eliminadas (las que no pudieron borrarse
+    /// del todo porque otro programa tenia archivos abiertos). Devuelve cuantas quedaron limpias.
+    pub async fn remove_leftovers(&self) -> usize {
+        let mut cleaned = 0;
+        for problem in self.scan().await.unwrap_or_default() {
+            if matches!(problem.kind, FolderProblemKind::Orphan) && self.remove_orphan(&problem.id).await.unwrap_or(false) {
+                cleaned += 1;
+            }
+        }
+        cleaned
     }
 
     async fn create_layout(&self, id: &str) -> Result<PathBuf, InstanceError> {
@@ -302,20 +313,18 @@ impl InstanceRepository for FileInstanceRepository {
         // La ficha se quita primero: si algun archivo queda bloqueado (antivirus, juego abierto) la instancia ya
         // no aparece y la carpeta sobrante se limpia como huerfana en el siguiente arranque.
         for file in ["instance.json", BACKUP_FILE, "instance.json.part"] {
-            let _ = fs::remove_file(dir.join(file)).await;
+            let _ = fs_safe::remove_file(dir.join(file)).await;
         }
-        let mut attempt = 0;
-        loop {
-            match fs::remove_dir_all(&dir).await {
-                Ok(()) => return Ok(()),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-                Err(_) if attempt < 2 => {
-                    attempt += 1;
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                }
-                Err(e) => return Err(e.into()),
+        // Se borra todo lo posible con reintentos. Si un programa (Java, el antivirus, la ventana de errores
+        // de un mod) mantiene archivos abiertos, solo esos quedan: la instancia ya no existe para el usuario
+        // y `remove_leftovers` termina el trabajo cuando se liberen.
+        match fs_safe::remove_tree(&dir).await? {
+            fs_safe::RemoveOutcome::Removed => {}
+            fs_safe::RemoveOutcome::Partial { remaining, error } => {
+                tracing::warn!(instance = %id, remaining, error = %error, "instancia eliminada; quedan archivos en uso que se borraran despues");
             }
         }
+        Ok(())
     }
 
     async fn duplicate(&self, id: &str) -> Result<Instance, InstanceError> {
@@ -335,7 +344,7 @@ impl InstanceRepository for FileInstanceRepository {
             .await
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         if let Err(e) = copied {
-            let _ = fs::remove_dir_all(self.instance_dir(&new_id)?).await;
+            let _ = fs_safe::remove_tree(self.instance_dir(&new_id)?).await;
             return Err(e.into());
         }
 
@@ -368,17 +377,36 @@ fn validate_id(id: &str) -> Result<(), InstanceError> {
     Ok(())
 }
 
+/// Carpetas cuyos archivos son inmutables (jar/zip) y se pueden compartir entre instancias.
+const SHARED_DIRS: [&str; 3] = ["mods", "resourcepacks", "shaderpacks"];
+
+fn is_shareable_file(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    [".jar", ".jar.disabled", ".zip", ".zip.disabled"].iter().any(|ext| lower.ends_with(ext))
+}
+
 /// Copia recursiva. Ignora enlaces simbolicos para no escapar del directorio de la instancia.
 fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    copy_tree(from, to, false)
+}
+
+/// En las carpetas compartidas los jar/zip se enlazan (hardlink) en vez de copiarse: duplicar una
+/// instancia no gasta disco extra para sus mods. Si el sistema de archivos no lo permite, se copian.
+fn copy_tree(from: &Path, to: &Path, shared: bool) -> std::io::Result<()> {
     std::fs::create_dir_all(to)?;
     for entry in std::fs::read_dir(from)? {
         let entry = entry?;
         let kind = entry.file_type()?;
         let dest = to.join(entry.file_name());
         if kind.is_dir() {
-            copy_dir(&entry.path(), &dest)?;
+            let name = entry.file_name();
+            let is_shared = !shared && SHARED_DIRS.iter().any(|d| name.to_str() == Some(d));
+            copy_tree(&entry.path(), &dest, is_shared)?;
         } else if kind.is_file() {
-            std::fs::copy(entry.path(), dest)?;
+            let linkable = shared && entry.file_name().to_str().is_some_and(is_shareable_file);
+            if !(linkable && std::fs::hard_link(entry.path(), &dest).is_ok()) {
+                std::fs::copy(entry.path(), dest)?;
+            }
         }
     }
     Ok(())
@@ -751,6 +779,51 @@ mod tests {
         assert!(copy.game_dir.join("options.txt").is_file());
         assert!(repo.get(&inst.id).await.unwrap().is_some());
         assert_eq!(repo.list().await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn duplicate_shares_jars_but_never_mutable_state() {
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("Original")).await.unwrap();
+        std::fs::write(inst.game_dir.join("mods").join("a.jar"), b"jar").unwrap();
+        std::fs::create_dir_all(inst.game_dir.join("config")).unwrap();
+        std::fs::write(inst.game_dir.join("config").join("a.toml"), b"v=1").unwrap();
+
+        let copy = repo.duplicate(&inst.id).await.unwrap();
+        // Cambiar el estado de la copia no toca el original (config nunca se enlaza).
+        std::fs::write(copy.game_dir.join("config").join("a.toml"), b"v=2").unwrap();
+        assert_eq!(std::fs::read(inst.game_dir.join("config").join("a.toml")).unwrap(), b"v=1");
+        // Borrar el jar original no afecta a la copia.
+        std::fs::remove_file(inst.game_dir.join("mods").join("a.jar")).unwrap();
+        assert_eq!(std::fs::read(copy.game_dir.join("mods").join("a.jar")).unwrap(), b"jar");
+    }
+
+    /// En Windows un archivo que otro programa mantiene abierto (Java con su registro, el antivirus, la ventana
+    /// de errores de un mod) no se puede borrar. Eliminar la instancia debe funcionar igualmente: se borra todo
+    /// lo demas y el resto se limpia cuando se libere.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn delete_succeeds_while_another_program_holds_a_file() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let (_d, repo) = repo();
+        let inst = repo.create(new_instance("Bloqueada")).await.unwrap();
+        std::fs::write(inst.game_dir.join("mods").join("a.jar"), b"jar").unwrap();
+        let log = inst.game_dir.join("logs").join("latest.log");
+        std::fs::create_dir_all(log.parent().unwrap()).unwrap();
+        std::fs::write(&log, b"x").unwrap();
+        let held = std::fs::OpenOptions::new().write(true).share_mode(3).open(&log).unwrap();
+
+        repo.delete(&inst.id).await.expect("eliminar no debe fallar por un archivo en uso");
+        assert!(repo.get(&inst.id).await.unwrap().is_none(), "la instancia ya no aparece");
+        assert!(repo.list().await.unwrap().is_empty());
+        assert!(!inst.game_dir.join("mods").exists(), "lo que no estaba en uso se borro");
+        let dir = repo.instance_dir(&inst.id).unwrap();
+        assert!(dir.exists(), "queda solo lo bloqueado");
+
+        assert_eq!(repo.remove_leftovers().await, 0, "mientras siga abierto no se puede");
+        drop(held);
+        assert_eq!(repo.remove_leftovers().await, 1);
+        assert!(!dir.exists());
     }
 
     #[tokio::test]

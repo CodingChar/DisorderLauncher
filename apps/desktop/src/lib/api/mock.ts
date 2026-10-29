@@ -43,6 +43,7 @@ let mockThemes: any[] = [
     density: { uiScale: 1, compact: false }, effects: { shadowStrength: 0.2, animations: true } },
 ]
 const installedMods = new Map<string, any[]>()
+let storageReclaimable = 48_000_000
 const pendingUpdates = new Set<string>()
 let settings = { schemaVersion: 1, theme: 'system', downloadProfile: 'normal', themeId: null as string | null, microsoftClientId: null as string | null, javaPath: null as string | null }
 
@@ -195,8 +196,6 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return 'LocalReady'
     }
     case 'accounts_remove': {
-      const using = instances.filter((i) => i.profileId === args.id).length
-      if (using > 0) throw `Este perfil lo usan ${using} instancia(s). Cambia el perfil de esas instancias antes de quitarlo.`
       accounts = accounts.filter((a) => a.id !== args.id)
       if (defaultId === args.id) defaultId = accounts[0]?.id ?? null
       return null
@@ -269,7 +268,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return {
         supported: !!inst && inst.loader !== 'vanilla',
         mods: mods.map(({ needsApi: _n, ...m }) => m),
-        missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, requires: 'Fabric API' }] : [],
+        missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, id: 'fabric-api', requires: 'Fabric API' }] : [],
       }
     }
     case 'mods_set_enabled': {
@@ -295,6 +294,15 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       ]
       const q = String(args.query ?? '').toLowerCase()
       return all.filter((h) => !q || h.title.toLowerCase().includes(q))
+    }
+    case 'mods_install_missing': {
+      const list = installedMods.get(args.id) ?? []
+      const needsApi = list.some((m) => m.enabled && m.needsApi) && !list.some((m) => m.enabled && m.name === 'Fabric API')
+      await sleep(400)
+      if (!needsApi) return { installed: [], unresolved: [] }
+      list.push({ fileName: 'fabric-api.jar', enabled: true, name: 'Fabric API', version: '1.0.0', description: null, size: 2100000, source: { projectId: 'P7dR8mSH', versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi: false })
+      installedMods.set(args.id, list)
+      return { installed: [{ projectId: 'P7dR8mSH', title: 'Fabric API', versionNumber: '1.0.0', file: 'fabric-api.jar', isDependency: true }], unresolved: [] }
     }
     case 'mods_install': {
       const list = installedMods.get(args.id) ?? []
@@ -347,6 +355,32 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
     }
     case 'modpacks_export':
       return { remoteFiles: 12, bundledFiles: 5 }
+    case 'dpack_export': {
+      for (let i = 0; i <= 10; i++) {
+        emit('install://progress', { instanceId: args.id, phase: 'export7z', completed: i * 3, total: 30 })
+        await sleep(60)
+      }
+      return { files: 30, bytes: 48_000_000 }
+    }
+    case 'store_summary':
+      return { storeBytes: 312_000_000, sharedBytes: 640_000_000, reclaimableBytes: storageReclaimable }
+    case 'store_cleanup': {
+      const freed = storageReclaimable
+      storageReclaimable = 0
+      return { freedBytes: freed }
+    }
+    case 'dpack_import': {
+      if (!defaultId) throw 'Primero crea un perfil para poder jugar.'
+      const id = `inst_${++counter}`
+      for (let i = 0; i <= 10; i++) {
+        emit('install://progress', { instanceId: id, phase: 'import7z', completed: i * 3, total: 30 })
+        await sleep(80)
+      }
+      const now = new Date().toISOString()
+      const inst: Instance = { id, name: 'Instancia importada', minecraftVersion: '1.21.1', loader: 'fabric', loaderVersion: '0.16.10', profileId: defaultId, java: { mode: 'auto' }, memory: { mode: 'auto' }, icon: null, optimization: 'off', jvmTweaks: [], jvmArgs: '', createdAt: now, updatedAt: now }
+      instances = [...instances, inst]
+      return inst
+    }
     case 'skins_list':
       return mockSkins.map((s) => s.asset)
     case 'skins_import': {

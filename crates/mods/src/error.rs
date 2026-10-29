@@ -18,6 +18,8 @@ pub enum ModError {
     NotFound,
     #[error("Necesita {0}, que no esta disponible para tu version")]
     MissingDependency(String),
+    #[error("error del almacen: {0}")]
+    Store(#[from] artifact_store::ArtifactError),
     #[error("origen de descarga no permitido")]
     UntrustedSource,
     #[error("la descarga no trae un archivo utilizable")]

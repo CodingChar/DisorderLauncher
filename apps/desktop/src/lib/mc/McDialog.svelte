@@ -37,12 +37,15 @@
   let layer = $state<HTMLDivElement>()
 
   const MSG_W = 280
-  const bodyLines = $derived(scroll && message ? wrap(message, MSG_W - 14).map((text, id) => ({ id, text })) : [])
+  // Un mensaje que no cabe pasa solo a una lista con scroll: nunca se corta.
+  const fitLines = $derived(Math.max(1, Math.floor((gui.H - 110) / 10)))
+  const useScroll = $derived(scroll || (!!message && wrap(message, MSG_W - 1).length > Math.min(8, fitLines)))
+  const bodyLines = $derived(useScroll && message ? wrap(message, MSG_W - 18).map((text, id) => ({ id, text })) : [])
   // Alto del cuerpo: lineas de texto, o la banda con scroll (nunca mas de lo que cabe en pantalla).
   const bodyHeight = $derived(
-    !message ? 0 : scroll ? Math.min(bodyLines.length * 10 + 8, gui.H - 96) : Math.min(wrap(message, MSG_W - 1, 8).length, Math.max(1, Math.floor((gui.H - 110) / 10))) * 10,
+    !message ? 0 : useScroll ? Math.min(bodyLines.length * 10 + 8, gui.H - 96) : Math.min(wrap(message, MSG_W - 1, 8).length, fitLines) * 10,
   )
-  const lineCount = $derived(scroll ? 0 : bodyHeight / 10)
+  const lineCount = $derived(useScroll ? 0 : bodyHeight / 10)
   // Bloque centrado: titulo (9) + hueco + cuerpo + hueco + botones (20).
   const total = $derived(9 + 8 + bodyHeight + (bodyHeight ? 14 : 0) + 20)
   const top = $derived(topAligned ? 16 : Math.max(14, (gui.H - total) >> 1))
@@ -108,7 +111,7 @@
   <span id="{uid}-title" class="sr-only">{title}</span>
   {#if message}<span id="{uid}-msg" class="sr-only">{message}</span>{/if}
   <div class="mc-label" style="left:calc(var(--cx) * 1px);top:{top}px" aria-hidden="true"><BitmapText text={title} center sr={false} /></div>
-  {#if message && scroll}
+  {#if message && useScroll}
     <McList
       items={bodyLines}
       getId={(l) => String(l.id)}
@@ -119,10 +122,11 @@
       h={bodyHeight}
       rowHeight={10}
       selectable={false}
+      expandable={false}
       ariaLabel={title}
     />
   {:else if message}
-    <McText text={message} x={-(MSG_W >> 1)} y={messageY} w={MSG_W} align="center" color="#a0a0a0" maxLines={lineCount} sr={false} />
+    <McText text={message} x={-(MSG_W >> 1)} y={messageY} w={MSG_W} align="center" color="#a0a0a0" maxLines={lineCount} sr={false} expandable={false} />
   {/if}
   {#each buttons as button, i (i)}
     <McButton label={button.label} x={layout[i].x} w={layout[i].w} y={buttonsY} onclick={button.onclick} />

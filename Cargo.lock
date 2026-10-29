@@ -8,6 +8,7 @@ version = "0.1.1"
 dependencies = [
  "async-trait",
  "chrono",
+ "fs-safe",
  "identity-api",
  "serde",
  "serde_json",
@@ -89,6 +90,19 @@ name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+
+[[package]]
+name = "artifact-store"
+version = "0.1.1"
+dependencies = [
+ "fs-safe",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+]
 
 [[package]]
 name = "async-broadcast"
@@ -1040,6 +1054,7 @@ dependencies = [
 name = "download-manager"
 version = "0.1.1"
 dependencies = [
+ "fs-safe",
  "reqwest 0.12.28",
  "sha1 0.10.7",
  "tempfile",
@@ -1048,6 +1063,20 @@ dependencies = [
  "tracing",
  "url",
  "zip",
+]
+
+[[package]]
+name = "dpack"
+version = "0.1.1"
+dependencies = [
+ "artifact-store",
+ "fs-safe",
+ "serde",
+ "serde_json",
+ "sevenz-rust2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
 ]
 
 [[package]]
@@ -1316,6 +1345,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs-safe"
+version = "0.1.1"
+dependencies = [
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2132,6 +2170,7 @@ version = "0.1.1"
 dependencies = [
  "async-trait",
  "chrono",
+ "fs-safe",
  "jvm-tuning",
  "serde",
  "serde_json",
@@ -2178,6 +2217,7 @@ name = "java-runtime"
 version = "0.1.1"
 dependencies = [
  "download-manager",
+ "fs-safe",
  "reqwest 0.12.28",
  "serde",
  "sha2 0.10.9",
@@ -2385,11 +2425,14 @@ name = "launcher-core"
 version = "0.1.1"
 dependencies = [
  "account-storage",
+ "artifact-store",
  "async-trait",
  "chrono",
  "credential-store",
  "diagnostics",
  "download-manager",
+ "dpack",
+ "fs-safe",
  "identity-api",
  "identity-local",
  "identity-microsoft",
@@ -2506,6 +2549,7 @@ version = "0.1.1"
 dependencies = [
  "async-trait",
  "download-manager",
+ "fs-safe",
  "instance-manager",
  "minecraft-launch",
  "minecraft-meta",
@@ -2534,6 +2578,12 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+
+[[package]]
+name = "lzma-rust2"
+version = "0.16.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca93e534d1142d1d0dcca6d25fe302508a5dfb40b302802904577725ea0b695b"
 
 [[package]]
 name = "lzma-rust2"
@@ -2621,6 +2671,7 @@ dependencies = [
 name = "minecraft-meta"
 version = "0.1.1"
 dependencies = [
+ "fs-safe",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -2666,6 +2717,7 @@ name = "modpacks"
 version = "0.1.1"
 dependencies = [
  "download-manager",
+ "fs-safe",
  "instance-manager",
  "mods",
  "reqwest 0.12.28",
@@ -2685,9 +2737,11 @@ dependencies = [
 name = "mods"
 version = "0.1.1"
 dependencies = [
+ "artifact-store",
  "async-trait",
  "chrono",
  "download-manager",
+ "fs-safe",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4035,6 +4089,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sevenz-rust2"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29225600349ef74beda5a9fffb36ac660a24613c0bde9315d0c49be1d51e9c24"
+dependencies = [
+ "crc32fast",
+ "js-sys",
+ "lzma-rust2 0.16.5",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4127,6 +4193,7 @@ version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
+ "fs-safe",
  "png 0.17.16",
  "serde",
  "serde_json",
@@ -4788,6 +4855,7 @@ dependencies = [
 name = "themes"
 version = "0.1.1"
 dependencies = [
+ "fs-safe",
  "serde",
  "serde_json",
  "tempfile",
@@ -6215,7 +6283,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hmac",
  "indexmap 2.14.2",
- "lzma-rust2",
+ "lzma-rust2 0.22.0",
  "memchr",
  "nix",
  "pbkdf2",

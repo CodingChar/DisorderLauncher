@@ -203,9 +203,7 @@ impl LoaderProvider for ProfileProvider {
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let part = path.with_extension("json.part");
-        tokio::fs::write(&part, &bytes).await?;
-        tokio::fs::rename(&part, &path).await?;
+        fs_safe::write_atomic(&path, &bytes).await?;
 
         Ok(InstalledLoader { overlay: overlay_from_profile(&profile), profile_id: profile.id })
     }

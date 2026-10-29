@@ -266,6 +266,23 @@ button {
   white-space: nowrap;
 }
 
+.mc-more {
+  position: absolute;
+  /* El relleno agranda la zona de clic sin mover el texto. */
+  margin: -3px 0 0;
+  padding: 3px 3px 3px 0;
+  border: 0;
+  background: transparent;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.mc-more:hover,
+.mc-more:focus-visible {
+  background: rgba(255, 255, 85, 0.25);
+  outline: 1px solid #ffff55;
+}
+
 .mc-label.block .bitmap-label {
   display: block;
 }

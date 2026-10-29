@@ -138,6 +138,14 @@ export function fitText(text: string | null | undefined, max: number): string {
   return chars.slice(0, Math.max(1, keep)).join('') + ELLIPSIS
 }
 
+/** `true` si `BitmapText` con `max` tendria que acortar este texto con «...». */
+export function isTruncated(text: string | null | undefined, max: number): boolean {
+  return max > 0 && stringWidth(normalizeText(text)) > max - 1
+}
+
+/** Ancho que ocupa la marca «[+]» (con un pixel de hueco a cada lado). */
+export const MORE_WIDTH = 17
+
 /** Conserva el final del texto (campos de entrada: se ve lo ultimo escrito). */
 export function tailText(text: string | null | undefined, max: number): string {
   const chars = [...normalizeText(text)]

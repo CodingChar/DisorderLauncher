@@ -20,7 +20,7 @@ export interface AuditProblem {
 }
 
 const CONTROLS = 'button:not(:disabled), input:not(:disabled), [role="slider"], [role="listbox"]'
-const CONTAINERS = '.mc-button, .mc-field, .mc-slider, .mc-row, .mc-list, .mc-dialog-layer'
+const CONTAINERS = '.mc-button, .mc-field, .mc-slider, .mc-row, .mc-list, .mc-dialog-layer, .mc-more'
 const MEASURED = '.mc-button, .mc-field, .mc-slider, .mc-list, .mc-label, .mc-row, .mc-viewport, .mc-progress, .mc-icon-cell, .mc-swatch'
 
 const box = (el: Element): Box => {

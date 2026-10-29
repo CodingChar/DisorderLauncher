@@ -8,7 +8,6 @@
 //! - perfil o Java elegido que ya no existen: se informan para que la persona elija otro (nunca se cambian solos).
 
 use crate::{Launcher, LauncherError};
-use account_storage::AccountRepository;
 use instance_manager::{FolderProblemKind, Instance, InstanceRepository, JavaSelection};
 use serde::Serialize;
 use std::path::Path;
@@ -71,7 +70,7 @@ impl IntegrityIssue {
     pub fn notice(&self) -> Option<String> {
         let name = if self.name.is_empty() { "una instancia".to_string() } else { format!("«{}»", self.name) };
         match self.kind {
-            IssueKind::ProfileMissing => Some(format!("A {name} le falta su perfil. Editala y elige otro perfil para poder jugar.")),
+            IssueKind::ProfileMissing => Some(format!("No hay un perfil para jugar {name}. Crea o elige uno en Perfiles.")),
             IssueKind::JavaMissing => Some(format!("A {name} le falta el Java que elegiste. Editala y vuelve a elegir Java.")),
             IssueKind::ImportRolledBack => Some("Se deshizo una importacion de modpack que quedo a medias. Puedes importarla de nuevo.".to_string()),
             IssueKind::Unreadable => Some("Hay una instancia que no se pudo leer. Se dejo como estaba, sin tocarla.".to_string()),
@@ -101,8 +100,10 @@ impl Launcher {
             }
             match problem.kind {
                 FolderProblemKind::Orphan => {
-                    if self.instances.remove_orphan(&problem.id).await.unwrap_or(false) {
-                        report.issues.push(issue(&problem.id, "", IssueKind::LeftoverRemoved, true));
+                    match self.instances.remove_orphan(&problem.id).await {
+                        Ok(true) => report.issues.push(issue(&problem.id, "", IssueKind::LeftoverRemoved, true)),
+                        Ok(false) => {}
+                        Err(e) => tracing::warn!(instance = %problem.id, error = %e, "no se pudo quitar una carpeta sobrante"),
                     }
                 }
                 FolderProblemKind::Unreadable(detail) => {
@@ -111,6 +112,9 @@ impl Launcher {
                 }
             }
         }
+
+        // Lo que siga bloqueado (el juego o su ventana de errores abiertos) se reintenta en segundo plano.
+        self.finish_leftovers_later().await;
 
         for instance in self.instances.list().await? {
             if self.is_busy(&instance.id) {
@@ -136,9 +140,9 @@ impl Launcher {
             report.issues.push(issue(id, name, IssueKind::LayoutRepaired, true));
         }
 
-        match self.accounts.get(&instance.profile_id).await {
-            Ok(Some(_)) => {}
-            Ok(None) => report.issues.push(issue(id, name, IssueKind::ProfileMissing, false)),
+        match self.owner_account(instance).await {
+            Ok(_) => {}
+            Err(LauncherError::ProfileMissing) => report.issues.push(issue(id, name, IssueKind::ProfileMissing, false)),
             // Un fallo de lectura pasajero no es un perfil faltante: se registra y no se avisa.
             Err(e) => tracing::warn!(instance = %id, error = %e, "no se pudo leer el perfil de la instancia"),
         }

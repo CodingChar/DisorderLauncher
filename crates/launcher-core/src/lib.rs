@@ -1,4 +1,6 @@
+mod crash_assistant;
 mod crash_hints;
+mod dpack_ops;
 mod error;
 mod events;
 mod external_versions;
@@ -15,9 +17,11 @@ mod registry;
 mod settings;
 mod skin_pack;
 mod skins_ops;
+mod store_ops;
 mod themes_ops;
 mod version_catalog;
 
+pub use dpack_ops::*;
 pub use error::*;
 pub use events::*;
 pub use external_versions::{default_minecraft_dir, display_version, ExternalKind, ExternalScan, ExternalVersion, CUSTOM_PREFIX};
@@ -32,4 +36,5 @@ pub use paths::*;
 pub use recommendation::Recommendation;
 pub use registry::*;
 pub use settings::*;
+pub use store_ops::*;
 pub use version_catalog::{CatalogSource, VersionCatalog};

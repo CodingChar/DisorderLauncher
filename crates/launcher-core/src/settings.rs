@@ -111,14 +111,15 @@ pub async fn save_settings(path: &Path, settings: &Settings) -> Result<(), Launc
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let part = path.with_extension("json.part");
-        tokio::fs::write(&part, serde_json::to_string_pretty(settings)?).await?;
-        tokio::fs::rename(&part, path).await?;
+        fs_safe::write_atomic(path, serde_json::to_string_pretty(settings)?).await?;
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     };
     write.await.map_err(|e| {
         tracing::error!(error = %e, "no se pudieron guardar los ajustes");
-        LauncherError::Storage
+        match e.downcast_ref::<std::io::Error>() {
+            Some(io) => LauncherError::from_io(io),
+            None => LauncherError::Storage,
+        }
     })
 }
 

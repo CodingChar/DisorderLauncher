@@ -5,7 +5,7 @@
 Lee TODOS los .md en `docs/spec/` antes de modificar codigo.
 
 **Interfaz estilo Minecraft (vigente desde 2026-10-18)**: antes de tocar `apps/desktop/src` lee `docs/UI_MIGRATION_MINECRAFT.md` (reglas, componentes, mapa y verificacion).
-`docs/UI_MIGRATION.md` (reforma moderna anterior) es historico. La fuente de verdad del estilo son `apps/desktop/src/lib/mc/` y `src/mc/*.css`.
+La fuente de verdad del estilo son `apps/desktop/src/lib/mc/` y `src/mc/*.css`.
 
 ## Prioridad de autenticacion
 
@@ -66,8 +66,6 @@ Estilo: escenario en pixeles de GUI con componentes `Mc*` y texto bitmap (nada d
 docs/spec/           especificacion tecnica (00-13)
 docs/adr/            decisiones arquitectonicas
 docs/UI_MIGRATION_MINECRAFT.md interfaz estilo Minecraft: reglas, componentes y estado
-DisorderLauncherUI/  maqueta visual (solo referencia, no se importa)
-docs/reference/      HTML de referencia visual
 theme_examples/      JSON de temas de ejemplo
 ```
 

@@ -54,3 +54,25 @@ it('la primera carga conserva las instancias que aun no estaban en memoria', asy
   expect(instances.list.map((item) => item.id)).toEqual(['a', 'b'])
   expect(list).toHaveBeenCalledTimes(1)
 })
+
+it('importar un paquete .7z añade y selecciona la instancia; cancelar no cambia nada', async () => {
+  vi.spyOn(api, 'dpackImport').mockResolvedValueOnce(make('p', 'Pack')).mockResolvedValueOnce(null)
+  const imported = await instances.importDpack()
+  expect(imported?.id).toBe('p')
+  expect(instances.selectedId).toBe('p')
+  expect(instances.list.map((item) => item.id)).toEqual(['a', 'p'])
+  expect(instances.importPercent).toBeNull()
+
+  expect(await instances.importDpack()).toBeNull()
+  expect(instances.list).toHaveLength(2)
+  expect(instances.importPercent).toBeNull()
+})
+
+it('exportar un paquete .7z libera el avance aunque falle', async () => {
+  const exported = vi.spyOn(api, 'dpackExport').mockResolvedValueOnce({ files: 3, bytes: 10 }).mockRejectedValueOnce(new Error('sin espacio'))
+  expect(await instances.exportDpack('a', false)).toEqual({ files: 3, bytes: 10 })
+  expect(instances.exportPercent).toBeNull()
+  await expect(instances.exportDpack('a', true)).rejects.toThrow('sin espacio')
+  expect(instances.exportPercent).toBeNull()
+  expect(exported).toHaveBeenLastCalledWith('a', true)
+})

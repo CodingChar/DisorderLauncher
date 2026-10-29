@@ -124,9 +124,7 @@ impl SkinLibrary {
         index.schema_version = SCHEMA_VERSION;
         tokio::fs::create_dir_all(&self.root).await?;
         let path = self.index_path();
-        let part = path.with_extension("json.part");
-        tokio::fs::write(&part, serde_json::to_string_pretty(&index)?).await?;
-        tokio::fs::rename(&part, &path).await?;
+        fs_safe::write_atomic(&path, serde_json::to_string_pretty(&index)?).await?;
         Ok(())
     }
 
@@ -150,9 +148,7 @@ impl SkinLibrary {
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let part = path.with_extension("png.part");
-        tokio::fs::write(&part, &checked.png).await?;
-        tokio::fs::rename(&part, &path).await?;
+        fs_safe::write_atomic(&path, &checked.png).await?;
 
         let now = Utc::now();
         let asset = SkinAsset {
@@ -190,9 +186,7 @@ impl SkinLibrary {
         let entry = index.skins.iter_mut().find(|s| s.id == id).ok_or(SkinError::NotFound)?;
 
         let path = self.asset_path(id)?;
-        let part = path.with_extension("png.part");
-        tokio::fs::write(&part, &checked.png).await?;
-        tokio::fs::rename(&part, &path).await?;
+        fs_safe::write_atomic(&path, &checked.png).await?;
 
         entry.width = checked.width;
         entry.height = checked.height;

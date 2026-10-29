@@ -59,14 +59,37 @@ pub enum LauncherError {
     #[error("Ya hay un inicio de sesion en curso.")]
     LoginInProgress,
 
-    #[error("Este perfil lo usan {0} instancia(s). Cambia el perfil de esas instancias antes de quitarlo.")]
-    ProfileInUse(usize),
-
     #[error("No se encontro el perfil.")]
     AccountNotFound,
 
     #[error("No se pudo leer o guardar la informacion del launcher.")]
     Storage,
+
+    #[error("Hay archivos en uso por otro programa (el juego, su ventana de errores o el antivirus). Cierralos e intentalo de nuevo.")]
+    FilesInUse,
+
+    #[error("No hay espacio suficiente en el disco.")]
+    DiskFull,
+
+    #[error("Windows no dejo acceder a la carpeta del launcher. Comprueba los permisos o que el antivirus no la bloquee.")]
+    AccessDenied,
+}
+
+impl LauncherError {
+    /// Error de disco con la causa que la persona puede resolver: archivo en uso, disco lleno o permisos.
+    /// El detalle tecnico va al registro; el mensaje es el de la causa, no un «no se pudo guardar» generico.
+    pub fn from_io(error: &std::io::Error) -> Self {
+        tracing::error!(error = %error, kind = ?error.kind(), os = ?error.raw_os_error(), "error de disco");
+        if fs_safe::is_in_use(error) {
+            Self::FilesInUse
+        } else if error.kind() == std::io::ErrorKind::StorageFull {
+            Self::DiskFull
+        } else if error.kind() == std::io::ErrorKind::PermissionDenied {
+            Self::AccessDenied
+        } else {
+            Self::Storage
+        }
+    }
 }
 
 /// Que accion puede ofrecer la interfaz ante un fallo.
@@ -95,6 +118,9 @@ impl LauncherError {
 
 impl From<account_storage::StorageError> for LauncherError {
     fn from(e: account_storage::StorageError) -> Self {
+        if let account_storage::StorageError::Io(io) = &e {
+            return Self::from_io(io);
+        }
         tracing::error!(error = %e, "error de almacenamiento de cuentas");
         Self::Storage
     }
@@ -106,6 +132,7 @@ impl From<instance_manager::InstanceError> for LauncherError {
         match e {
             E::NotFound(_) | E::InvalidId => Self::InstanceNotFound,
             E::Invalid(msg) => Self::InvalidInput(msg),
+            E::Io(io) => Self::from_io(&io),
             other => {
                 tracing::error!(error = %other, "error de almacenamiento de instancias");
                 Self::Storage
@@ -218,5 +245,20 @@ impl From<loaders::LoaderError> for LauncherError {
             E::NoVersionFor(_) => Self::LoaderUnavailable("Ese cargador de mods".into()),
             _ => Self::InstallFailed,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+
+    #[test]
+    fn disk_errors_explain_what_the_person_can_do() {
+        assert!(matches!(LauncherError::from_io(&io::Error::from_raw_os_error(32)), LauncherError::FilesInUse));
+        assert!(matches!(LauncherError::from_io(&io::Error::from(io::ErrorKind::StorageFull)), LauncherError::DiskFull));
+        assert!(matches!(LauncherError::from_io(&io::Error::from(io::ErrorKind::PermissionDenied)), LauncherError::AccessDenied));
+        assert!(matches!(LauncherError::from_io(&io::Error::from(io::ErrorKind::NotFound)), LauncherError::Storage));
+        assert!(LauncherError::FilesInUse.to_string().contains("en uso"));
     }
 }

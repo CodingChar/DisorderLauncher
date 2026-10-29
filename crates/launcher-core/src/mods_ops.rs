@@ -4,7 +4,7 @@
 use crate::{Launcher, LauncherError};
 use instance_manager::{Instance, InstanceRepository, LoaderKind};
 use mods::{
-    InstalledMod, InstanceTarget, MissingDependency, ModEntry, ModError, ModManager, ProjectHit, UpdateInfo,
+    DependencyReport, InstalledMod, InstanceTarget, MissingDependency, ModEntry, ModError, ModManager, ProjectHit, UpdateInfo,
 };
 use serde::Serialize;
 use std::path::Path;
@@ -45,6 +45,7 @@ impl From<ModError> for LauncherError {
             ModError::NotAMod => Self::InvalidInput("Ese archivo no es un mod valido (Fabric, Quilt, Forge o NeoForge).".into()),
             ModError::InvalidFileName => Self::InvalidInput("Nombre de archivo no valido.".into()),
             ModError::NotFound => Self::InvalidInput("No se encontro ese mod.".into()),
+            ModError::Io(io) => Self::from_io(&io),
             _ => Self::Storage,
         }
     }
@@ -109,7 +110,9 @@ impl Launcher {
         self.ensure_idle(instance_id)?;
         let (instance, manager) = self.mod_context(instance_id).await?;
         Self::require_mod_support(&instance)?;
-        Ok(manager.add_local(source).await?)
+        let entry = manager.add_local(source).await?;
+        self.adopt_game_dir(instance_id, &instance.game_dir).await;
+        Ok(entry)
     }
 
     pub async fn mods_search(&self, instance_id: &str, query: &str, page: u32) -> Result<Vec<ProjectHit>, LauncherError> {
@@ -130,6 +133,19 @@ impl Launcher {
         let target = InstanceTarget { minecraft_version: &instance.minecraft_version, loader: &loader };
         let concurrency = self.settings().download_profile.concurrency();
         Ok(self.mods_service.install(&manager, project_id, target, concurrency).await?)
+    }
+
+    /// Instala de golpe lo que los mods de la instancia piden y no esta (p. ej. Fabric API). Lo que no se encuentra
+    /// para esta version se devuelve aparte; nunca se instala nada a medias.
+    pub async fn mods_install_missing(&self, instance_id: &str) -> Result<DependencyReport, LauncherError> {
+        let _turn = self.mods_guard(instance_id).await;
+        self.ensure_idle(instance_id)?;
+        let (instance, manager) = self.mod_context(instance_id).await?;
+        Self::require_mod_support(&instance)?;
+        let loader = loader_name(instance.loader);
+        let target = InstanceTarget { minecraft_version: &instance.minecraft_version, loader: &loader };
+        let concurrency = self.settings().download_profile.concurrency();
+        Ok(self.mods_service.install_missing(&manager, target, concurrency).await?)
     }
 
     pub async fn mods_check_updates(&self, instance_id: &str) -> Result<Vec<UpdateInfo>, LauncherError> {

@@ -202,7 +202,7 @@ fn write_package(dest: &Path, index: &ModpackIndex, game_dir: &Path, bundled: &[
         }
     }
     zip.finish()?;
-    std::fs::rename(&part, dest)?;
+    fs_safe::rename_blocking(&part, dest)?;
     Ok(())
 }
 
