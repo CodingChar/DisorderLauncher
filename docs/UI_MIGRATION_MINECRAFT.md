@@ -95,7 +95,7 @@ Texturas y fuente inspiradas en Minecraft, © Mojang. DisorderLauncher no está 
 ## Sonido de interfaz
 
 - Modulo unico: `apps/desktop/src/lib/audio/sfx.ts` (Web Audio, buffers decodificados al arrancar via `preloadCore`). Uso: `playSfx('click' | 'back')`.
-- Efectos en `apps/desktop/public/assets/sounds/` (copia de `launcher_music/`). Para anadir uno: copiar el mp3 y registrarlo en `SOUNDS`.
+- Efectos en `apps/desktop/public/assets/sounds/`. Para anadir uno: copiar el mp3 y registrarlo en `SOUNDS`.
 - `McButton` suena solo (`sound="auto"`): etiquetas Atras/Volver/Cancelar/Salir/Cerrar/Hecho/No -> `back`, el resto -> `click`. `sound="none"` lo silencia. `McList` (fila), `McIconGrid`, `McTabs` y `McToggle`/`McCycle` heredan el clic.
 - Esc: `App.svelte` y `McDialog` reproducen `back`.
 - Volumen: deslizador en Ajustes; se guarda en `localStorage` (`disorder.sfxVolume`).

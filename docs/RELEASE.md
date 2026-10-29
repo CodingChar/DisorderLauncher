@@ -52,3 +52,13 @@ Cuando existan: anadir el plugin, declarar `pubkey` y `endpoints` en `tauri.conf
 ## Datos del usuario
 
 Directorio de datos: `app_data_dir` de Tauri (en Windows `%APPDATA%\com.disorderlauncher.app`). Desinstalar la app **no** borra ese directorio. Contiene perfiles, instancias, skins, temas y ajustes; los secretos de Microsoft estan en el almacen seguro del sistema (Credential Manager / Keychain / Secret Service), no en archivos.
+
+## Publicar en GitHub y en la web
+
+La landing (`landing/`) siempre ofrece la ultima release: los botones apuntan a `releases/latest/download/DisorderLauncher_x64-setup.exe` y `landing/script.js` lee `releases/latest` para mostrar version, tamano y SHA-256 (sin depender de ello para descargar). Por eso **cada release debe llevar dos copias del instalador**:
+
+```bash
+gh release create vX.Y.Z "DisorderLauncher_X.Y.Z_x64-setup.exe" "DisorderLauncher_x64-setup.exe" --latest --notes-file notas.md
+```
+
+`DisorderLauncher_x64-setup.exe` es el mismo archivo con nombre sin version. La landing solo cambia si se edita `landing/`; entonces lanzar el workflow "Landing (GitHub Pages)".

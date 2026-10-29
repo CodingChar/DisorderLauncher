@@ -12,7 +12,7 @@ DisorderLauncher es un proyecto independiente. **No está afiliado, respaldado n
 |---|---|
 | `apps/desktop/public/assets/` (`ascii.png`, `button*.png`, `widgets.png`, `options_background.png`, `world_selection.png`, `unknown_server.png`, `splashes.txt`) | Texturas, fuente bitmap y textos de la interfaz de Minecraft |
 | `apps/desktop/public/assets/panorama/` | Panorama del menú principal |
-| `apps/desktop/public/assets/sounds/`, `launcher_music/` | Sonidos de clic y de volver |
+| `apps/desktop/public/assets/sounds/` | Sonidos de clic y de volver |
 | `minecraft_iconos_emblematicos/` | Iconos de objetos de Minecraft (origen: [destruc7i0n/minecraft-textures](https://github.com/destruc7i0n/minecraft-textures), texturas de la 1.16) |
 | `landing/assets/` | Copias de varios de los archivos anteriores y capturas de pantalla del launcher |
 

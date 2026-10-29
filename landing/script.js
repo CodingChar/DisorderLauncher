@@ -1,5 +1,6 @@
 // Enlaza los botones de descarga con el instalador de la última versión publicada.
-// Si la API de GitHub no responde, los botones siguen apuntando a la página de versiones.
+// Los botones ya apuntan a "releases/latest/download/<nombre fijo>", que GitHub resuelve siempre a la última
+// versión sin usar la API; esta consulta solo añade el número de versión, el tamaño y el SHA-256.
 (function () {
   "use strict";
 
@@ -29,7 +30,8 @@
   }
 
   fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {
-    headers: { Accept: "application/vnd.github+json" }
+    headers: { Accept: "application/vnd.github+json" },
+    cache: "no-cache"
   })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("sin versiones")); })
     .then(function (release) {
