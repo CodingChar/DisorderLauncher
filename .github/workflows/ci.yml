@@ -68,6 +68,9 @@ jobs:
   audit:
     name: Auditoria de dependencias Rust
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # la action publica el resultado como check
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2

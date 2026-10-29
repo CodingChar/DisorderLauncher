@@ -1078,10 +1078,10 @@ async fn storage_cleanup_frees_only_what_no_instance_uses() {
 
     let summary = launcher.store_summary().await.unwrap();
     assert_eq!((summary.store_bytes, summary.shared_bytes, summary.reclaimable_bytes), (2148, 2048, 0));
-    // Lo recien llegado esta en gracia: aunque ya no se use, todavia no se libera.
+    // Un objeto que ninguna instancia usa se libera al momento (no hay gracia por fecha; ver ADR-003).
     std::fs::remove_file(a.game_dir.join("mods").join("solo-a.jar")).unwrap();
     launcher.store_adopt_instance(&a.id).await.unwrap();
-    assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 0);
+    assert_eq!(launcher.store_cleanup().await.unwrap().freed_bytes, 100);
 
     // Borrar una instancia no toca los mods que otra sigue usando.
     launcher.instances_delete(&a.id).await.unwrap();
