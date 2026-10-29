@@ -180,7 +180,8 @@ mod tests {
     const LIGHT: &str = include_str!("../../../theme_examples/default-light.theme.json");
 
     fn with(replacements: &[(&str, &str)]) -> String {
-        let mut s = DARK.to_string();
+        // En Windows git puede descargar los ejemplos con CRLF; los patrones de los tests usan LF.
+        let mut s = DARK.replace("\r\n", "\n");
         for (from, to) in replacements {
             assert!(s.contains(from), "no esta {from} en el ejemplo");
             s = s.replace(from, to);
