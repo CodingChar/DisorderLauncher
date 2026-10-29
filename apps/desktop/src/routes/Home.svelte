@@ -8,6 +8,7 @@
   import McProgress from '../lib/mc/McProgress.svelte'
   import McScreen from '../lib/mc/McScreen.svelte'
   import McText from '../lib/mc/McText.svelte'
+  import { wrap } from '../lib/mc/font'
   import { useGui } from '../lib/mc/gui'
   import type { RowSpec } from '../lib/mc/listTypes'
   import { bandWidth } from '../lib/mc/pos'
@@ -126,11 +127,31 @@
     return 'INFO'
   }
 
-  function lineRow(line: LogLine): RowSpec {
+  function lineRow(row: ConsoleRow): RowSpec {
+    return { lines: [{ text: row.text, color: row.color }] }
+  }
+
+  // Una linea del juego mas larga que la consola sigue en las filas siguientes (nada se recorta).
+  interface ConsoleRow {
+    id: string
+    text: string
+    color: string
+  }
+
+  const textWidth = $derived(bw - 17) // ancho de fila de McList (w - 10) menos el margen del texto
+  const wrapCache = new WeakMap<LogLine, { width: number; rows: ConsoleRow[] }>()
+
+  function rowsOf(line: LogLine, width: number): ConsoleRow[] {
+    const cached = wrapCache.get(line)
+    if (cached && cached.width === width) return cached.rows
     const kind = levelOf(line.text)
     const color = line.stream === 'stderr' || kind === 'ERROR' ? '#ff5555' : kind === 'WARN' ? '#ffaa00' : /\bDEBUG\b/.test(line.text) ? '#808080' : '#ffffff'
-    return { lines: [{ text: line.text, color }] }
+    const rows = wrap(line.text, width).map((text, i) => ({ id: `${line.id}.${i}`, text, color }))
+    wrapCache.set(line, { width, rows })
+    return rows
   }
+
+  const consoleRows = $derived(visible.flatMap((line) => rowsOf(line, textWidth)))
 
   const emptyText = $derived(
     filter || level !== 'all'
@@ -151,9 +172,10 @@
     <McField x={-155} y={58} w={190} bind:value={filter} placeholder="Buscar en la consola..." label="Buscar en la consola" />
     <McCycle x={39} y={58} w={116} label="Mostrar" options={levels} bind:value={level} />
     <McList
-      items={visible}
-      getId={(l) => String(l.id)}
+      items={consoleRows}
+      getId={(r) => r.id}
       row={lineRow}
+      expandable={false}
       x={-(bw >> 1)}
       y={82}
       w={bw}
