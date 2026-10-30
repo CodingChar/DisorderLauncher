@@ -646,6 +646,17 @@ impl Launcher {
         self.emit_state(id, LaunchState::Preparing);
         let plan = self.prepare_launch(instance).await?;
 
+        // Avisar de choques conocidos antes de que el juego se cierre solo; no se bloquea el lanzamiento
+        // porque una regla puede equivocarse, pero el aviso queda en la consola y en el mensaje de cierre.
+        let conflicts = self.mod_conflicts(instance).await;
+        for conflict in &conflicts {
+            tracing::warn!(first = %conflict.first, second = %conflict.second, "mods que no se llevan bien");
+            self.events.game_output(
+                OutputStream::Stdout,
+                GameOutputEvent { instance_id: id.to_string(), line: format!("[Disorder/WARN]: Aviso: {}.", conflict.sentence()) },
+            );
+        }
+
         self.emit_state(id, LaunchState::Starting);
         let mut game = ProcessRunner::launch(&plan).await?;
         self.running_guard().insert(instance.id.clone(), Some(game.killer()));
@@ -672,22 +683,46 @@ impl Launcher {
                         GameOutputEvent { instance_id: id.to_string(), line },
                     );
                 }
-                LaunchEvent::Exited { code }
-                    if code != Some(0)
-                        && watch.hint().is_some()
-                        && !self.stopping.lock().unwrap_or_else(|p| p.into_inner()).remove(id) =>
-                {
-                    let hint = watch.hint().expect("comprobado arriba");
-                    tracing::warn!(?code, ?hint, "el juego se cerro con una causa conocida");
-                    self.emit_state(
-                        id,
-                        LaunchState::Failed { message: hint.message().into(), kind: crate::ErrorKind::Other },
-                    );
+                LaunchEvent::Exited { code } => {
+                    // Quitar la marca siempre: si el usuario cerro el juego, no es un fallo.
+                    let stopped = self.stopping.lock().unwrap_or_else(|p| p.into_inner()).remove(id);
+                    let explanation = if code != Some(0) && !stopped { self.explain_exit(instance, &watch, &conflicts).await } else { None };
+                    match explanation {
+                        Some(message) => {
+                            tracing::warn!(?code, hint = ?watch.hint(), "el juego se cerro con una causa conocida");
+                            self.emit_state(id, LaunchState::Failed { message, kind: crate::ErrorKind::Other });
+                        }
+                        None => self.emit_state(id, LaunchState::Exited { code }),
+                    }
                 }
-                LaunchEvent::Exited { code } => self.emit_state(id, LaunchState::Exited { code }),
             }
         }
         Ok(())
+    }
+
+    /// Choques conocidos entre los mods activos de la instancia. Nunca falla: es solo un aviso.
+    async fn mod_conflicts(&self, instance: &Instance) -> Vec<mods::ModConflict> {
+        if !crate::mods_ops::supports_mods(instance.loader) {
+            return Vec::new();
+        }
+        mods::ModManager::new(&instance.game_dir).conflicts(&instance.minecraft_version).await.unwrap_or_default()
+    }
+
+    /// Por que se cerro el juego, en palabras simples: causa reconocida, choques entre mods y los mods de la traza.
+    async fn explain_exit(&self, instance: &Instance, watch: &crate::crash_hints::CrashWatch, conflicts: &[mods::ModConflict]) -> Option<String> {
+        let suspects = if crate::mods_ops::supports_mods(instance.loader) {
+            let entries = mods::ModManager::new(&instance.game_dir).list().await.unwrap_or_default();
+            watch
+                .jars()
+                .into_iter()
+                .filter_map(|jar| entries.iter().find(|e| e.enabled && e.file_name.eq_ignore_ascii_case(jar)))
+                .map(|e| e.name.clone())
+                .take(3)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        crate::crash_hints::explain(watch.hint(), conflicts, &suspects)
     }
 
     /// Flujo de la spec 02: instancia -> perfil -> identidad -> version -> Java -> plan.

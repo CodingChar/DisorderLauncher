@@ -1,4 +1,4 @@
-use crate::{load_lock, read_mod_meta, save_lock, LockedMod, ModError, ModMeta};
+use crate::{find_conflicts, load_lock, read_mod_meta, save_lock, LockedMod, ModConflict, ModError, ModMeta};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -107,7 +107,12 @@ impl ModManager {
                 has_previous_version: l.previous.is_some(),
             });
             entries.push(ModEntry {
-                name: meta.as_ref().map(|m| m.name.clone()).unwrap_or_else(|| base.trim_end_matches(".jar").to_string()),
+                // Sin metadatos legibles (p. ej. mods de 1.12) vale mas el titulo de Modrinth que el nombre del archivo.
+                name: meta
+                    .as_ref()
+                    .map(|m| m.name.clone())
+                    .or_else(|| lock.find_file(base).map(|l| l.title.clone()))
+                    .unwrap_or_else(|| base.trim_end_matches(".jar").to_string()),
                 version: meta.as_ref().map(|m| m.version.clone()).filter(|v| !v.is_empty()),
                 description: meta.as_ref().and_then(|m| m.description.clone()),
                 file_name,
@@ -119,6 +124,13 @@ impl ModManager {
         }
         entries.sort_by_key(|e| e.name.to_lowercase());
         Ok(entries)
+    }
+
+    /// Choques conocidos entre los mods activos (ver `find_conflicts`).
+    pub async fn conflicts(&self, minecraft_version: &str) -> Result<Vec<ModConflict>, ModError> {
+        let entries = self.list().await?;
+        let lock = load_lock(&self.lock_path()).await;
+        Ok(find_conflicts(&entries, &lock.mods, minecraft_version))
     }
 
     pub async fn set_enabled(&self, file_name: &str, enabled: bool) -> Result<String, ModError> {

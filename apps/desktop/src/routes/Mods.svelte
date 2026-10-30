@@ -75,6 +75,7 @@
     const out: { text: string; color: string; role?: 'alert' | 'status' }[] = []
     if (mods.error) out.push({ text: mods.error, color: '#ff5555', role: 'alert' })
     if (mods.notice) out.push({ text: mods.notice, color: '#55ff55', role: 'status' })
+    for (const c of overview?.conflicts ?? []) out.push({ text: `${c.first} y ${c.second} no se llevan bien: ${c.reason}. Desactiva uno de los dos.`, color: '#ff5555', role: 'alert' })
     if (running) out.push({ text: 'El juego está abierto. Cierra el juego para cambiar mods.', color: '#ffaa00', role: 'status' })
     for (const dep of overview?.missingDependencies ?? []) out.push({ text: `${dep.modName} necesita ${dep.requires}${mods.busy === 'deps' ? ': se está instalando.' : ' y no se encontró solo. Búscalo en «Buscar mods».'}`, color: '#ffaa00', role: 'alert' })
     if (tab === 'installed' && mods.updates !== null && mods.updates.length === 0) out.push({ text: 'Todos tus mods están al día.', color: '#808080', role: 'status' })

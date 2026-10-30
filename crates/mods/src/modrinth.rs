@@ -73,6 +73,15 @@ impl ModVersion {
         self.files.iter().find(|f| f.primary).or_else(|| self.files.first())
     }
 
+    /// Proyectos que el autor declara incompatibles con esta version.
+    pub fn incompatible_projects(&self) -> Vec<String> {
+        self.dependencies
+            .iter()
+            .filter(|d| d.dependency_type == "incompatible")
+            .filter_map(|d| d.project_id.clone())
+            .collect()
+    }
+
     pub fn required_dependencies(&self) -> impl Iterator<Item = &Dependency> {
         self.dependencies.iter().filter(|d| d.dependency_type == "required")
     }

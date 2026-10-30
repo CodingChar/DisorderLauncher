@@ -268,6 +268,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return {
         supported: !!inst && inst.loader !== 'vanilla',
         mods: mods.map(({ needsApi: _n, ...m }) => m),
+        conflicts: [],
         missingDependencies: needsApi ? [{ modName: mods.find((m) => m.needsApi)!.name, id: 'fabric-api', requires: 'Fabric API' }] : [],
       }
     }

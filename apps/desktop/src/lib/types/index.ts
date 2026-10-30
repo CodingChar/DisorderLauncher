@@ -196,6 +196,12 @@ export interface ModEntry {
   source: ModSource | null
 }
 
+export interface ModConflict {
+  first: string
+  second: string
+  reason: string
+}
+
 export interface MissingDependency {
   modName: string
   /** Id del mod que falta, como lo declara el mod que lo pide. */
@@ -213,6 +219,8 @@ export interface DependencyReport {
 export interface ModsOverview {
   mods: ModEntry[]
   missingDependencies: MissingDependency[]
+  /** Mods activos que no se llevan bien entre si (pueden cerrar el juego). */
+  conflicts: ModConflict[]
   supported: boolean
 }
 

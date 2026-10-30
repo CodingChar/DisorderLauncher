@@ -1195,6 +1195,7 @@ async fn adoption_keeps_the_modrinth_origin_known_from_the_mod_lock() {
         installed_at: chrono::Utc::now(),
         dependency_of: None,
         previous: None,
+        incompatible: Vec::new(),
     });
     mods::save_lock(&manager.lock_file(), &lock).await.unwrap();
 

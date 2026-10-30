@@ -4,7 +4,7 @@
 use crate::{Launcher, LauncherError};
 use instance_manager::{Instance, InstanceRepository, LoaderKind};
 use mods::{
-    DependencyReport, InstalledMod, InstanceTarget, MissingDependency, ModEntry, ModError, ModManager, ProjectHit, UpdateInfo,
+    DependencyReport, InstalledMod, InstanceTarget, MissingDependency, ModConflict, ModEntry, ModError, ModManager, ProjectHit, UpdateInfo,
 };
 use serde::Serialize;
 use std::path::Path;
@@ -16,6 +16,8 @@ const SEARCH_PAGE: u32 = 20;
 pub struct ModsOverview {
     pub mods: Vec<ModEntry>,
     pub missing_dependencies: Vec<MissingDependency>,
+    /// Mods activos que no se llevan bien entre si (pueden cerrar el juego).
+    pub conflicts: Vec<ModConflict>,
     /// `false` si el tipo de instancia no admite mods (p. ej. Vanilla).
     pub supported: bool,
 }
@@ -28,7 +30,7 @@ fn loader_name(kind: LoaderKind) -> String {
     }
 }
 
-fn supports_mods(kind: LoaderKind) -> bool {
+pub(crate) fn supports_mods(kind: LoaderKind) -> bool {
     !matches!(kind, LoaderKind::Vanilla)
 }
 
@@ -82,7 +84,9 @@ impl Launcher {
     pub async fn mods_list(&self, instance_id: &str) -> Result<ModsOverview, LauncherError> {
         let (instance, manager) = self.mod_context(instance_id).await?;
         let mods = manager.list().await?;
+        let conflicts = if supports_mods(instance.loader) { manager.conflicts(&instance.minecraft_version).await? } else { Vec::new() };
         Ok(ModsOverview {
+            conflicts,
             missing_dependencies: ModManager::missing_dependencies(&mods),
             mods,
             supported: supports_mods(instance.loader),

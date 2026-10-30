@@ -31,6 +31,9 @@ pub struct LockedMod {
     /// Version anterior guardada tras una actualizacion.
     #[serde(default)]
     pub previous: Option<PreviousVersion>,
+    /// Proyectos de Modrinth que el autor declara incompatibles con este mod.
+    #[serde(default)]
+    pub incompatible: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,6 +111,7 @@ mod tests {
             installed_at: Utc::now(),
             dependency_of: None,
             previous: None,
+            incompatible: Vec::new(),
         }
     }
 

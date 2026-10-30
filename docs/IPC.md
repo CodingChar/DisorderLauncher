@@ -34,7 +34,7 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `store_cleanup` | — | `{ freedBytes }` — borra del almacen lo que ninguna instancia usa (solo lo que ninguna instancia usa; no se ejecuta con una instancia en uso); se niega si hay un registro danado o algo en curso |
 | `mods_install_missing` | `id` | `{ installed: InstalledMod[], unresolved: string[] }` — instala de una vez las dependencias que faltan a los mods activos (busca en Modrinth, descarta repetidas, descarga en paralelo); lo no encontrado va en `unresolved` |
 | `modpacks_export` | `id` | `{ remoteFiles, bundledFiles } \| null` — pide donde guardar; no incluye mundos ni logs |
-| `mods_list` | `id` | `{ mods, missingDependencies, supported }` (`supported` = cualquier tipo salvo Vanilla; lee `fabric.mod.json`, `META-INF/neoforge.mods.toml` o `META-INF/mods.toml`) — cada mod: `fileName`, `enabled`, `name`, `version`, `description`, `size`, `source?` |
+| `mods_list` | `id` | `{ mods, missingDependencies, conflicts, supported }` (`conflicts`: `{ first, second, reason }` de mods activos que no se llevan bien; vienen de lo que declara Modrinth al instalar y de una tabla propia en `crates/mods/src/conflicts.rs`; el launcher tambien los avisa en la consola al jugar y los usa para explicar un cierre inesperado) (`supported` = cualquier tipo salvo Vanilla; lee `fabric.mod.json`, `META-INF/neoforge.mods.toml` o `META-INF/mods.toml`) — cada mod: `fileName`, `enabled`, `name`, `version`, `description`, `size`, `source?` |
 | `mods_set_enabled` | `id`, `file`, `enabled` | `void` (renombra a `.jar.disabled`) |
 | `mods_remove` | `id`, `file` | `void` |
 | `mods_add_local` | `id` | `ModEntry \| null` — abre el selector de archivos del sistema; `null` si se cancela |

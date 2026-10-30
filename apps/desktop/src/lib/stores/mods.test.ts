@@ -3,7 +3,7 @@ import { api } from '../api'
 import type { ModsOverview } from '../types'
 import { ModsStore } from './mods.svelte'
 
-const overview = (supported = true): ModsOverview => ({ mods: [], missingDependencies: [], supported })
+const overview = (supported = true): ModsOverview => ({ mods: [], missingDependencies: [], conflicts: [], supported })
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() }
 afterEach(() => vi.restoreAllMocks())
 
@@ -60,8 +60,8 @@ it('un fallo de refresco conserva los datos previos y muestra el error', async (
   expect(store.loading).toBe(false)
 })
 
-const missing = (): ModsOverview => ({ mods: [], supported: true, missingDependencies: [{ modName: 'Alpha', id: 'fabric-api', requires: 'Fabric API' }] })
-const fixed = (): ModsOverview => ({ mods: [], supported: true, missingDependencies: [] })
+const missing = (): ModsOverview => ({ mods: [], supported: true, conflicts: [], missingDependencies: [{ modName: 'Alpha', id: 'fabric-api', requires: 'Fabric API' }] })
+const fixed = (): ModsOverview => ({ mods: [], supported: true, conflicts: [], missingDependencies: [] })
 
 it('si a un mod le falta otro, se instala solo una vez y se avisa', async () => {
   const store = new ModsStore()

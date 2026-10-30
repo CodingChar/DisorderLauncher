@@ -179,6 +179,7 @@ impl ModsService {
                     installed_at: Utc::now(),
                     dependency_of: planned.dependency_of.clone(),
                     previous: None,
+                    incompatible: planned.version.incompatible_projects(),
                 })
                 .await?;
             installed.push(InstalledMod {
@@ -225,6 +226,7 @@ impl ModsService {
                     installed_at: Utc::now(),
                     dependency_of: None,
                     previous: None,
+                    incompatible: version.incompatible_projects(),
                 })
                 .await?;
             registered += 1;
@@ -310,6 +312,7 @@ impl ModsService {
             sha1: prepared.sha1,
             installed_at: Utc::now(),
             dependency_of: current.dependency_of.clone(),
+            incompatible: best.incompatible_projects(),
             previous: Some(PreviousVersion {
                 file: backup_name,
                 version_id: current.version_id,

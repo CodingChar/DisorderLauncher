@@ -2,6 +2,7 @@
 //! origen (Modrinth), resolucion de dependencias, actualizaciones y rollback.
 //! No conoce identidad ni cuentas (spec 07).
 
+mod conflicts;
 mod error;
 mod local;
 mod lock;
@@ -10,6 +11,7 @@ mod modrinth;
 mod resolve;
 mod service;
 
+pub use conflicts::*;
 pub use error::*;
 pub use local::*;
 pub use lock::*;
