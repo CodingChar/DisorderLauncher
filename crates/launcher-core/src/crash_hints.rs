@@ -11,6 +11,8 @@ pub(crate) enum CrashHint {
     JavaTooOld,
     HeapReserve,
     OutOfMemory,
+    /// Un mod que relanza el juego con su propio cargador (p. ej. Essential) choca con otro mod.
+    ModLoaderClash,
     IncompatibleMods,
 }
 
@@ -32,6 +34,9 @@ impl CrashHint {
             Self::OutOfMemory => {
                 "El juego se quedo sin memoria. Sube la memoria de la instancia en sus ajustes \
                  (o quita mods pesados)."
+            }
+            Self::ModLoaderClash => {
+                "El juego se cerro porque el mod Essential no se lleva bien con otro mod de la instancia                  (como el que instalan Entity Culling o Distant Horizons). Quita Essential en Mods y vuelve a jugar."
             }
             Self::IncompatibleMods => {
                 "Algunos mods no son compatibles entre si o con esta version del juego. \
@@ -55,6 +60,10 @@ pub(crate) fn classify_line(line: &str) -> Option<CrashHint> {
     // Solo la excepcion que tumba el hilo principal: las capturadas e impresas por mods no son un cierre por memoria.
     if line.contains("Exception in thread") && line.contains("java.lang.OutOfMemoryError") {
         return Some(CrashHint::OutOfMemory);
+    }
+    // Essential relanza el juego con su propio sistema de carga; MixinBooter 10+ no lo entiende.
+    if line.contains("NoSuchMethodError") && line.contains("org.spongepowered.asm.mixin.transformer.IMixinTransformer") {
+        return Some(CrashHint::ModLoaderClash);
     }
     const MOD_SIGNATURES: &[&str] = &[
         "Incompatible mod set",
@@ -95,6 +104,7 @@ mod tests {
             ("java.lang.UnsupportedClassVersionError: X has been compiled by a more recent version", CrashHint::JavaTooOld),
             ("Error occurred during initialization of VM\nCould not reserve enough space for object heap", CrashHint::HeapReserve),
             ("Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space", CrashHint::OutOfMemory),
+            ("Caused by: java.lang.NoSuchMethodError: org.spongepowered.asm.mixin.transformer.IMixinTransformer.couldTransformClass(Lorg/spongepowered/asm/mixin/MixinEnvironment;Ljava/lang/String;)Z", CrashHint::ModLoaderClash),
             ("net.fabricmc.loader.impl.FormattedException: Incompatible mod set!", CrashHint::IncompatibleMods),
             ("net.minecraftforge.fml.ModLoadingException: Missing or unsupported mandatory dependencies", CrashHint::IncompatibleMods),
         ];
@@ -115,7 +125,7 @@ mod tests {
 
     #[test]
     fn messages_are_plain_spanish_without_internal_terms() {
-        for hint in [CrashHint::JavaTooNew, CrashHint::JavaTooOld, CrashHint::HeapReserve, CrashHint::OutOfMemory, CrashHint::IncompatibleMods] {
+        for hint in [CrashHint::JavaTooNew, CrashHint::JavaTooOld, CrashHint::HeapReserve, CrashHint::OutOfMemory, CrashHint::ModLoaderClash, CrashHint::IncompatibleMods] {
             let text = hint.message();
             assert!(!text.contains("Mixin") && !text.contains("JVM") && !text.contains("heap"), "{text}");
         }

@@ -11,7 +11,6 @@
   import { wrap } from '../lib/mc/font'
   import { useGui } from '../lib/mc/gui'
   import type { RowSpec } from '../lib/mc/listTypes'
-  import { bandWidth } from '../lib/mc/pos'
   import { loaderName, phaseLabel, versionLabel } from '../lib/text'
   import { accounts } from '../lib/stores/accounts.svelte'
   import { instances } from '../lib/stores/instances.svelte'
@@ -19,7 +18,8 @@
   import { sessions, type LogLine } from '../lib/stores/sessions.svelte'
 
   const gui = useGui()
-  const bw = $derived(bandWidth(gui.W))
+  // La consola usa el ancho que sobra (hasta 520): asi caben mas caracteres por fila y se lee mejor.
+  const cw = $derived(Math.min(520, (gui.W - 16) & ~1))
 
   const instance = $derived(instances.selected)
   const session = $derived(instance ? sessions.get(instance.id) : undefined)
@@ -138,7 +138,7 @@
     color: string
   }
 
-  const textWidth = $derived(bw - 17) // ancho de fila de McList (w - 10) menos el margen del texto
+  const textWidth = $derived(cw - 17) // ancho de fila de McList (w - 10) menos el margen del texto
   const wrapCache = new WeakMap<LogLine, { width: number; rows: ConsoleRow[] }>()
 
   function rowsOf(line: LogLine, width: number): ConsoleRow[] {
@@ -152,6 +152,28 @@
   }
 
   const consoleRows = $derived(visible.flatMap((line) => rowsOf(line, textWidth)))
+
+  // El texto de la consola es bitmap (no se puede seleccionar): se copia entero, tal como se ve filtrado.
+  let copied = $state(false)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+  async function copyConsole() {
+    const text = visible.map((line) => line.text).join('\n')
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const area = document.createElement('textarea')
+      area.value = text
+      area.style.cssText = 'position:fixed;opacity:0'
+      document.body.append(area)
+      area.select()
+      document.execCommand('copy')
+      area.remove()
+    }
+    copied = true
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => (copied = false), 1800)
+  }
 
   const emptyText = $derived(
     filter || level !== 'all'
@@ -169,16 +191,16 @@
       <McLabel center y={32} color={isProblem ? '#ff5555' : '#ffffff'} max={gui.W - 8} text={statusText} />
     {/if}
 
-    <McField x={-155} y={58} w={190} bind:value={filter} placeholder="Buscar en la consola..." label="Buscar en la consola" />
-    <McCycle x={39} y={58} w={116} label="Mostrar" options={levels} bind:value={level} />
+    <McField x={-(cw >> 1)} y={58} w={cw - 120} bind:value={filter} placeholder="Buscar en la consola..." label="Buscar en la consola" />
+    <McCycle x={(cw >> 1) - 116} y={58} w={116} label="Mostrar" options={levels} bind:value={level} />
     <McList
       items={consoleRows}
       getId={(r) => r.id}
       row={lineRow}
       expandable={false}
-      x={-(bw >> 1)}
+      x={-(cw >> 1)}
       y={82}
-      w={bw}
+      w={cw}
       h={gui.H - 140}
       rowHeight={10}
       selectable={false}
@@ -188,11 +210,12 @@
     />
 
     {#if running}
-      <McButton anchor="bottom" x={-154} y={-52} w={150} label="Cerrar juego" onclick={() => sessions.stop(instance.id)} />
+      <McButton anchor="bottom" x={-155} y={-52} w={102} label="Cerrar juego" onclick={() => sessions.stop(instance.id)} />
     {:else}
-      <McButton anchor="bottom" x={-154} y={-52} w={150} label={busy ? 'Un momento…' : 'Jugar'} disabled={busy} onclick={() => sessions.launch(instance.id)} />
+      <McButton anchor="bottom" x={-155} y={-52} w={102} label={busy ? 'Un momento…' : 'Jugar'} disabled={busy} onclick={() => sessions.launch(instance.id)} />
     {/if}
-    <McButton anchor="bottom" x={4} y={-52} w={150} label="Limpiar consola" disabled={lines.length === 0} onclick={() => sessions.clearLog(instance.id)} />
+    <McButton anchor="bottom" x={-51} y={-52} w={102} label={copied ? '¡Copiado!' : 'Copiar'} ariaLabel="Copiar la consola" disabled={visible.length === 0} onclick={copyConsole} />
+    <McButton anchor="bottom" x={53} y={-52} w={102} label="Limpiar consola" disabled={lines.length === 0} onclick={() => sessions.clearLog(instance.id)} />
     <McButton anchor="bottom" x={-150} y={-28} w={72} label="Mods" disabled={busy || instance.loader === 'vanilla'} onclick={() => nav.go('mods')} />
     <McButton anchor="bottom" x={-74} y={-28} w={72} label="Configurar" disabled={busy} onclick={() => nav.go('edit')} />
     <McButton anchor="bottom" x={2} y={-28} w={72} label="Reparar" disabled={busy} onclick={() => sessions.repair(instance.id)} />

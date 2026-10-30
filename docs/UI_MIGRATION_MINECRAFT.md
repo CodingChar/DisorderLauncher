@@ -52,7 +52,7 @@
 |---|---|---|
 | `menu` (nueva, inicial) | `routes/MainMenu.svelte` | Panorama, logo, splash, pie, botón de ayuda, **Salir** (`getCurrentWindow().close()`, deshabilitado fuera de Tauri). |
 | `instances` | `Instances.svelte` | Lista + Jugar/Nueva/Editar/Mods/Explorar/Atrás. |
-| `home` | `Home.svelte` | Centro de sesión: progreso, consola real (lista con seguimiento del final), diálogo de fallo. |
+| `home` | `Home.svelte` | Centro de sesión: progreso, consola real (hasta 520 px de ancho, las líneas largas continúan en la fila siguiente, botón Copiar porque el texto bitmap no se selecciona; lista con seguimiento del final), diálogo de fallo. |
 | `create` · `edit` | `CreateInstance.svelte`, `EditInstance.svelte` | Subpantallas: versión, versión instalada (Personalizado), icono, opciones avanzadas, más acciones, perfil. Partes compartidas en `routes/parts/`. |
 | `explore` · `tools` | `Explore.svelte`, `Tools.svelte` | Listas con acción. |
 | `accounts` (+ nuevo perfil) · bienvenida | `AccountPicker.svelte`, `parts/ProfileForm.svelte`, `Welcome.svelte` | Microsoft solo si `FEATURES`/ya hay cuenta. |
