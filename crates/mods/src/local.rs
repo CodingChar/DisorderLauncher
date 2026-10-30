@@ -26,6 +26,7 @@ pub struct ModEntry {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModSource {
+    pub provider: String,
     pub project_id: String,
     pub version_id: String,
     pub version_number: String,
@@ -101,6 +102,7 @@ impl ModManager {
                 .and_then(Result::ok);
 
             let source = lock.find_file(base).map(|l| ModSource {
+                provider: l.provider.clone(),
                 project_id: l.project_id.clone(),
                 version_id: l.version_id.clone(),
                 version_number: l.version_number.clone(),

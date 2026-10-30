@@ -317,7 +317,7 @@ impl Launcher {
 
         let mut report = OptimizationReport { installed: Vec::new(), skipped: Vec::new() };
         for (slug, name) in list {
-            match self.mods_install(instance_id, slug).await {
+            match self.mods_install(instance_id, slug, None).await {
                 Ok(_) => report.installed.push(name.to_string()),
                 // Sin internet no tiene sentido seguir probando uno por uno.
                 Err(LauncherError::Offline) => return Err(LauncherError::Offline),

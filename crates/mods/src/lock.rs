@@ -14,11 +14,18 @@ pub struct ModLock {
     pub mods: Vec<LockedMod>,
 }
 
+fn default_provider() -> String {
+    crate::MODRINTH.to_string()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LockedMod {
     /// Nombre del archivo activo, sin el sufijo `.disabled`.
     pub file: String,
+    /// Proveedor del que viene (`ContentHit::provider`); los registros antiguos son de Modrinth.
+    #[serde(default = "default_provider")]
+    pub provider: String,
     pub project_id: String,
     pub version_id: String,
     pub version_number: String,
@@ -103,6 +110,7 @@ mod tests {
     fn locked(project: &str, file: &str) -> LockedMod {
         LockedMod {
             file: file.into(),
+            provider: "modrinth".into(),
             project_id: project.into(),
             version_id: "v1".into(),
             version_number: "1.0".into(),

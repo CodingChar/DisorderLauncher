@@ -287,21 +287,38 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       return null
     case 'mods_add_local':
       return null
+    case 'mods_catalog':
+      return {
+        providers: [{ id: 'modrinth', name: 'Modrinth', kinds: ['mod'], sorts: ['relevance', 'downloads', 'follows', 'newest', 'updated'], sideFilter: true, reportsTotal: true }],
+        categories: ['adventure', 'decoration', 'library', 'optimization', 'technology', 'utility', 'worldgen'],
+      }
     case 'mods_search': {
+      const hit = (projectId: string, slug: string, title: string, summary: string, author: string, downloads: number, categories: string[], clientSide: string, serverSide: string) => ({
+        provider: 'modrinth', projectId, slug, title, summary, author, downloads, follows: Math.round(downloads / 900), iconUrl: null, categories, loaders: ['fabric'],
+        latestVersion: '1.20.1', updatedAt: '2026-09-20T10:00:00Z', clientSide, serverSide, pageUrl: `https://modrinth.com/mod/${slug}`,
+      })
       const all = [
-        { project_id: 'AANobbMI', slug: 'sodium', title: 'Sodium', description: 'Motor de renderizado moderno que mejora los FPS.', author: 'jellysquid3', downloads: 50000000, icon_url: null, categories: ['fabric'] },
-        { project_id: 'gvQqBUqZ', slug: 'lithium', title: 'Lithium', description: 'Optimiza la logica del juego sin cambiar su comportamiento.', author: 'jellysquid3', downloads: 30000000, icon_url: null, categories: ['fabric'] },
-        { project_id: 'P7dR8mSH', slug: 'fabric-api', title: 'Fabric API', description: 'Base que necesitan muchos mods de Fabric.', author: 'modmuss50', downloads: 90000000, icon_url: null, categories: ['fabric'] },
+        hit('AANobbMI', 'sodium', 'Sodium', 'Motor de renderizado moderno que mejora los FPS.', 'jellysquid3', 50000000, ['optimization'], 'required', 'unsupported'),
+        hit('gvQqBUqZ', 'lithium', 'Lithium', 'Optimiza la logica del juego sin cambiar su comportamiento.', 'jellysquid3', 30000000, ['optimization'], 'optional', 'optional'),
+        hit('P7dR8mSH', 'fabric-api', 'Fabric API', 'Base que necesitan muchos mods de Fabric.', 'modmuss50', 90000000, ['library'], 'required', 'required'),
       ]
-      const q = String(args.query ?? '').toLowerCase()
-      return all.filter((h) => !q || h.title.toLowerCase().includes(q))
+      const req = args.request ?? {}
+      const q = String(req.text ?? '').toLowerCase()
+      const cats: string[] = req.categories ?? []
+      const found = all
+        .filter((h) => !q || h.title.toLowerCase().includes(q))
+        .filter((h) => cats.every((c) => h.categories.includes(c)))
+        .filter((h) => req.side !== 'server' || h.serverSide !== 'unsupported')
+        .filter((h) => req.side !== 'client' || h.clientSide !== 'unsupported')
+        .sort((a, b) => (req.sort === 'downloads' || req.sort === 'follows' ? b.downloads - a.downloads : 0))
+      return { hits: found, total: found.length, offset: req.offset ?? 0 }
     }
     case 'mods_install_missing': {
       const list = installedMods.get(args.id) ?? []
       const needsApi = list.some((m) => m.enabled && m.needsApi) && !list.some((m) => m.enabled && m.name === 'Fabric API')
       await sleep(400)
       if (!needsApi) return { installed: [], unresolved: [] }
-      list.push({ fileName: 'fabric-api.jar', enabled: true, name: 'Fabric API', version: '1.0.0', description: null, size: 2100000, source: { projectId: 'P7dR8mSH', versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi: false })
+      list.push({ fileName: 'fabric-api.jar', enabled: true, name: 'Fabric API', version: '1.0.0', description: null, size: 2100000, source: { provider: 'modrinth', projectId: 'P7dR8mSH', versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi: false })
       installedMods.set(args.id, list)
       return { installed: [{ projectId: 'P7dR8mSH', title: 'Fabric API', versionNumber: '1.0.0', file: 'fabric-api.jar', isDependency: true }], unresolved: [] }
     }
@@ -309,7 +326,7 @@ export async function mockCall(cmd: string, args: Record<string, any> = {}): Pro
       const list = installedMods.get(args.id) ?? []
       const result: any[] = []
       const add = (title: string, file: string, dep: boolean, needsApi = false) => {
-        list.push({ fileName: file, enabled: true, name: title, version: '1.0.0', description: null, size: 1200000, source: { projectId: file, versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi })
+        list.push({ fileName: file, enabled: true, name: title, version: '1.0.0', description: null, size: 1200000, source: { provider: 'modrinth', projectId: file, versionId: 'v1', versionNumber: '1.0.0', hasPreviousVersion: false }, needsApi })
         result.push({ projectId: file, title, versionNumber: '1.0.0', file, isDependency: dep })
       }
       if (args.projectId === 'P7dR8mSH') {

@@ -1,25 +1,85 @@
-use crate::ModError;
+use crate::{
+    Catalog, ContentHit, ContentKind, ContentProvider, ModError, ProviderInfo, SearchPage, SearchQuery, Side, SideSupport, SortKey, CATEGORIES,
+};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use std::sync::Arc;
 use url::Url;
 
 pub const MODRINTH_API: &str = "https://api.modrinth.com/v2";
 
+/// Id con el que Modrinth se identifica en `ContentHit::provider`, en el registro de mods y en el IPC.
+pub const MODRINTH: &str = "modrinth";
+
 /// Modrinth sirve los archivos desde su CDN; cualquier otro host se rechaza.
 const TRUSTED_FILE_HOSTS: &[&str] = &["cdn.modrinth.com"];
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectHit {
-    pub project_id: String,
-    pub slug: String,
-    pub title: String,
-    pub description: String,
-    pub author: String,
-    pub downloads: u64,
+/// Resultado tal como lo devuelve `/search` de Modrinth.
+#[derive(Debug, Deserialize)]
+struct RawHit {
+    project_id: String,
+    slug: String,
+    title: String,
     #[serde(default)]
-    pub icon_url: Option<String>,
+    description: String,
     #[serde(default)]
-    pub categories: Vec<String>,
+    author: String,
+    #[serde(default)]
+    downloads: u64,
+    #[serde(default)]
+    follows: u64,
+    #[serde(default)]
+    icon_url: Option<String>,
+    /// Mezcla categorias y loaders.
+    #[serde(default)]
+    categories: Vec<String>,
+    #[serde(default)]
+    client_side: Option<String>,
+    #[serde(default)]
+    server_side: Option<String>,
+    #[serde(default)]
+    latest_version: Option<String>,
+    #[serde(default)]
+    date_modified: Option<DateTime<Utc>>,
+    #[serde(default)]
+    project_type: Option<String>,
+}
+
+/// Loaders que Modrinth mezcla con las categorias en sus resultados.
+const LOADER_IDS: &[&str] = &["fabric", "forge", "neoforge", "quilt", "liteloader", "rift", "modloader"];
+
+fn side_support(raw: Option<&str>) -> Option<SideSupport> {
+    match raw? {
+        "required" => Some(SideSupport::Required),
+        "optional" => Some(SideSupport::Optional),
+        "unsupported" => Some(SideSupport::Unsupported),
+        _ => None,
+    }
+}
+
+impl RawHit {
+    fn into_hit(self) -> ContentHit {
+        let kind = self.project_type.as_deref().unwrap_or("mod");
+        ContentHit {
+            provider: MODRINTH.to_string(),
+            page_url: Some(format!("https://modrinth.com/{kind}/{}", self.slug)),
+            categories: self.categories.iter().filter(|c| CATEGORIES.contains(&c.as_str())).cloned().collect(),
+            loaders: self.categories.iter().filter(|c| LOADER_IDS.contains(&c.as_str())).cloned().collect(),
+            client_side: side_support(self.client_side.as_deref()),
+            server_side: side_support(self.server_side.as_deref()),
+            project_id: self.project_id,
+            slug: self.slug,
+            title: self.title,
+            summary: self.description,
+            author: self.author,
+            downloads: self.downloads,
+            follows: self.follows,
+            icon_url: self.icon_url,
+            latest_version: self.latest_version,
+            updated_at: self.date_modified,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -102,14 +162,49 @@ pub fn validate_project_ref(value: &str) -> Result<(), ModError> {
     if ok { Ok(()) } else { Err(ModError::NotFound) }
 }
 
-/// Facetas de busqueda: solo mods compatibles con la version y el loader de la instancia.
-pub fn search_facets(minecraft_version: &str, loader: &str) -> String {
-    serde_json::json!([
-        ["project_type:mod"],
-        [format!("versions:{minecraft_version}")],
-        [format!("categories:{loader}")]
-    ])
-    .to_string()
+/// Valores que pueden ir tal cual dentro de una faceta (versiones, loaders, categorias).
+fn facet_safe(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 48 && value.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+'))
+}
+
+fn project_type(kind: ContentKind) -> &'static str {
+    match kind {
+        ContentKind::Mod => "mod",
+        ContentKind::Modpack => "modpack",
+        ContentKind::ResourcePack => "resourcepack",
+        ContentKind::Shader => "shader",
+    }
+}
+
+/// Facetas de Modrinth: cada grupo se cumple (AND) y dentro de un grupo vale cualquiera (OR).
+pub fn search_facets(query: &SearchQuery) -> String {
+    let mut groups: Vec<Vec<String>> = vec![vec![format!("project_type:{}", project_type(query.kind))]];
+    if let Some(version) = query.minecraft_version.as_deref().filter(|v| facet_safe(v)) {
+        groups.push(vec![format!("versions:{version}")]);
+    }
+    let loaders: Vec<String> = query.loaders.iter().filter(|l| facet_safe(l)).map(|l| format!("categories:{l}")).collect();
+    if !loaders.is_empty() {
+        groups.push(loaders);
+    }
+    for category in query.categories.iter().filter(|c| facet_safe(c)) {
+        groups.push(vec![format!("categories:{category}")]);
+    }
+    match query.side {
+        Some(Side::Client) => groups.push(vec!["client_side:required".into(), "client_side:optional".into()]),
+        Some(Side::Server) => groups.push(vec!["server_side:required".into(), "server_side:optional".into()]),
+        None => {}
+    }
+    serde_json::json!(groups).to_string()
+}
+
+fn sort_index(sort: SortKey) -> &'static str {
+    match sort {
+        SortKey::Relevance => "relevance",
+        SortKey::Downloads => "downloads",
+        SortKey::Follows => "follows",
+        SortKey::Newest => "newest",
+        SortKey::Updated => "updated",
+    }
 }
 
 #[derive(Clone)]
@@ -120,7 +215,9 @@ pub struct ModrinthClient {
 
 #[derive(Deserialize)]
 struct SearchResponse {
-    hits: Vec<ProjectHit>,
+    hits: Vec<RawHit>,
+    #[serde(default)]
+    total_hits: u64,
 }
 
 #[derive(Deserialize)]
@@ -138,29 +235,23 @@ impl ModrinthClient {
         self
     }
 
-    pub async fn search(
-        &self,
-        query: &str,
-        minecraft_version: &str,
-        loader: &str,
-        limit: u32,
-        offset: u32,
-    ) -> Result<Vec<ProjectHit>, ModError> {
+    pub async fn search(&self, query: &SearchQuery) -> Result<SearchPage, ModError> {
         let response: SearchResponse = self
             .http
             .get(format!("{}/search", self.base_url))
             .query(&[
-                ("query", query.to_string()),
-                ("facets", search_facets(minecraft_version, loader)),
-                ("limit", limit.min(50).to_string()),
-                ("offset", offset.to_string()),
+                ("query", query.trimmed_text().to_string()),
+                ("facets", search_facets(query)),
+                ("index", sort_index(query.sort).to_string()),
+                ("limit", query.page_size().to_string()),
+                ("offset", query.offset.to_string()),
             ])
             .send()
             .await?
             .error_for_status()?
             .json()
             .await?;
-        Ok(response.hits)
+        Ok(SearchPage { hits: response.hits.into_iter().map(RawHit::into_hit).collect(), total: response.total_hits, offset: query.offset })
     }
 
     pub async fn project_versions(
@@ -249,16 +340,100 @@ impl ModrinthClient {
     }
 }
 
+/// Modrinth como proveedor del catalogo.
+#[derive(Clone)]
+pub struct ModrinthProvider {
+    client: ModrinthClient,
+}
+
+impl ModrinthProvider {
+    pub fn new(client: ModrinthClient) -> Self {
+        Self { client }
+    }
+}
+
+#[async_trait]
+impl ContentProvider for ModrinthProvider {
+    fn info(&self) -> ProviderInfo {
+        ProviderInfo {
+            id: MODRINTH.to_string(),
+            name: "Modrinth".to_string(),
+            kinds: vec![ContentKind::Mod, ContentKind::Modpack, ContentKind::ResourcePack, ContentKind::Shader],
+            sorts: vec![SortKey::Relevance, SortKey::Downloads, SortKey::Follows, SortKey::Newest, SortKey::Updated],
+            side_filter: true,
+            reports_total: true,
+        }
+    }
+
+    async fn search(&self, query: &SearchQuery) -> Result<SearchPage, ModError> {
+        self.client.search(query).await
+    }
+}
+
+impl Catalog {
+    /// Catalogo con solo Modrinth.
+    pub fn modrinth(client: ModrinthClient) -> Self {
+        Catalog::new().with_provider(Arc::new(ModrinthProvider::new(client)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn facets(query: &SearchQuery) -> serde_json::Value {
+        serde_json::from_str(&search_facets(query)).unwrap()
+    }
+
     #[test]
     fn facets_filter_by_version_and_loader() {
-        let facets: serde_json::Value = serde_json::from_str(&search_facets("1.20.1", "fabric")).unwrap();
+        let query = SearchQuery { minecraft_version: Some("1.20.1".into()), loaders: vec!["fabric".into()], ..SearchQuery::default() };
+        let facets = facets(&query);
         assert_eq!(facets[0][0], "project_type:mod");
         assert_eq!(facets[1][0], "versions:1.20.1");
         assert_eq!(facets[2][0], "categories:fabric");
+    }
+
+    #[test]
+    fn no_filters_means_only_the_project_type() {
+        assert_eq!(facets(&SearchQuery::default()), serde_json::json!([["project_type:mod"]]));
+    }
+
+    #[test]
+    fn several_loaders_are_alternatives_and_each_category_is_required() {
+        let query = SearchQuery {
+            loaders: vec!["quilt".into(), "fabric".into()],
+            categories: vec!["optimization".into(), "library".into()],
+            side: Some(Side::Client),
+            ..SearchQuery::default()
+        };
+        let facets = facets(&query);
+        assert_eq!(facets[1], serde_json::json!(["categories:quilt", "categories:fabric"]));
+        assert_eq!(facets[2], serde_json::json!(["categories:optimization"]));
+        assert_eq!(facets[3], serde_json::json!(["categories:library"]));
+        assert_eq!(facets[4], serde_json::json!(["client_side:required", "client_side:optional"]));
+    }
+
+    #[test]
+    fn unsafe_facet_values_are_dropped() {
+        let query = SearchQuery { minecraft_version: Some("1.20\"],[\"x".into()), categories: vec!["a b".into()], ..SearchQuery::default() };
+        assert_eq!(facets(&query), serde_json::json!([["project_type:mod"]]));
+    }
+
+    #[test]
+    fn hits_are_translated_to_the_neutral_shape() {
+        let raw: RawHit = serde_json::from_str(
+            r#"{"project_id":"AANobbMI","slug":"sodium","title":"Sodium","description":"Motor","author":"jelly","downloads":9,"follows":3,
+                "categories":["fabric","optimization","quilt","raro"],"client_side":"required","server_side":"unsupported",
+                "latest_version":"1.20.1","date_modified":"2024-05-01T10:00:00Z","project_type":"mod"}"#,
+        )
+        .unwrap();
+        let hit = raw.into_hit();
+        assert_eq!(hit.provider, "modrinth");
+        assert_eq!(hit.categories, ["optimization"]);
+        assert_eq!(hit.loaders, ["fabric", "quilt"]);
+        assert_eq!((hit.client_side, hit.server_side), (Some(SideSupport::Required), Some(SideSupport::Unsupported)));
+        assert_eq!(hit.page_url.as_deref(), Some("https://modrinth.com/mod/sodium"));
     }
 
     #[test]

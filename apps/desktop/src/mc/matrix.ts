@@ -132,6 +132,9 @@ export async function runMatrix(options: { seed?: boolean; extra?: number } = {}
   await check('mods')
   await click('Buscar mods')
   await check('mods/buscar')
+  await click('Filtros de búsqueda')
+  await check('mods/filtros')
+  await click('Filtros de búsqueda')
   await go('menu')
   return res
 }

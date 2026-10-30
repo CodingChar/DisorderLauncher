@@ -109,6 +109,7 @@ pub fn run() {
       commands::mods_remove,
       commands::mods_add_local,
       commands::mods_search,
+      commands::mods_catalog,
       commands::mods_install,
       commands::mods_check_updates,
       commands::mods_update,

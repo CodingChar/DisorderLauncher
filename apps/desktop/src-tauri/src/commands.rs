@@ -273,10 +273,14 @@ pub async fn mods_add_local(
 pub async fn mods_search(
   state: State<'_, AppState>,
   id: String,
-  query: String,
-  page: Option<u32>,
-) -> Result<Vec<mods::ProjectHit>, String> {
-  state.launcher.mods_search(&id, &query, page.unwrap_or(0)).await.map_err(user_message)
+  request: launcher_core::ModSearchRequest,
+) -> Result<mods::SearchPage, String> {
+  state.launcher.mods_search(&id, request).await.map_err(user_message)
+}
+
+#[tauri::command]
+pub fn mods_catalog(state: State<'_, AppState>) -> launcher_core::CatalogInfo {
+  state.launcher.mods_catalog()
 }
 
 #[tauri::command]
@@ -284,8 +288,9 @@ pub async fn mods_install(
   state: State<'_, AppState>,
   id: String,
   project_id: String,
+  provider: Option<String>,
 ) -> Result<Vec<mods::InstalledMod>, String> {
-  state.launcher.mods_install(&id, &project_id).await.map_err(user_message)
+  state.launcher.mods_install(&id, &project_id, provider.as_deref()).await.map_err(user_message)
 }
 
 #[tauri::command]

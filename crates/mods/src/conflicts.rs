@@ -141,6 +141,7 @@ mod tests {
     fn lock(file: &str, project: &str, title: &str, incompatible: &[&str]) -> LockedMod {
         LockedMod {
             file: file.into(),
+            provider: "modrinth".into(),
             project_id: project.into(),
             version_id: "v".into(),
             version_number: "1".into(),

@@ -1,10 +1,21 @@
 import { api } from '../api'
-import type { DependencyReport, ModsOverview, ProjectHit, UpdateInfo } from '../types'
+import type { CatalogInfo, ContentHit, DependencyReport, ModSearchRequest, ModsOverview, UpdateInfo } from '../types'
+
+/** Filtros de la busqueda: lo que la persona elige, sin lo que depende de la pagina. */
+export type SearchFilters = Omit<ModSearchRequest, 'offset'>
+
+export const defaultFilters = (): SearchFilters => ({ text: '', categories: [], side: null, sort: 'relevance', compatibility: 'instance' })
 
 /** Estado de la pantalla de mods de una instancia. */
 export class ModsStore {
   overview = $state<ModsOverview | null>(null)
-  results = $state<ProjectHit[]>([])
+  results = $state<ContentHit[]>([])
+  /** Total de coincidencias en el proveedor (no solo las cargadas). */
+  total = $state(0)
+  /** `true` tras la primera busqueda: distingue «sin buscar aun» de «sin resultados». */
+  searched = $state(false)
+  catalog = $state<CatalogInfo | null>(null)
+  filters = $state<SearchFilters>(defaultFilters())
   updates = $state<UpdateInfo[] | null>(null)
   loading = $state(false)
   busy = $state<string | null>(null)
@@ -13,6 +24,7 @@ export class ModsStore {
   private cache = new Map<string, ModsOverview>()
   private context = 0
   private request = 0
+  private searchRequest = 0
   private instanceId: string | null = null
   /** Instancias en las que ya se intento instalar dependencias desde que se abrio la pantalla (evita bucles). */
   private triedDependencies = new Set<string>()
@@ -83,7 +95,11 @@ export class ModsStore {
     this.instanceId = null
     this.loading = false
     this.overview = null
+    this.searchRequest++
     this.results = []
+    this.total = 0
+    this.searched = false
+    this.filters = defaultFilters()
     this.updates = null
     this.error = null
     this.notice = null
@@ -140,26 +156,58 @@ export class ModsStore {
     })
   }
 
-  async search(id: string, query: string) {
-    const context = this.context
-    this.busy = 'search'
-    this.error = null
+  get hasMore() {
+    return this.results.length < this.total
+  }
+
+  /** Categorias y proveedores disponibles; se piden una sola vez. */
+  async loadCatalog() {
+    if (this.catalog) return
     try {
-      const results = await api.modsSearch(id, query)
-      if (context !== this.context) return
-      this.results = results
-    } catch (e) {
-      if (context !== this.context) return
-      this.error = (e as Error).message
-      this.results = []
-    } finally {
-      if (context === this.context) this.busy = null
+      this.catalog = await api.modsCatalog()
+    } catch {
+      // Sin catalogo la busqueda sigue funcionando; solo faltan los filtros por categoria.
     }
   }
 
-  install(id: string, project: ProjectHit) {
-    return this.run(id, project.project_id, async () => {
-      const installed = await api.modsInstall(id, project.project_id)
+  /** Busca desde la primera pagina con los filtros dados (o los actuales). */
+  async search(id: string, filters: SearchFilters = this.filters) {
+    this.filters = { ...filters, categories: [...filters.categories] }
+    return this.fetchPage(id, 0)
+  }
+
+  /** Anade la pagina siguiente a los resultados. */
+  async loadMore(id: string) {
+    if (this.busy === 'search' || !this.hasMore) return
+    return this.fetchPage(id, this.results.length)
+  }
+
+  private async fetchPage(id: string, offset: number) {
+    const context = this.context
+    const request = ++this.searchRequest
+    this.busy = 'search'
+    this.error = null
+    try {
+      const page = await api.modsSearch(id, { ...this.filters, categories: [...this.filters.categories], offset })
+      if (context !== this.context || request !== this.searchRequest) return
+      this.results = offset === 0 ? page.hits : [...this.results, ...page.hits.filter((h) => !this.results.some((r) => r.provider === h.provider && r.projectId === h.projectId))]
+      this.total = page.total
+      this.searched = true
+    } catch (e) {
+      if (context !== this.context || request !== this.searchRequest) return
+      this.error = (e as Error).message
+      if (offset === 0) {
+        this.results = []
+        this.total = 0
+      }
+    } finally {
+      if (context === this.context && request === this.searchRequest) this.busy = null
+    }
+  }
+
+  install(id: string, project: ContentHit) {
+    return this.run(id, project.projectId, async () => {
+      const installed = await api.modsInstall(id, project.projectId, project.provider)
       const extras = installed.filter((m) => m.isDependency).map((m) => m.title)
       if (installed.length === 0) return `«${project.title}» ya estaba instalado.`
       return extras.length

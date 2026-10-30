@@ -7,6 +7,10 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho, verificacion parcial · ⛔ bloqu
 
 ✅ Migrada. Sustituye a la reforma moderna de abajo: escenario en pixeles de GUI, texto bitmap y todas las pantallas portadas sin tocar contratos IPC ni stores. Reglas, componentes y verificacion en [`UI_MIGRATION_MINECRAFT.md`](UI_MIGRATION_MINECRAFT.md): **leelo antes de tocar `apps/desktop/src`**.
 
+## Busqueda de mods con filtros y proveedores intercambiables (2026-10-29)
+
+✅ `crates/mods/src/catalog.rs` define una busqueda **independiente del proveedor**: `SearchQuery` (texto, tipo, version, loaders, categorias, entorno, orden, paginacion), `ContentHit`/`SearchPage` (con `provider` y total), el trait `ContentProvider` y el registro `Catalog`. Modrinth es solo la primera implementacion (`ModrinthProvider`); un proveedor nuevo (CurseForge...) implementa el trait, mapea las categorias neutras (`CATEGORIES`) y declara en `ProviderInfo` lo que no soporta, y se registra con `ModsService::with_provider`; el catalogo descarta los filtros no soportados antes de preguntarle. El registro de mods (`LockedMod`/`ModSource`) guarda el `provider` (los antiguos cuentan como Modrinth). IPC: `mods_search(request)`, `mods_catalog`, `mods_install(..., provider?)`. Pantalla de Mods: orden, panel de filtros (categorias, entorno, compatibilidad, fuente), total, detalle del resultado y «Ver más». Pendiente: instalar desde un proveedor distinto de Modrinth (`ModsService::ensure_installable`) y el proveedor CurseForge (requiere clave de API).
+
 ## Almacen comun de mods y paquetes `.7z` (2026-10-27)
 
 ✅ Cuatro fases. (1) `artifact-store`: objetos por SHA-512, hardlink/copia, adopcion perezosa y duplicar instancias sin copiar jars. (2) Instalar/actualizar mods via el almacen: un mod conocido no se descarga otra vez. (3) `dpack`: exportar/importar instancias `.7z` con manifiesto, verificacion de hashes y defensas contra rutas, enlaces y bombas. (4) Estadisticas y limpieza bajo reserva exclusiva de las instancias, y tres herramientas nuevas en la pantalla Herramientas. Decisiones en `docs/adr/ADR-003_artifact_store_and_dpack.md`; contratos en `docs/IPC.md`.

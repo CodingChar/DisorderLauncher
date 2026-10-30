@@ -24,6 +24,8 @@ pub enum ModError {
     UntrustedSource,
     #[error("la descarga no trae un archivo utilizable")]
     NoFile,
+    #[error("el proveedor {0} no esta disponible")]
+    ProviderUnavailable(String),
     #[error("no hay una copia anterior para restaurar")]
     NothingToRollback,
 }

@@ -58,7 +58,7 @@
 | `accounts` (+ nuevo perfil) · bienvenida | `AccountPicker.svelte`, `parts/ProfileForm.svelte`, `Welcome.svelte` | Microsoft solo si `FEATURES`/ya hay cuenta. |
 | `settings` | `Settings.svelte` | Subpantallas: tema especial (con confirmación al quitar) y avanzado (ID de Microsoft, solo con `FEATURES.microsoftSettings`). |
 | `skins` · `skinEditor` | `Skins.svelte`, `SkinEditor.svelte` | Editor: lienzo con zoom entero 1–3, paleta de 32 colores + R/G/B, opciones en subpantalla. |
-| `mods` | `Mods.svelte` | Pestañas «Mis mods» / «Buscar mods». |
+| `mods` | `Mods.svelte` | Pestañas «Mis mods» / «Buscar mods». La búsqueda tiene orden, panel «Filtros» (categorías de casillas, entorno, compatibilidad, fuente si hay más de un proveedor), total de resultados, detalle del mod elegido y «Ver más» (paginación). Todo viene del contrato neutro de `mods_search`/`mods_catalog`: los textos están en `lib/modCatalog.ts` y un id sin nombre se muestra tal cual. |
 
 ## Temas
 

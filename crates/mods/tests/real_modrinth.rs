@@ -1,6 +1,6 @@
 //! Pruebas contra la API real de Modrinth: `cargo test -p mods --test real_modrinth -- --ignored --nocapture`
 
-use mods::{InstanceTarget, ModManager, ModrinthClient, ModsService, PlannedMod};
+use mods::{InstanceTarget, ModManager, ModrinthClient, ModsService, PlannedMod, SearchQuery};
 
 const FABRIC_API: &str = "P7dR8mSH";
 const TARGET: InstanceTarget<'static> = InstanceTarget { minecraft_version: "1.20.1", loader: "fabric" };
@@ -9,11 +9,21 @@ fn http() -> reqwest::Client {
     reqwest::Client::builder().user_agent("DisorderLauncher/0.1 (pruebas)").build().unwrap()
 }
 
+fn query(text: &str, target: InstanceTarget<'_>) -> SearchQuery {
+    SearchQuery {
+        text: text.into(),
+        minecraft_version: Some(target.minecraft_version.into()),
+        loaders: vec![target.loader.into()],
+        limit: 5,
+        ..SearchQuery::default()
+    }
+}
+
 #[tokio::test]
 #[ignore = "requiere internet"]
 async fn search_is_filtered_by_version_and_loader() {
     let service = ModsService::new(http());
-    let hits = service.search("sodium", TARGET, 5, 0).await.unwrap();
+    let hits = service.search(None, &query("sodium", TARGET)).await.unwrap().hits;
     assert!(!hits.is_empty());
     assert!(hits.iter().any(|h| h.slug == "sodium"), "{:?}", hits.iter().map(|h| &h.slug).collect::<Vec<_>>());
 }
@@ -88,7 +98,7 @@ async fn install_jei_and_read_meta(target: InstanceTarget<'_>) {
     let manager = ModManager::new(dir.path().join("game"));
     let service = ModsService::new(http());
 
-    let hits = service.search("jei", target, 5, 0).await.unwrap();
+    let hits = service.search(None, &query("jei", target)).await.unwrap().hits;
     let jei = hits.iter().find(|h| h.slug == "jei").unwrap_or_else(|| panic!("JEI no aparece: {:?}", hits.iter().map(|h| &h.slug).collect::<Vec<_>>()));
 
     service.install(&manager, &jei.project_id, target, 4).await.unwrap();

@@ -504,8 +504,8 @@ async fn vanilla_instances_do_not_support_mods() {
     assert!(!launcher.mods_list(&instance.id).await.unwrap().supported);
     let jar = write_mod(&dir.path().join("d"), "a.jar", r#"{"id":"a"}"#);
     assert!(matches!(launcher.mods_add_local(&instance.id, &jar).await, Err(LauncherError::InvalidInput(_))));
-    assert!(matches!(launcher.mods_search(&instance.id, "sodium", 0).await, Err(LauncherError::InvalidInput(_))));
-    assert!(matches!(launcher.mods_install(&instance.id, "AANobbMI").await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.mods_search(&instance.id, launcher_core::ModSearchRequest::default()).await, Err(LauncherError::InvalidInput(_))));
+    assert!(matches!(launcher.mods_install(&instance.id, "AANobbMI", None).await, Err(LauncherError::InvalidInput(_))));
 }
 
 #[tokio::test]
@@ -623,7 +623,7 @@ async fn real_modpack_export_and_import_use_modrinth_references() {
         .instances_create("Real", "1.20.1", LoaderKind::Fabric, Some("0.15.0".into()))
         .await
         .unwrap();
-    let installed = launcher.mods_install(&source.id, "P7dR8mSH").await.unwrap();
+    let installed = launcher.mods_install(&source.id, "P7dR8mSH", None).await.unwrap();
     assert!(installed.iter().any(|m| m.title.to_lowercase().contains("fabric api")));
 
     let pack = dir.path().join("real.mrpack");
@@ -789,7 +789,7 @@ async fn run_loader_e2e_with_mods(kind: LoaderKind, mc: &str, expected_in_output
     let instance = launcher.instances_create(&format!("E2E {kind:?}"), mc, kind, None).await.unwrap();
     println!("version elegida: {:?}", instance.loader_version);
     for project in mod_projects {
-        let installed = launcher.mods_install(&instance.id, project).await.unwrap();
+        let installed = launcher.mods_install(&instance.id, project, None).await.unwrap();
         println!("mods instalados: {:?}", installed.iter().map(|m| (&m.title, &m.version_number)).collect::<Vec<_>>());
     }
 
@@ -1187,6 +1187,7 @@ async fn adoption_keeps_the_modrinth_origin_known_from_the_mod_lock() {
     let mut lock = mods::ModLock::default();
     lock.upsert(mods::LockedMod {
         file: "sodium.jar".into(),
+        provider: "modrinth".into(),
         project_id: "AANobbMI".into(),
         version_id: "ver1".into(),
         version_number: "1.0".into(),

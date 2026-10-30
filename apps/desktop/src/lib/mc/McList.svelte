@@ -36,6 +36,8 @@
     /** Doble clic o Intro sobre una fila. */
     onactivate?: (item: T) => void
     onselect?: (item: T) => void
+    /** Clic de raton sobre una fila (las flechas no lo disparan): para listas de casillas. */
+    onrowclick?: (item: T) => void
     /** Texto cuando no hay filas. */
     empty?: string
     loading?: boolean
@@ -63,6 +65,7 @@
     rowHeight = 36,
     onactivate,
     onselect,
+    onrowclick,
     empty = '',
     loading = false,
     loadingText = 'Cargando...',
@@ -240,6 +243,7 @@
           if (!selectable) return
           if (!spec.disabled) playSfx('click')
           choose(index)
+          if (!spec.disabled) onrowclick?.(item)
         }}
         ondblclick={() => selectable && !spec.disabled && onactivate?.(item)}
       >

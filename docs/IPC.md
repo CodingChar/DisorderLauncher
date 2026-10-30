@@ -38,8 +38,9 @@ Los objetos se serializan en camelCase. Ningun comando devuelve ni recibe tokens
 | `mods_set_enabled` | `id`, `file`, `enabled` | `void` (renombra a `.jar.disabled`) |
 | `mods_remove` | `id`, `file` | `void` |
 | `mods_add_local` | `id` | `ModEntry \| null` — abre el selector de archivos del sistema; `null` si se cancela |
-| `mods_search` | `id`, `query`, `page?` | `ProjectHit[]` filtrados por version y loader de la instancia (Modrinth) |
-| `mods_install` | `id`, `projectId` | `InstalledMod[]` (el mod y sus dependencias obligatorias) |
+| `mods_search` | `id`, `request` | `SearchPage { hits, total, offset }`. `request`: `{ provider?, text, kind?, categories[], side: 'client'\|'server'\|null, sort: 'relevance'\|'downloads'\|'follows'\|'newest'\|'updated', compatibility: 'instance'\|'anyLoader'\|'anyVersion'\|'any', offset }` (20 por pagina; `offset` = resultados ya cargados). Es un contrato **neutro de proveedor** (`crates/mods/src/catalog.rs`): cada `ContentHit` lleva su `provider` y solo ids de `categories` comunes. Lo que un proveedor no soporta (orden, entorno, tipo) se descarta antes de preguntarle |
+| `mods_catalog` | — | `{ providers: ProviderInfo[], categories: string[] }`: que proveedores hay (`id`, `name`, `kinds`, `sorts`, `sideFilter`, `reportsTotal`) y las categorias neutras, para dibujar los filtros |
+| `mods_install` | `id`, `projectId`, `provider?` | `InstalledMod[]` (el mod y sus dependencias obligatorias). `provider` por defecto `modrinth`; uno sin instalador devuelve «<proveedor> todavia no esta disponible» |
 | `mods_check_updates` | `id` | `{ file, projectId, title, currentVersion, latestVersion }[]` |
 | `mods_update` | `id`, `file` | `InstalledMod` (guarda la version anterior) |
 | `mods_rollback` | `id`, `file` | `void` (restaura la version anterior) |

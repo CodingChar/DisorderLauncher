@@ -9,6 +9,8 @@ use tokio::net::TcpListener;
 pub struct Recorded {
     pub method: String,
     pub path: String,
+    /// Lo que sigue a `?` en la URL (sin decodificar), vacio si no hay.
+    pub query: String,
     pub body: String,
     pub authorization: Option<String>,
 }
@@ -129,5 +131,6 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<Recorded> {
         buf.extend_from_slice(&chunk[..n]);
     }
     let body = String::from_utf8_lossy(&buf[header_end..(header_end + length).min(buf.len())]).to_string();
-    Some(Recorded { method, path: target.split('?').next()?.to_string(), body, authorization })
+    let (path, query) = target.split_once('?').unwrap_or((target.as_str(), ""));
+    Some(Recorded { method, path: path.to_string(), query: query.to_string(), body, authorization })
 }

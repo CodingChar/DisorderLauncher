@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from 'svelte'
   import { goBack } from '../lib/mc/back'
   import McButton from '../lib/mc/McButton.svelte'
+  import McCycle from '../lib/mc/McCycle.svelte'
   import McDialog from '../lib/mc/McDialog.svelte'
   import McField from '../lib/mc/McField.svelte'
   import McList from '../lib/mc/McList.svelte'
@@ -17,7 +18,8 @@
   import { mods } from '../lib/stores/mods.svelte'
   import { nav } from '../lib/stores/nav.svelte'
   import { sessions } from '../lib/stores/sessions.svelte'
-  import type { ModEntry, ProjectHit } from '../lib/types'
+  import { categoryLabel, compatibilityOptions, environmentLabel, formatDownloads, loaderLabel, sideOptions, sinceLabel, sortLabels, type SideFilter } from '../lib/modCatalog'
+  import type { Compatibility, ContentHit, ModEntry, SortKey } from '../lib/types'
 
   const gui = useGui()
   const bw = $derived(bandWidth(gui.W))
@@ -33,23 +35,40 @@
   let modId = $state<string | null>(null)
   let hitId = $state<string | null>(null)
 
+  // Filtros en edicion (se aplican con «Aplicar»); los que ya se aplicaron viven en `mods.filters`.
+  let filtersOpen = $state(false)
+  let draftCategories = $state<string[]>([])
+  let draftSide = $state<SideFilter>('any')
+  let draftCompat = $state<Compatibility>('instance')
+  let draftProvider = $state<string | null>(null)
+  let categoryCursor = $state<string | null>(null)
+
   onMount(() => {
     if (instance) mods.open(instance.id)
     else mods.reset()
+    void mods.loadCatalog()
   })
   onDestroy(() => mods.reset())
 
-  const installedProjects = $derived(new Set(overview?.mods.map((m) => m.source?.projectId).filter(Boolean)))
+  const hitKey = (h: { provider: string; projectId: string }) => `${h.provider}:${h.projectId}`
+  const installedProjects = $derived(new Set(overview?.mods.filter((m) => m.source).map((m) => hitKey(m.source!))))
   const selectedMod = $derived(overview?.mods.find((m) => m.fileName === modId) ?? null)
-  const selectedHit = $derived(mods.results.find((h) => h.project_id === hitId) ?? null)
+  const selectedHit = $derived(mods.results.find((h) => hitKey(h) === hitId) ?? null)
+
+  const providers = $derived(mods.catalog?.providers ?? [])
+  const activeProvider = $derived(providers.find((p) => p.id === mods.filters.provider) ?? providers[0] ?? null)
+  const sortOptions = $derived((activeProvider?.sorts ?? (Object.keys(sortLabels) as SortKey[])).map((value) => ({ value, label: sortLabels[value] })))
+  const draftProviderInfo = $derived(providers.find((p) => p.id === draftProvider) ?? providers[0] ?? null)
+  const sideFilterAvailable = $derived(draftProviderInfo?.sideFilter ?? true)
+  const categoryChoices = $derived(mods.catalog?.categories ?? [])
+  const activeFilterCount = $derived(mods.filters.categories.length + (mods.filters.side ? 1 : 0) + (mods.filters.compatibility !== 'instance' ? 1 : 0))
+  const totalText = $derived(
+    mods.searched ? `${mods.total.toLocaleString('es')} ${mods.total === 1 ? 'resultado' : 'resultados'}${mods.results.length < mods.total ? ` · mostrando ${mods.results.length}` : ''}` : '',
+  )
   const selectedUpdate = $derived(selectedMod ? updateFor(selectedMod.fileName) : undefined)
 
   function formatSize(bytes: number) {
     return bytes > 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
-  }
-
-  function formatDownloads(n: number) {
-    return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} M` : n >= 1000 ? `${Math.round(n / 1000)} mil` : String(n)
   }
 
   function updateFor(file: string) {
@@ -57,13 +76,43 @@
     return mods.updates?.find((u) => u.file === base)
   }
 
-  async function search() {
-    if (instance) await mods.search(instance.id, query.trim())
+  async function search(patch: Partial<typeof mods.filters> = {}) {
+    if (!instance) return
+    hitId = null
+    await mods.search(instance.id, { ...mods.filters, ...patch, text: query.trim() })
   }
 
   function openSearch() {
     tab = 'search'
-    if (instance && mods.results.length === 0) mods.search(instance.id, '')
+    if (instance && !mods.searched) void search()
+  }
+
+  function openFilters() {
+    draftCategories = [...mods.filters.categories]
+    draftSide = mods.filters.side ?? 'any'
+    draftCompat = mods.filters.compatibility
+    draftProvider = mods.filters.provider ?? null
+    filtersOpen = true
+  }
+
+  function applyFilters() {
+    filtersOpen = false
+    void search({ categories: [...draftCategories], side: draftSide === 'any' || !sideFilterAvailable ? null : draftSide, compatibility: draftCompat, provider: draftProvider })
+  }
+
+  function clearDraft() {
+    draftCategories = []
+    draftSide = 'any'
+    draftCompat = 'instance'
+  }
+
+  function toggleCategory(id: string) {
+    draftCategories = draftCategories.includes(id) ? draftCategories.filter((c) => c !== id) : [...draftCategories, id]
+  }
+
+  function categoryRow(id: string): RowSpec {
+    const on = draftCategories.includes(id)
+    return { lines: [{ text: `${on ? '[x]' : '[ ]'} ${categoryLabel(id)}`, color: on ? '#55ff55' : '#ffffff' }] }
   }
 
   const busyLabel = $derived(
@@ -99,13 +148,27 @@
     }
   }
 
-  function hitRow(h: ProjectHit): RowSpec {
-    const installed = installedProjects.has(h.project_id)
+  function hitRow(h: ContentHit): RowSpec {
+    const installed = installedProjects.has(hitKey(h))
     return {
       icon: genericIcon ? { src: genericIcon.src } : undefined,
-      lines: [{ text: h.title }, { text: `por ${h.author} · ${formatDownloads(h.downloads)} descargas` }, installed ? { text: 'Instalado', color: '#55ff55' } : { text: h.description }],
+      lines: [
+        { text: installed ? `${h.title} · Instalado` : h.title, color: installed ? '#55ff55' : '#ffffff' },
+        { text: `por ${h.author} · ${formatDownloads(h.downloads)} descargas` },
+        { text: h.summary },
+      ],
     }
   }
+
+  // Detalle del resultado elegido (lo que no cabe en su fila): categorias, loaders, entorno y novedad.
+  const hitDetails = $derived.by(() => {
+    const h = selectedHit
+    if (!h) return []
+    const since = sinceLabel(h.updatedAt)
+    const first = [h.categories.map(categoryLabel).join(', '), h.loaders.map(loaderLabel).join(', ')].filter(Boolean).join(' · ')
+    const second = [environmentLabel(h), h.follows > 0 ? `${formatDownloads(h.follows)} seguidores` : null, h.latestVersion ? `Minecraft ${h.latestVersion}` : null, since ? `actualizado ${since}` : null].filter(Boolean).join(' · ')
+    return [first, second].filter(Boolean)
+  })
 
   const tabs = $derived([
     { id: 'installed' as const, label: `Mis mods${overview ? ` (${overview.mods.length})` : ''}` },
@@ -186,45 +249,119 @@
         class="mc-form"
         onsubmit={(e) => {
           e.preventDefault()
+          filtersOpen = false
           search()
         }}
       >
         <McField x={-155} y={44} w={228} maxlength={60} bind:value={query} placeholder="Sodium, Lithium, minimapa…" label="Buscar mods" />
         <McButton x={77} y={44} w={78} type="submit" label={mods.busy === 'search' ? 'Buscando…' : 'Buscar'} disabled={mods.busy === 'search'} />
       </form>
-      <McText text="Solo se muestran mods compatibles con tu versión." x={-155} y={68} w={310} color="#808080" maxLines={1} />
-      <McList
-        items={mods.results}
-        getId={(h) => h.project_id}
-        row={hitRow}
-        bind:selectedId={hitId}
-        x={-(bw >> 1)}
-        y={80}
-        w={bw}
-        h={gui.H - 142}
-        loading={mods.busy === 'search'}
-        loadingText="Buscando..."
-        empty="No se encontraron mods compatibles."
-        ariaLabel="Resultados de la búsqueda"
-      />
-      {#if mods.busy !== null && mods.busy !== 'search'}
-        <McProgress percent={null} label="Instalando" x={-155} w={310} y={gui.H - 42} />
-      {:else}
-        {#each messages as m, i (m.text)}
-          <McText text={m.text} x={-155} y={gui.H - 52 + i * 10} w={310} align="center" color={m.color} role={m.role} maxLines={1} />
-        {/each}
-      {/if}
-      <McButton
-        anchor="bottom"
+      <McCycle
         x={-155}
-        y={-28}
-        w={150}
-        label={selectedHit && mods.busy === selectedHit.project_id ? 'Instalando…' : 'Instalar'}
-        ariaLabel={selectedHit ? `Instalar ${selectedHit.title}` : 'Instalar mod'}
-        disabled={locked || !selectedHit || installedProjects.has(selectedHit.project_id)}
-        onclick={() => selectedHit && mods.install(instance.id, selectedHit)}
+        y={68}
+        w={152}
+        label="Orden"
+        options={sortOptions}
+        value={mods.filters.sort}
+        onchange={(sort) => {
+          filtersOpen = false
+          search({ sort })
+        }}
       />
-      <McButton anchor="bottom" x={5} y={-28} w={150} label="Volver" onclick={() => goBack()} />
+      <McButton
+        x={3}
+        y={68}
+        w={152}
+        label={filtersOpen ? 'Cerrar filtros' : activeFilterCount > 0 ? `Filtros (${activeFilterCount})...` : 'Filtros...'}
+        ariaLabel="Filtros de búsqueda"
+        onclick={() => (filtersOpen ? (filtersOpen = false) : openFilters())}
+      />
+
+      {#if filtersOpen}
+        <McCycle x={-155} y={92} w={152} label="Entorno" options={sideOptions} bind:value={draftSide} disabled={!sideFilterAvailable} />
+        <McCycle x={3} y={92} w={152} label="Para" options={compatibilityOptions} bind:value={draftCompat} />
+        {#if providers.length > 1}
+          <McCycle
+            x={-155}
+            y={116}
+            w={310}
+            label="Fuente"
+            options={providers.map((p) => ({ value: p.id, label: p.name }))}
+            value={draftProvider ?? providers[0].id}
+            onchange={(id) => (draftProvider = id)}
+          />
+        {/if}
+        {@const listTop = providers.length > 1 ? 152 : 128}
+        <McText text="Categorías (el mod debe tener todas las marcadas)" x={-155} y={listTop - 12} w={310} color="#a0a0a0" maxLines={1} />
+        <McList
+          items={categoryChoices}
+          getId={(c) => c}
+          row={categoryRow}
+          bind:selectedId={categoryCursor}
+          onrowclick={toggleCategory}
+          onactivate={toggleCategory}
+          expandable={false}
+          x={-(bw >> 1)}
+          y={listTop}
+          w={bw}
+          h={Math.max(24, gui.H - listTop - 34)}
+          rowHeight={14}
+          empty="Este proveedor no ofrece categorías."
+          ariaLabel="Categorías"
+        />
+        <McButton anchor="bottom" x={-155} y={-28} w={150} label="Aplicar" onclick={applyFilters} />
+        <McButton anchor="bottom" x={5} y={-28} w={150} label="Quitar filtros" onclick={clearDraft} />
+      {:else}
+        {#if totalText}
+          <McText text={totalText} x={-155} y={92} w={310} color="#808080" maxLines={1} />
+        {/if}
+        <McList
+          items={mods.results}
+          getId={hitKey}
+          row={hitRow}
+          bind:selectedId={hitId}
+          x={-(bw >> 1)}
+          y={104}
+          w={bw}
+          h={gui.H - 166}
+          loading={mods.busy === 'search' && mods.results.length === 0}
+          loadingText="Buscando..."
+          empty={mods.searched ? 'No se encontraron mods con estos filtros.' : 'Escribe qué buscas y pulsa Buscar.'}
+          ariaLabel="Resultados de la búsqueda"
+        />
+        {#if mods.busy !== null && mods.busy !== 'search'}
+          <McProgress percent={null} label="Instalando" x={-155} w={310} y={gui.H - 42} />
+        {:else if messages.length > 0}
+          {#each messages as m, i (m.text)}
+            <McText text={m.text} x={-155} y={gui.H - 52 + i * 10} w={310} align="center" color={m.color} role={m.role} maxLines={1} />
+          {/each}
+        {:else}
+          {#each hitDetails as line, i (i)}
+            <McText text={line} x={-155} y={gui.H - 52 + i * 10} w={310} align="center" color="#a0a0a0" maxLines={1} />
+          {/each}
+        {/if}
+        <McButton
+          anchor="bottom"
+          x={-155}
+          y={-28}
+          w={102}
+          label={selectedHit && mods.busy === selectedHit.projectId ? 'Instalando…' : 'Instalar'}
+          ariaLabel={selectedHit ? `Instalar ${selectedHit.title}` : 'Instalar mod'}
+          disabled={locked || !selectedHit || installedProjects.has(hitKey(selectedHit))}
+          onclick={() => selectedHit && mods.install(instance.id, selectedHit)}
+        />
+        <McButton
+          anchor="bottom"
+          x={-51}
+          y={-28}
+          w={102}
+          label="Ver más"
+          ariaLabel="Cargar más resultados"
+          disabled={mods.busy !== null || !mods.hasMore}
+          onclick={() => mods.loadMore(instance.id)}
+        />
+        <McButton anchor="bottom" x={53} y={-28} w={102} label="Volver" onclick={() => goBack()} />
+      {/if}
     {/if}
 
     {#if toRemove}

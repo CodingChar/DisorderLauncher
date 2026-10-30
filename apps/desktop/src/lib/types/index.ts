@@ -180,6 +180,7 @@ export interface SettingsSnapshot {
 }
 
 export interface ModSource {
+  provider: string
   projectId: string
   versionId: string
   versionNumber: string
@@ -224,14 +225,63 @@ export interface ModsOverview {
   supported: boolean
 }
 
-export interface ProjectHit {
-  project_id: string
+/** Orden de los resultados (cada proveedor declara cuales entiende). */
+export type SortKey = 'relevance' | 'downloads' | 'follows' | 'newest' | 'updated'
+export type SideSupport = 'required' | 'optional' | 'unsupported'
+/** Con que se compara lo buscado: version y loader de la instancia, solo uno de los dos o nada. */
+export type Compatibility = 'instance' | 'anyLoader' | 'anyVersion' | 'any'
+export type ContentKind = 'mod' | 'modpack' | 'resourcePack' | 'shader'
+
+/** Un resultado de busqueda, igual para cualquier proveedor (Modrinth hoy; otros mas adelante). */
+export interface ContentHit {
+  provider: string
+  projectId: string
   slug: string
   title: string
-  description: string
+  summary: string
   author: string
   downloads: number
-  icon_url: string | null
+  follows: number
+  iconUrl: string | null
+  /** Solo ids de `CatalogInfo.categories`. */
+  categories: string[]
+  loaders: string[]
+  latestVersion: string | null
+  updatedAt: string | null
+  clientSide: SideSupport | null
+  serverSide: SideSupport | null
+  pageUrl: string | null
+}
+
+export interface SearchPage {
+  hits: ContentHit[]
+  total: number
+  offset: number
+}
+
+export interface ModSearchRequest {
+  provider?: string | null
+  text: string
+  kind?: ContentKind
+  categories: string[]
+  side: 'client' | 'server' | null
+  sort: SortKey
+  compatibility: Compatibility
+  offset: number
+}
+
+export interface ProviderInfo {
+  id: string
+  name: string
+  kinds: ContentKind[]
+  sorts: SortKey[]
+  sideFilter: boolean
+  reportsTotal: boolean
+}
+
+/** Lo que hace falta para dibujar los filtros: que proveedores hay y que categorias ofrecen. */
+export interface CatalogInfo {
+  providers: ProviderInfo[]
   categories: string[]
 }
 

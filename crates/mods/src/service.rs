@@ -1,7 +1,8 @@
 use crate::local::{split_mod_file, validate_file_name, DISABLED_SUFFIX};
 use crate::{
     ensure_trusted_file_url, load_lock, pick_best_version, plan_install, save_lock, LockedMod, ModError,
-    ModManager, ModVersion, ModrinthClient, ModrinthSource, PlannedMod, PreviousVersion, ProjectHit,
+    Catalog, ContentProvider, ModManager, ModVersion, ModrinthClient, ModrinthProvider, ModrinthSource, PlannedMod, PreviousVersion,
+    SearchPage, SearchQuery, MODRINTH,
 };
 use crate::plan_missing;
 use artifact_store::{ArtifactIndex, ArtifactSource, ArtifactStore};
@@ -10,6 +11,7 @@ use download_manager::{DownloadManager, DownloadTask};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
 
 /// Version de Minecraft y loader contra los que se filtra todo.
@@ -52,13 +54,16 @@ pub struct UpdateInfo {
 pub struct ModsService {
     http: reqwest::Client,
     client: ModrinthClient,
+    /// Donde se busca contenido: Modrinth y los proveedores que se anadan.
+    catalog: Catalog,
     /// Almacen comun: si esta, un mod ya conocido no se vuelve a descargar y las copias comparten disco.
     store: Option<ArtifactStore>,
 }
 
 impl ModsService {
     pub fn new(http: reqwest::Client) -> Self {
-        Self { client: ModrinthClient::new(http.clone()), http, store: None }
+        let client = ModrinthClient::new(http.clone());
+        Self { catalog: Catalog::modrinth(client.clone()), client, http, store: None }
     }
 
     pub fn with_store(mut self, store: ArtifactStore) -> Self {
@@ -94,8 +99,25 @@ impl ModsService {
     }
 
     pub fn with_client(mut self, client: ModrinthClient) -> Self {
+        self.catalog = self.catalog.with_provider(Arc::new(ModrinthProvider::new(client.clone())));
         self.client = client;
         self
+    }
+
+    /// Anade un proveedor de busqueda (p. ej. CurseForge). Instalar desde el sigue pendiente de que
+    /// ese proveedor implemente sus versiones y descargas: ver `ensure_installable`.
+    pub fn with_provider(mut self, provider: Arc<dyn ContentProvider>) -> Self {
+        self.catalog = self.catalog.with_provider(provider);
+        self
+    }
+
+    pub fn catalog(&self) -> &Catalog {
+        &self.catalog
+    }
+
+    /// Solo se instala desde los proveedores que saben resolver versiones y descargas (hoy Modrinth).
+    pub fn ensure_installable(&self, provider: &str) -> Result<(), ModError> {
+        if provider == MODRINTH { Ok(()) } else { Err(ModError::ProviderUnavailable(provider.to_string())) }
     }
 
     fn source(&self, target: InstanceTarget<'_>) -> ModrinthSource {
@@ -106,14 +128,9 @@ impl ModsService {
         }
     }
 
-    pub async fn search(
-        &self,
-        query: &str,
-        target: InstanceTarget<'_>,
-        limit: u32,
-        offset: u32,
-    ) -> Result<Vec<ProjectHit>, ModError> {
-        self.client.search(query, target.minecraft_version, target.loader, limit, offset).await
+    /// Busca en un proveedor (el predeterminado si no se indica).
+    pub async fn search(&self, provider: Option<&str>, query: &SearchQuery) -> Result<SearchPage, ModError> {
+        self.catalog.search(provider, query).await
     }
 
     /// Instala un mod con sus dependencias obligatorias. Nada se escribe si falta alguna.
@@ -171,6 +188,7 @@ impl ModsService {
             manager
                 .record(LockedMod {
                     file: prepared.file_name.clone(),
+                    provider: MODRINTH.to_string(),
                     project_id: planned.project_id.clone(),
                     version_id: planned.version.id.clone(),
                     version_number: planned.version.version_number.clone(),
@@ -218,6 +236,7 @@ impl ModsService {
             manager
                 .record(LockedMod {
                     file: name.clone(),
+                    provider: MODRINTH.to_string(),
                     project_id: version.project_id.clone(),
                     version_id: version.id.clone(),
                     version_number: version.version_number.clone(),
@@ -305,6 +324,7 @@ impl ModsService {
         }
         lock.upsert(LockedMod {
             file: prepared.file_name.clone(),
+            provider: current.provider.clone(),
             project_id: current.project_id.clone(),
             version_id: best.id.clone(),
             version_number: best.version_number.clone(),
